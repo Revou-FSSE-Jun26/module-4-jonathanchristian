@@ -1,6 +1,6 @@
 # Design Document
 
-**Version:** V4 (revised against requirements V4; initial design was V3)
+**Version:** V5 (revised against requirements V5; initial design was V3)
 
 ## Overview
 
@@ -222,7 +222,7 @@ Serialization: `UuidField` outputs `str(uuid)` (lowercase, 36 characters). `UtcD
 ### A3. Authentication and users (Requirements 6, 7, 28.1)
 
 - Password hashing: `werkzeug.security.generate_password_hash(password)` (salted, adaptive scrypt). Verification uses `check_password_hash`. A dummy hash check is run when the email is unknown so both login failures take similar time.
-- Emails are trimmed and lowercased on write and on lookup, so the unique index is effectively case-insensitive (Requirements 6.2, 7.4).
+- Emails are trimmed and lowercased on write and on lookup (see the normalization bullet below), the stored value is always lowercase, and the partial unique index on `email` therefore gives the case-insensitive uniqueness of Requirements 2.12, 6.2, and 7.4.
 - Two token types (Requirements 6.4, 6.5, 6.10 to 6.15). Both are signed with `JWT_SECRET_KEY` and carry `sub = str(user.user_id)` (a string because current PyJWT rejects non-string subjects). Flask-JWT-Extended sets the `type` claim itself:
 
   | Token | Created by | `type` | Lifetime | Accepted by |
@@ -233,8 +233,10 @@ Serialization: `UuidField` outputs `str(uuid)` (lowercase, 36 characters). `UtcD
 - Type enforcement: `@jwt_required()` (default) rejects a refresh token and `@jwt_required(refresh=True)` rejects an access token. Flask-JWT-Extended raises its wrong-token error in both cases (it would answer 422 by default). The `invalid_token_loader` registered in `errors.py` maps it to 401 in the envelope (Requirement 4.6). A test asserts the 401 for each direction, so a library default change is caught.
 - `jwt.user_lookup_loader` loads the non-deleted User by id once per request and caches it on `flask.g`. A missing or soft-deleted user returns `None`, which the lookup-error callback turns into 401 (Requirement 6.9). This is query 1 of every protected request.
 - `POST /api/auth/refresh` (`auth/service.refresh(identity)`): `@jwt_required(refresh=True)`, then loads the non-deleted User by `get_jwt_identity()` and raises `Unauthorized` if missing (Requirement 6.13), then returns `create_access_token(...)`. It does not issue a new refresh token (no rotation), and it keeps no server state (Requirement 6.15).
-- `GET/PATCH /api/users/me` use the cached user. PATCH updates only supplied fields, checks email uniqueness case-insensitively, and returns 404 if the user no longer exists (Requirement 7.7).
-- The login response is `{ "data": { "access_token": "<jwt>", "refresh_token": "<jwt>", "token_type": "Bearer", "expires_in": 3600, "user": { ... } } }`. `expires_in` is `JWT_ACCESS_TOKEN_EXPIRES` in seconds. The refresh response is `{ "data": { "access_token": "<jwt>", "token_type": "Bearer", "expires_in": 3600 } }`. Register returns the user profile only and no tokens.
+- `GET/PATCH /api/users/me` use the cached user. PATCH updates only supplied fields and stores a supplied email lowercased, and checks uniqueness on the lowercased value. A token whose subject is a soft-deleted or nonexistent user never reaches the route: the lookup loader answers 401 on every protected endpoint, including these two (Requirements 6.9 and 7.6). There is no 404 for a missing current user.
+- No endpoint deletes or deactivates a user (Requirement 7.7). Soft-deleted users exist only as seed data: tests insert a `User` row with `is_deleted = true` directly through the test session (a `make_deleted_user` fixture). Requirements 6.6, 6.9, 6.13, and 31.11 are tested with those rows.
+- Email normalization: `normalize_email(value) = value.strip().lower()` in `users/schema.py`, applied by a Marshmallow `pre_load` hook on every schema that carries an email (`RegisterSchema`, `LoginSchema`, `UserUpdateSchema`, `MemberAddSchema`), so register, login lookup, PATCH, and add-member lookup all work on the lowercased value, and the stored column is always lowercase (Requirements 2.12, 6.1, 7.2, 9.1).
+- The login response is `{ "data": { "access_token": "<jwt>", "refresh_token": "<jwt>", "token_type": "Bearer", "expires_in": 3600, "refresh_expires_in": 604800, "user": { ... } } }`. `expires_in` is `JWT_ACCESS_TOKEN_EXPIRES` and `refresh_expires_in` is `JWT_REFRESH_TOKEN_EXPIRES`, both in seconds. The refresh response is `{ "data": { "access_token": "<jwt>", "token_type": "Bearer", "expires_in": 3600 } }`. Register returns the user profile only and no tokens.
 - Logout is client-only. Because refresh tokens are stateless, a stolen refresh token stays usable until it expires (assumption, see Open issues).
 
 ### A4. Permissions helpers (`permissions.py`, Requirements 1.6, 28.10, 28.11)
@@ -330,10 +332,10 @@ Legend: Auth `-` = none, `JWT` = any authenticated user holding a valid access t
 |---|---|---|---|---|---|---|---|
 | 1 | GET | `/api/health` | - | none | 200 `{status:"ok"}` | 405, 500 | 5 |
 | 2 | POST | `/api/auth/register` | - | `RegisterSchema` (name 1-100, email <=254, password 8-128) | 201 user profile | 400, 409 | 6.1-6.3 |
-| 3 | POST | `/api/auth/login` | - | `LoginSchema` (email, password) | 200 `{access_token, refresh_token, token_type, expires_in, user}` | 400, 401 | 6.4-6.9 |
+| 3 | POST | `/api/auth/login` | - | `LoginSchema` (email, password) | 200 `{access_token, refresh_token, token_type, expires_in, refresh_expires_in, user}` | 400, 401 | 6.4-6.9 |
 | 3a | POST | `/api/auth/refresh` | Refresh | none (token in `Authorization` header) | 200 `{access_token, token_type, expires_in}` | 401 | 6.10-6.15 |
-| 4 | GET | `/api/users/me` | JWT | none | 200 profile | 401, 404 | 7.1, 7.6, 7.7 |
-| 5 | PATCH | `/api/users/me` | JWT | `UserUpdateSchema` (name, email; `password` rejected) | 200 profile | 400, 401, 404, 409 | 7.2-7.5 |
+| 4 | GET | `/api/users/me` | JWT | none | 200 profile | 401 | 7.1, 7.6 |
+| 5 | PATCH | `/api/users/me` | JWT | `UserUpdateSchema` (name, email; `password` rejected) | 200 profile | 400, 401, 409 | 7.2-7.6 |
 | 6 | POST | `/api/boards` | JWT | `BoardCreateSchema` (name 1-100, not blank) | 201 board with `my_role` | 400 | 8.1, 8.8, 8.10 |
 | 7 | GET | `/api/boards` | JWT | none | 200 list, `created_at` desc | none | 8.2 |
 | 8 | GET | `/api/boards/<uuid:id>` | Member | none | 200 board, columns, cards | 403, 404 | 8.3, 8.6, 8.9, 11.16 |
@@ -422,7 +424,7 @@ Directories under `components/` follow API resources (auth, boards, cards, comme
 | Route | Component type | Data | Notes |
 |---|---|---|---|
 | `/register` | Server page, `RegisterForm` Client | POST `/api/auth/register` | Controlled inputs, client validation (`lib/validation.ts`), 409 shows email error, success redirects to `/login` with toast |
-| `/login` | Server page, `LoginForm` Client | POST `/api/auth/login` | On 200 calls `AuthContext.login({ access_token, refresh_token, expires_in, user })`, router push `/`; 401 shows one generic message and clears password |
+| `/login` | Server page, `LoginForm` Client | POST `/api/auth/login` | On 200 calls `AuthContext.login({ access_token, refresh_token, expires_in, refresh_expires_in, user })`, router push `/`; 401 shows one generic message and clears password |
 | `/` | Server | GET `/api/boards` with the access cookie token | Renders `BoardList` (role `BaseBadge`), `CreateBoardModal` (Client) opened from `BaseButton`; empty state; load error shows `ErrorPanel` with retry (`router.refresh()`) |
 | `/boards/[id]` | Server fetch, `BoardView` Client | GET `/api/boards/<id>` | 403 or 404 renders `BoardAccessMessage` with link to `/`; otherwise `BoardView` owns columns state, drag and drop, search |
 | `/my-tasks` | Server fetch, `MyTasksList` Client | GET `/api/cards?assignee=me` | Groups by `board_name`; empty and error states; Server error also fires toast through a small client effect |
@@ -449,10 +451,10 @@ Every button in pages and feature components uses `BaseButton` (Requirement 18.6
   | Cookie | Holds | Lifetime (`Max-Age`) | Source of the lifetime |
   |---|---|---|---|
   | `kano_access` | access token | 3600 s | `expires_in` from the login or refresh response |
-  | `kano_refresh` | refresh token | 604800 s | constant `REFRESH_COOKIE_MAX_AGE = 604800` (the login response carries no refresh expiry) |
+  | `kano_refresh` | refresh token | 604800 s by default | `refresh_expires_in` from the login response (no constant) |
 
-  `lib/authCookie.ts` exposes `setAccessCookie(token, expiresIn)`, `setRefreshCookie(token)`, `getAccessToken()`, `getRefreshToken()`, `clearAuthCookies()` (clears both), the constants `ACCESS_COOKIE`, `REFRESH_COOKIE`, `REFRESH_COOKIE_MAX_AGE`, and the pure functions `decodeJwtExp(token): number | null` and `guardDecision(...)`. The lifetime is no longer derived from the JWT payload, which resolves the earlier open issue about reading `exp`. If `JWT_REFRESH_TOKEN_EXPIRES` is changed from its default, `REFRESH_COOKIE_MAX_AGE` must be changed too (assumption, see Open issues). The cookie max-age is a browser convenience only. The API remains the authority on token validity.
-- `AuthProvider` receives `initialAccessToken` and `initialRefreshToken` from the root layout (Server reads both cookies). On mount, if either cookie exists it calls GET `/api/users/me` through `apiRequest`. When only the refresh token exists, `apiRequest` refreshes first (see B5). Success sets the user and both tokens. A 401 that survives the refresh flow clears both cookies and all auth state and redirects to `/login`. A network error or 5xx keeps both cookies, leaves the user unset, and calls `useErrorHandler`. It exposes `login({ access_token, refresh_token, expires_in, user })`, `logout()` (clears both cookies and state, then `router.push("/login")`, no API call), `updateUser(user)` (replaces only the user object), `setAccessToken(token)` (used after a refresh), and `status`. It registers its session callbacks with `lib/refreshSession.ts` (see B5).
+  `lib/authCookie.ts` exposes `setAccessCookie(token, expiresIn)`, `setRefreshCookie(token, refreshExpiresIn)`, `getAccessToken()`, `getRefreshToken()`, `clearAuthCookies()` (clears both), the constants `ACCESS_COOKIE` and `REFRESH_COOKIE`, and the pure functions `decodeJwtExp(token): number | null` and `guardDecision(...)`. Both lifetimes come from the API responses (`expires_in`, `refresh_expires_in`), so there is no lifetime constant and changing `JWT_REFRESH_TOKEN_EXPIRES` needs no frontend change. `AuthProvider.login(r)` calls `setAccessCookie(r.access_token, r.expires_in)` and `setRefreshCookie(r.refresh_token, r.refresh_expires_in)`. The cookie max-age is a browser convenience only. The API remains the authority on token validity.
+- `AuthProvider` receives `initialAccessToken` and `initialRefreshToken` from the root layout (Server reads both cookies). On mount, if either cookie exists it calls GET `/api/users/me` through `apiRequest`. When only the refresh token exists, `apiRequest` refreshes first (see B5). Success sets the user and both tokens. A 401 that survives the refresh flow clears both cookies and all auth state and redirects to `/login`. A network error or 5xx keeps both cookies, leaves the user unset, and calls `useErrorHandler`. It exposes `login({ access_token, refresh_token, expires_in, refresh_expires_in, user })`, `logout()` (clears both cookies and state, then `router.push("/login")`, no API call), `updateUser(user)` (replaces only the user object), `setAccessToken(token)` (used after a refresh), and `status`. It registers its session callbacks with `lib/refreshSession.ts` (see B5).
 - `middleware.ts` (matcher excludes `_next`, static files, `favicon.ico`) reads both cookies and computes `guardDecision({ pathname, accessExp, refreshExp, now })` (pure, in `lib/authCookie.ts`). A token is "valid" when its cookie is present and `exp > now` (the signature is verified by the API, not the middleware). The result is one of:
 
   | Situation | Decision |
@@ -464,7 +466,7 @@ Every button in pages and feature components uses `BaseButton` (Requirement 18.6
   | `/login` or `/register`, otherwise | `allow` |
 
   On `refresh` the middleware sends `POST ${API_BASE_URL}/api/auth/refresh` with `Authorization: Bearer <refresh>`. On 200 it forwards the new access token to the same request by calling `request.cookies.set("kano_access", token)` and `NextResponse.next({ request: { headers: request.headers } })`, so Server Components in this request read the new value, and it also sets `kano_access` on the response (`Max-Age` = `expires_in`) so the browser stores it. Server Components cannot set cookies, which is why this step lives in the middleware. On 401 it redirects to `/login` and deletes both cookies. On a network error or 5xx it treats the refresh as failed and redirects to `/login?expired=1` (see Open issues). A request to `/login?expired=1` is always allowed and deletes both cookies, which prevents a redirect loop when the API rejected a token that still looks valid.
-- Server Components get the access token through `lib/serverAuth.ts`: `getServerToken()` using `cookies()` from `next/headers` and pass it to `apiRequest(..., { token })` (Requirement 17.10). Server-side `apiRequest` never refreshes.
+- Server Components get the access token through `lib/serverAuth.ts`: `getServerToken()` using `cookies()` from `next/headers` and pass it to `apiRequest(..., { token })` (Requirement 17.10). Server-side `apiRequest` never refreshes, never writes or deletes a cookie, and throws `ApiError(401, ...)` on a 401 (Requirement 16.18); the page then calls `redirect("/login?expired=1")`. Only the middleware renews the access token for server rendering.
 
 ```mermaid
 sequenceDiagram
@@ -476,8 +478,8 @@ sequenceDiagram
     participant SC as Server Component
     U->>LF: submit valid email and password
     LF->>API: POST /api/auth/login
-    API-->>LF: 200 { data: { access_token, refresh_token, token_type, expires_in: 3600, user } }
-    LF->>AC: login(...): memory + kano_access (Max-Age 3600) + kano_refresh (Max-Age 604800)
+    API-->>LF: 200 { data: { access_token, refresh_token, token_type, expires_in: 3600, refresh_expires_in: 604800, user } }
+    LF->>AC: login(...): memory + kano_access (Max-Age expires_in) + kano_refresh (Max-Age refresh_expires_in)
     LF->>U: router.push("/")
     U->>MW: GET /
     MW->>MW: access cookie present and exp in future
@@ -506,7 +508,7 @@ sequenceDiagram
         MW->>SC: continue
         SC->>API: GET /api/boards/123 (Bearer new access token)
         API-->>SC: 200
-        SC-->>U: page + Set-Cookie kano_access (Max-Age 3600)
+        SC-->>U: page + Set-Cookie kano_access (Max-Age expires_in of the refresh response)
     else 401
         API-->>MW: 401
         MW-->>U: redirect /login + delete kano_access and kano_refresh
@@ -531,7 +533,7 @@ Behavior:
 3. 10-second timeout through `AbortController`; network error or timeout gives `ApiError(0, "Could not reach the server")`.
 4. 2xx: parse JSON and return `body.data as T`.
 5. Non-2xx with a body that has a string `error`: `ApiError(response.status, body.error)`. Otherwise `ApiError(response.status, "Unexpected server response")`.
-6. Refresh and retry (client only, Requirements 16.14 to 16.17). When a request that carried an access token gets 401, the path is not `/api/auth/login`, `/api/auth/register`, or `/api/auth/refresh`, a refresh token exists, and the request has not been retried, `apiRequest` awaits `refreshAccessToken()` and repeats the original request once with the new access token. A 401 on the retry, or a failed refresh, calls `sessionExpired()` and throws `ApiError(401, ...)`. Server-side calls (`opts.token` given, `typeof window === "undefined"`) never refresh.
+6. Refresh and retry (browser runtime only, Requirements 16.14 to 16.17). When a request that carried an access token gets 401, the path is not `/api/auth/login`, `/api/auth/register`, or `/api/auth/refresh`, a refresh token exists, and the request has not been retried, `apiRequest` awaits `refreshAccessToken()` and repeats the original request once with the new access token. A 401 on the retry, or a failed refresh, calls `sessionExpired()` and throws `ApiError(401, ...)`. Server-side calls (`typeof window === "undefined"`, normally with `opts.token` from `getServerToken()`) never refresh and never write cookies: the 401 handling branch is guarded by `typeof window !== "undefined"`, and on the server a 401 throws `ApiError(401, ...)` directly (Requirement 16.18). Token renewal for server rendering belongs to the middleware (B4).
 
 `lib/refreshSession.ts` (client only) keeps the single-flight state:
 
@@ -562,6 +564,7 @@ sequenceDiagram
     participant AC as apiClient
     participant RS as refreshSession
     participant API as Flask API
+    Note over C1,API: browser runtime only (Client Components). A Server Component never refreshes: a 401 throws ApiError(401) and the page redirects to /login
     C1->>AC: apiRequest(/api/boards)
     C2->>AC: apiRequest(/api/cards?assignee=me)
     AC->>API: GET (Bearer expired access token) x2
@@ -605,9 +608,30 @@ export function computeDropOrder(targetCards: {card_id: string; order: number}[]
 export function isValidOrder(x: number): boolean   // Number.isFinite(x) && x > 0
 export function moveCardInState(cols, cardId, toColumnId, order): Cols    // pure optimistic update
 export function restoreCardInState(cols, snapshot): Cols                   // pure revert
+export function computeDropIndex(cardMidYs: number[], pointY: number): number
+// cardMidYs = vertical midpoints of the target column's cards (excluding the dragged card), top to bottom.
+// result = number of midpoints that are < pointY, so 0 = start, cardMidYs.length = end.
+export const LONG_PRESS_MS = 300; export const MOVE_TOLERANCE_PX = 10;
+export type TouchGesture = { phase: "idle" | "pressing" | "dragging" | "cancelled"; startX: number; startY: number; startedAt: number };
+export function touchGestureStep(g: TouchGesture, ev: TouchEv): TouchGesture
+// TouchEv = start(x,y,t) | move(x,y,t) | timer(t) | scroll | end | cancel. Pure state machine:
+// idle --start--> pressing; pressing --timer(t) with t - startedAt >= 300--> dragging;
+// pressing --move farther than 10 px, scroll, end, cancel--> cancelled (no drag, no request);
+// dragging --move--> dragging; dragging --end--> idle (drop evaluated by the hook); dragging --cancel--> cancelled.
 ```
 
-`hooks/useDragAndDrop.ts` API: `{ onDragStart, onDragOver, onDrop, pendingIds }`. On drop: compute the order; if the drop is outside any column, or leaves the card at its current column and index, do nothing and send nothing; if `!isValidOrder(order)` do nothing and call `handleError`; if the card id is in `pendingIds`, ignore. Otherwise snapshot `{column_id, order}`, apply `moveCardInState` immediately (well under 100 ms), add to `pendingIds`, and send `PATCH /api/cards/<id>/position`. On error restore with `restoreCardInState` and call `handleError` once. The native HTML5 API is used (`draggable`, `dataTransfer`). Touch devices do not fire HTML5 drag events (see Open issues).
+`hooks/useDragAndDrop.ts` API: `{ onDragStart, onDragOver, onDrop, onTouchStart, pendingIds, touchDrag }`. It serves two input paths that share one drop routine `commitDrop(cardId, columnId, index)`.
+
+- **Mouse (Requirement 22.1).** The native HTML5 API is used (`draggable`, `dataTransfer`). On drop: compute the order; if the drop is outside any column, or leaves the card at its current column and index, do nothing and send nothing; if `!isValidOrder(order)` do nothing and call `handleError`; if the card id is in `pendingIds`, ignore. Otherwise snapshot `{column_id, order}`, apply `moveCardInState` immediately (well under 100 ms), add to `pendingIds`, and send `PATCH /api/cards/<id>/position`. On error restore with `restoreCardInState` and call `handleError` once.
+- **Touch (Requirements 22.12 to 22.17).** `CardItem` forwards `onTouchStart` from the hook. The hook runs `touchGestureStep`:
+  1. On `touchstart` it records the point and starts a 300 ms timer (`LONG_PRESS_MS`). It also marks the input as touch, so a native `dragstart` that a mobile browser may fire on long-press for a `draggable` element is cancelled (`preventDefault`) and the touch path stays the only one active.
+  2. If `touchmove` goes more than 10 px away, the page fires `scroll`, or `touchend` / `touchcancel` arrives before the timer fires, the timer is cleared and nothing else happens: no drag, no request, scrolling continues as normal (Requirement 22.14).
+  3. When the timer fires the card enters the dragging phase (`touchDrag` shows a lifted style, optional `navigator.vibrate(10)`), and the hook registers `touchmove` and `touchend` listeners on `document` with `{ passive: false }`. From then on `touchmove` calls `preventDefault()`, which stops scrolling for the rest of that touch (Requirement 22.13). Because the finger has not moved before the timer fired, no scroll gesture has started yet, so `preventDefault` is honored.
+  4. On each `touchmove` (throttled with `requestAnimationFrame`) the hook calls `document.elementFromPoint(x, y)`, finds the closest ancestor with `data-column-id`, highlights it, and computes `index = computeDropIndex(midYs, y)` from the `getBoundingClientRect()` of that column's cards.
+  5. On `touchend`, if the last target is a column, it calls `commitDrop(cardId, columnId, index)` and the rules of the mouse path apply unchanged: same order computation (`computeDropOrder`), same optimistic update, same revert and one toast on failure, same ignore rules for pending cards (Requirement 22.15). If the touch ends outside any column, on the card's own position, or as `touchcancel`, nothing changes and no request is sent (Requirement 22.16).
+  6. Listeners and the timer are removed on every exit path and on unmount.
+
+CSS and scrolling (Requirement 22.17): the page and the Kanban container keep the browser default `touch-action: auto`, and `CardItem` must not set `touch-action: none` (it would block panning when the user only wants to scroll). Cards use `select-none [-webkit-touch-callout:none]` so the long-press does not open the text selection or callout menu, and `onContextMenu` calls `preventDefault` during a touch drag. The only scroll blocking is the `preventDefault` on `touchmove` after the long-press, so scrolling works whenever no drag is active. Edge auto-scroll of the board container while dragging near the screen edge is not designed (see Open issues).
 
 ```mermaid
 sequenceDiagram
@@ -617,8 +641,16 @@ sequenceDiagram
     participant S as React state (columns)
     participant API as Flask API
     participant EH as useErrorHandler
-    U->>KC: dragStart(card), drop(column, index)
-    KC->>H: onDrop(cardId, columnId, index)
+    alt mouse input
+        U->>KC: dragStart(card), drop(column, index)
+        KC->>H: onDrop(cardId, columnId, index)
+    else touch input
+        U->>KC: touchstart on card, hold 300 ms without moving 10 px
+        KC->>H: onTouchStart, timer fires, drag active, touchmove preventDefault
+        U->>KC: touchmove, touchend at a point
+        H->>H: elementFromPoint(x, y) gives column, computeDropIndex gives index
+        Note over H: touch moved over 10 px, scrolled, ended, or cancelled before 300 ms, or ended outside a column: no drag, no request
+    end
     H->>H: order = computeDropOrder(targetCards, index)
     alt outside column, same position, pending, or invalid order
         H-->>U: no state change, no request (invalid order: toast)
@@ -658,6 +690,7 @@ Mobile-first Tailwind; the minimum design width is 375 px.
 | Kanban | Container `flex gap-4 overflow-x-auto`; column `w-72 min-w-[240px] shrink-0` so columns stay at least 240 px below 768 px |
 | Modal | `max-h-[100dvh] overflow-y-auto w-[calc(100vw-1rem)] max-w-lg`; close control `sticky top-0` |
 | Tap targets | Shared `min-h-[44px] min-w-[44px]` on `BaseButton`, links in `Header`, inputs `min-h-[44px]` |
+| Touch drag (Requirement 27.8) | Cards drag by 300 ms long-press (B6). Page, Kanban container, and Cards keep default `touch-action` so panning works; `select-none` and `-webkit-touch-callout: none` on Cards; scroll is blocked only by `preventDefault` on `touchmove` while a touch drag is active |
 | Overlap | Stack form controls with `flex-col gap-2` below `md`; no absolute positioning for controls |
 | Below 375 px | Page can scroll horizontally; content is not truncated |
 | Tailwind scan | v4: `@source "../components"; @source "../hooks";` in `globals.css`. v3: `content` array lists `./app`, `./components`, `./hooks` |
@@ -667,7 +700,7 @@ Mobile-first Tailwind; the minimum design width is 375 px.
 ```ts
 export type Role = "admin" | "member";
 export interface User { user_id: string; name: string; email: string; created_at: string }
-export interface LoginResult { access_token: string; refresh_token: string; token_type: "Bearer"; expires_in: number; user: User }
+export interface LoginResult { access_token: string; refresh_token: string; token_type: "Bearer"; expires_in: number; refresh_expires_in: number; user: User }
 export interface RefreshResult { access_token: string; token_type: "Bearer"; expires_in: number }
 export interface AuthState { user: User | null; accessToken: string | null; refreshToken: string | null;
   status: "loading" | "authenticated" | "anonymous" }
@@ -736,7 +769,7 @@ class Card(SoftDeleteMixin, db.Model):
 
 | Model / table | Columns | Constraints and indexes |
 |---|---|---|
-| `User` / `users` | `user_id` UUID PK, `name` varchar(100) not null, `email` varchar(254) not null (stored lowercase), `password_hash` varchar(255) not null, mixin | partial unique index `uq_users_email_active` on `email` where `is_deleted = false` |
+| `User` / `users` | `user_id` UUID PK, `name` varchar(100) not null, `email` varchar(254) not null (always stored lowercase: normalized by `normalize_email` in the Marshmallow `pre_load` of every email-carrying schema), `password_hash` varchar(255) not null, mixin | check `ck_users_email_lowercase` (`email = lower(email)`); partial unique index `uq_users_email_active` on `email` where `is_deleted = false` (the column is already normalized, so no `lower(email)` expression index is needed) |
 | `Board` / `boards` | `board_id` UUID PK, `name` varchar(100) not null, `created_by` UUID not null, mixin | FK `fk_boards_users` (created_by to users.user_id); index `ix_boards_created_by` |
 | `BoardMembership` / `board_memberships` | `board_membership_id` UUID PK, `board_id`, `user_id`, `role` varchar(10) not null, mixin | FKs `fk_board_memberships_boards`, `fk_board_memberships_users`; check `ck_board_memberships_role` (`admin` or `member`); partial unique index `uq_board_memberships_board_user_active` on (`board_id`, `user_id`) where `is_deleted = false`; indexes `ix_board_memberships_user_id`, `ix_board_memberships_board_id` |
 | `Column` / `columns` | `column_id` UUID PK, `board_id`, `name` varchar(100) not null, `order` float not null, mixin | FK `fk_columns_boards`; check `order > 0`; index `ix_columns_board_id_order` on (`board_id`, `order`) |
@@ -891,9 +924,9 @@ Name fields strip whitespace and reject blank values. All input schemas set `unk
 
 ### Property 9: Uniqueness ignores soft-deleted rows
 
-*For any* sequence of create and soft-delete operations on Users and Board_Memberships, creating a User with an email (compared case-insensitively) or a membership for a (board, user) pair succeeds iff no non-deleted row with that key exists, and a duplicate returns 409 and changes nothing.
+*For any* sequence of create and soft-delete operations on Users and Board_Memberships, creating a User with an email or a membership for a (board, user) pair succeeds iff no non-deleted row with that key exists (the User key is the lowercased email, so emails differing only in letter case collide), and a duplicate returns 409 and changes nothing; and *for any* email string used in register or PATCH `/api/users/me`, the stored email equals the trimmed, lowercased input, and an add-member request finds the User whatever the letter case of the request email.
 
-**Validates: Requirements 2.12, 6.2, 7.4, 9.4**
+**Validates: Requirements 2.12, 6.1, 6.2, 7.2, 7.4, 9.1, 9.4**
 
 ### Property 10: Password handling
 
@@ -903,7 +936,7 @@ Name fields strip whitespace and reject blank values. All input schemas set `unk
 
 ### Property 11: Register then login round trip
 
-*For any* valid name, email, and password, registering and then logging in with the same credentials (any letter case in the email) returns 200 with an access token and a refresh token whose `sub` equals the user's `user_id`, with `expires_in` equal to the configured access lifetime; and *for any* login with an unknown email, a wrong password, or a soft-deleted user's email, the response is 401 with an identical message and no token. Token types and lifetimes are covered by Properties 36 and 37.
+*For any* valid name, email, and password, registering and then logging in with the same credentials (any letter case in the email) returns 200 with an access token and a refresh token whose `sub` equals the user's `user_id`, with `expires_in` equal to the configured access lifetime and `refresh_expires_in` equal to the configured refresh lifetime; and *for any* login with an unknown email, a wrong password, or a soft-deleted user's email, the response is 401 with an identical message and no token. Token types and lifetimes are covered by Properties 36 and 37.
 
 **Validates: Requirements 6.4, 6.5, 6.6**
 
@@ -1053,7 +1086,7 @@ Name fields strip whitespace and reject blank values. All input schemas set `unk
 
 ### Property 36: Token types and lifetimes
 
-*For any* registered user and any configured positive lifetimes `A` (access) and `R` (refresh), login returns an access token with `type = "access"` and `exp - iat = A`, and a refresh token with `type = "refresh"` and `exp - iat = R`, both with `sub` equal to the user's `user_id`; with the default configuration `A = 3600` and `R = 604800`, and `expires_in` equals `A`.
+*For any* registered user and any configured positive lifetimes `A` (access) and `R` (refresh), login returns an access token with `type = "access"` and `exp - iat = A`, and a refresh token with `type = "refresh"` and `exp - iat = R`, both with `sub` equal to the user's `user_id`; with the default configuration `A = 3600` and `R = 604800`, and the login response has `expires_in = A` and `refresh_expires_in = R`.
 
 **Validates: Requirements 6.4, 6.5**
 
@@ -1071,9 +1104,33 @@ Name fields strip whitespace and reject blank values. All input schemas set `unk
 
 ### Property 39: Failed refresh clears the session, shared refresh runs once
 
-*For any* number `n >= 1` of concurrent protected requests that all receive 401, the apiClient sends exactly one `POST /api/auth/refresh`; when it returns 200 each original request is retried exactly once with the new access token and the access cookie is updated; when it returns 401 both cookies and the AuthContext state are cleared, the user is redirected to `/login`, and each original request rejects with `ApiError(401, ...)`; and *for any* 401 from `/api/auth/login`, `/api/auth/register`, or `/api/auth/refresh`, no refresh is attempted.
+*For any* number `n >= 1` of concurrent protected requests made in the browser runtime that all receive 401, the apiClient sends exactly one `POST /api/auth/refresh`; when it returns 200 each original request is retried exactly once with the new access token and the access cookie is updated; when it returns 401 both cookies and the AuthContext state are cleared, the user is redirected to `/login`, and each original request rejects with `ApiError(401, ...)`; and *for any* 401 from `/api/auth/login`, `/api/auth/register`, or `/api/auth/refresh`, no refresh is attempted.
 
 **Validates: Requirements 16.14, 16.15, 16.16, 16.17, 17.4**
+
+### Property 40: Server-side apiClient never renews
+
+*For any* path and any 401 response received while the apiClient runs in a Server Component (no `window`), with or without a refresh cookie present, the apiClient sends no `POST /api/auth/refresh`, writes and deletes no cookie, and throws `ApiError` with `statusCode` 401; and *for any* login response with arbitrary positive `expires_in` and `refresh_expires_in`, the access cookie `Max-Age` equals `expires_in` and the refresh cookie `Max-Age` equals `refresh_expires_in`.
+
+**Validates: Requirements 16.18, 17.2**
+
+### Property 41: Touch drop index from the touch point
+
+*For any* list of card vertical midpoints sorted ascending (the target Column's Cards without the dragged Card) and any touch y coordinate, `computeDropIndex` returns the number of midpoints smaller than y, which lies between 0 and the list length, and feeding that index to `computeDropOrder` gives the same result as a mouse drop at that index (1.0 for an empty Column, half the first order at index 0, last order plus 1 at the end, the midpoint of the two neighbors otherwise).
+
+**Validates: Requirements 22.2, 22.3, 22.4, 22.5, 22.15**
+
+### Property 42: Touch gesture state machine
+
+*For any* sequence of touch events (start, move, timer, scroll, end, cancel) with timestamps and coordinates, `touchGestureStep` reaches the dragging phase iff a timer event arrives at least 300 ms after the start with no move farther than 10 px from the start point, no scroll, no end, and no cancel in between; *for any* sequence that leaves the pressing phase another way, the final phase is cancelled and the hook sends no position request; and *for any* dragging sequence that ends outside a Column, on the Card's own position, or with a cancel, no request is sent and the Card state equals the initial state.
+
+**Validates: Requirements 22.12, 22.13, 22.14, 22.16**
+
+### Property 43: Deleted or unknown token subject yields 401
+
+*For any* protected endpoint (including GET and PATCH `/api/users/me`) and any valid access token whose subject belongs to a soft-deleted or nonexistent user, the response is 401 and no data changes; and *for any* valid access token of a non-deleted user, the same request is not rejected for that reason.
+
+**Validates: Requirements 6.9, 7.6**
 
 ## Error Handling
 
@@ -1090,7 +1147,10 @@ Name fields strip whitespace and reject blank values. All input schemas set `unk
 | Cascade or create failure mid-transaction | rollback everything, 500 | 2.13, 8.10 |
 | Missing env variable at startup | process fails naming the variable | 1.13, 28.6 |
 | Frontend network error or timeout over 10 s | `ApiError(0, ...)`; toast through `useErrorHandler` | 16.8 |
-| Frontend 401 on a protected request | one shared refresh, retry once; if refresh or retry returns 401, clear both cookies and state, redirect `/login` | 16.13 to 16.17 |
+| Frontend 401 on a protected request in the browser | one shared refresh, retry once; if refresh or retry returns 401, clear both cookies and state, redirect `/login` | 16.13 to 16.17 |
+| Frontend 401 in a Server Component | no refresh, no cookie write; `ApiError(401)` is thrown and the page calls `redirect("/login?expired=1")` | 16.18 |
+| Access token of a soft-deleted or nonexistent user, on any protected endpoint including `/api/users/me` | 401 envelope from the user lookup callback | 6.9, 7.6 |
+| Touch drag interrupted (moved over 10 px, scrolled, or ended before 300 ms; ended outside a Column; `touchcancel`) | no drag, no state change, no request | 22.14, 22.16 |
 | Refresh endpoint 401 (wrong type, expired, deleted user) | 401 envelope, no token issued | 6.11 to 6.14 |
 | Middleware refresh fails | 401: delete both cookies, redirect `/login`; network error or 5xx: redirect `/login?expired=1` | 17.7, 17.8 |
 | Failed optimistic move | restore original state, one toast | 22.7 |
@@ -1116,7 +1176,8 @@ Libraries: **Hypothesis** for Python and **fast-check** for TypeScript. Property
 |---|---|
 | Config | `pytest.ini` (markers `perf`, `unit`, `e2e`), `tests/conftest.py` |
 | Unit, no DB | `ordering.py`, `start_of_week_utc`, `comment_recipients`, Marshmallow schema boundaries (Board and Column names of 0, 1, 100, 101; Card title 200, 201; password 7, 8), config validation (both JWT expiry variables), serializers; mostly property tests (1 to 5, 12, 21, 24 partial) |
-| Auth tokens | login returns access (`type=access`, 3600 s) and refresh (`type=refresh`, 604800 s) tokens with `sub = user_id`; refresh returns 200 and the new token works on `GET /api/users/me`; 401 for an expired, missing, or access-type token on refresh, for a refresh token of a soft-deleted user, and for a refresh token on `GET /api/users/me` and every other protected endpoint (parametrized); tokens are created with short test lifetimes or a patched clock instead of waiting (Properties 36 to 38, requirement 31.11) |
+| Auth tokens | login returns access (`type=access`, 3600 s) and refresh (`type=refresh`, 604800 s) tokens with `sub = user_id`, plus `expires_in = 3600` and `refresh_expires_in = 604800` in the response data; GET and PATCH `/api/users/me` and one more protected endpoint return 401 for an access token of a soft-deleted user (Property 43); refresh returns 200 and the new token works on `GET /api/users/me`; 401 for an expired, missing, or access-type token on refresh, for a refresh token of a soft-deleted user, and for a refresh token on `GET /api/users/me` and every other protected endpoint (parametrized); tokens are created with short test lifetimes or a patched clock instead of waiting (Properties 36 to 38 and 43, requirement 31.11) |
+| Soft-deleted user fixtures | No endpoint deletes a User (Requirement 7.7), so a `make_deleted_user(email)` fixture inserts a `User` row with `is_deleted = true` and `deleted_at` set directly through the test session. Requirements 6.6, 6.9, 6.13, and 31.11 and Properties 9, 11, 38, and 43 use it. It also seeds soft-deleted rows for the uniqueness test (Property 9) |
 | Service and e2e, DB | Flask test client against the separate PostgreSQL test database; covers all 8 packages with at least one success and one error path each; asserts envelope shape and status on every request; properties 6 to 25 where DB-backed |
 | Comments | tests for 201 success, 400 missing content, 400 empty content, 401 unauthenticated, 403 non-owner including the Board_Admin |
 | Role enforcement | parametrized matrix of non-member, member, admin over Board, Column, Card, Comment, member, update, delete, analytics endpoints |
@@ -1144,7 +1205,10 @@ Runner: Vitest with jsdom and React Testing Library (`vitest --run` for `npm tes
 | `NotificationBell` | shows 1 and 99, hides at 0 (plus Property 32) |
 | `apiClient` | Authorization header present or omitted; returns `data`; ApiError for 400, 401 (no refresh token), 403, 404, 409, 500 (Property 26) |
 | `apiClient` refresh | 401 triggers one refresh and one retry with the new token; concurrent 401s share one refresh; refresh 401 clears both cookies and state and redirects; a 401 from login does not refresh (Property 39, requirement 32.12) |
-| `useDragAndDrop` | failing request restores card and calls handler once; card moves before the request resolves (Properties 30, 31) |
+| `useDragAndDrop` (mouse) | failing request restores card and calls handler once; card moves before the request resolves (Properties 30, 31) |
+| `useDragAndDrop` (touch, Requirement 32.13) | RTL `fireEvent.touchStart` / `touchMove` / `touchEnd` / `touchCancel` with `vi.useFakeTimers()` and `document.elementFromPoint` mocked to return a Column element: 300 ms hold without movement starts a drag and `touchmove` is default-prevented; move over 10 px, end, or cancel before 300 ms starts no drag and sends no request; touch end over a Column moves the card before the mocked request resolves; a rejected request restores the card and shows one toast; touch end outside a Column, on the own position, or `touchcancel` sends nothing (Properties 41, 42) |
+| `apiClient` server runtime (Requirement 32.14) | with `window` undefined: a 401 throws `ApiError(401)`, no refresh request, no cookie write (Property 40) |
+| `AuthProvider.login` (Requirement 32.14) | cookie `Max-Age` values come from `expires_in` and `refresh_expires_in`, tested with values other than 3600 and 604800 (Property 40) |
 | Pure libs | `order.ts`, `authCookie.ts` (`guardDecision`, cookie constants), `validation.ts`, `format.ts`, `diffCardFields`, `groupByBoard` via fast-check (Properties 27 to 35) |
 
 ### Playwright E2E (`npx playwright test`, run from `web/`)
@@ -1154,6 +1218,7 @@ Runner: Vitest with jsdom and React Testing Library (`vitest --run` for `npm tes
 - Auth specs (4 scenarios): valid login redirects to `/`; invalid credentials show the error and stay on `/login`; unauthenticated visit to `/` redirects to `/login`; logout redirects to `/login` and a following visit to `/` redirects again.
 - Kanban journey (serial, one test with 8 `test.step` blocks): 1 register a unique user (`e2e+<timestamp>@example.com`), 2 login, 3 create Board, 4 add 2 Columns, 5 create Card in the first, 6 drag it to the second (`locator.dragTo`, which dispatches HTML5 drag events in Chromium), 7 reload and confirm the Card is in the second Column, 8 add a Comment then edit it and confirm the new text. `test.describe.configure({ mode: "serial" })` skips remaining steps after a failure.
 - The HTML report from a passing run is committed (`web/playwright-report/`) and viewed with `npx playwright show-report`.
+- Playwright covers the mouse drag only. A long-press touch drag cannot be simulated reliably in Playwright, so the touch drag is verified manually in browser DevTools device mode at 375 px (Requirements 27.8, 34.8) and by the React Testing Library tests above.
 - Mobile viewport checks (375 px) use a Playwright project with `devices["iPhone SE"]`-like viewport and assert no horizontal overflow outside the Kanban container.
 
 ## Part D: Deployment, Guidelines, and Documentation Design
@@ -1201,7 +1266,7 @@ flowchart LR
 2. Test database: `flask db upgrade` with `DATABASE_URL` pointed at the `*_test` database.
 3. Production: `flask db upgrade` with `DATABASE_URL` pointed at the production database, run from a local shell, before verification (Requirement 34.3). Until it runs, database endpoints return the generic 500 envelope (Requirement 34.10).
 
-**Verification order.** After deployment: Postman `GET /api/health` (200), `POST /api/auth/register` (201), `POST /api/auth/login` (200 with `access_token` and `refresh_token`), then one request per Blueprint_Package; then browser walk-through at 1280 px and 375 px; then Playwright against the Vercel URL. A CORS failure marks the verification failed until `CORS_ORIGINS` is corrected and the API redeployed.
+**Verification order.** After deployment: Postman `GET /api/health` (200), `POST /api/auth/register` (201), `POST /api/auth/login` (200 with `access_token` and `refresh_token`), then one request per Blueprint_Package; then browser walk-through at 1280 px and 375 px (the 375 px card drag is done by touch in browser DevTools device mode, because Playwright does not run it); then Playwright against the Vercel URL. A CORS failure marks the verification failed until `CORS_ORIGINS` is corrected and the API redeployed.
 
 **Serverless risks (flagged).**
 
@@ -1231,7 +1296,7 @@ How code generation references them: every implementation task in `tasks.md` nam
 
 ### D3. Documentation design (Requirement 36)
 
-`README.md` at the root contains the sections Overview, AI Workflow Summary (six subsections of at least three sentences each, with links to `guidelines/`, the violation report, and the before/after comparison), Features, Technologies, Local Run Steps (9 numbered steps in the required order, `flask db upgrade` marked manual), Test Steps, Screenshots, and a Security note on the non-httpOnly access and refresh cookies, the XSS exposure of both tokens (including the higher impact of the 7-day refresh token), the stateless refresh token limitation (no revocation on logout), and the mitigations (short access expiry, refresh expiry, React escaping, no `dangerouslySetInnerHTML`).
+`README.md` at the root contains the sections Overview, AI Workflow Summary (seven subsections of at least three sentences each, one each for the project brief, Kiro specifications, Guidelines, review against the Guidelines, violations, Antigravity, and Claude Code tests and documentation, with links to `guidelines/`, the violation report, and the before/after comparison), Features, Technologies (the AI tools Kiro, Antigravity, and Claude Code are listed next to the other technologies), Local Run Steps (9 numbered steps in the required order, `flask db upgrade` marked manual), Test Steps, Screenshots, and a Security note on the non-httpOnly access and refresh cookies, the XSS exposure of both tokens (including the higher impact of the 7-day refresh token), the stateless refresh token limitation (no revocation on logout), and the mitigations (short access expiry, refresh expiry, React escaping, no `dangerouslySetInnerHTML`).
 
 ## Traceability Matrix
 
@@ -1240,12 +1305,12 @@ Every requirement maps to at least one design element. Part references point to 
 | Req | Title | Backend route / module | Frontend page / component / module | Tests |
 |---|---|---|---|---|
 | 1 | Backend structure | `app/__init__.py`, `config.py`, `extensions.py`, `errors.py`, `permissions.py`, `wsgi.py`, `blueprints/*` (A1, Architecture) | none | smoke, Property 5 |
-| 2 | Models and soft delete | all `schema.py`, `soft_delete.py` (A5, Data Models) | none | Properties 6 to 9 |
+| 2 | Models and soft delete | all `schema.py`, `soft_delete.py`, lowercase email normalization (A3, A5, Data Models) | none | Properties 6 to 9 |
 | 3 | Manual migrations | `Migrate` in factory, generic 500 handler (A1, A2, D1) | none | 500-handler examples |
 | 4 | Envelope and errors | `errors.py`, endpoints 1 to 29 and 3a (A2, A11) | none | Properties 1 to 4, 37 |
 | 5 | Health | `GET /api/health` in `health.py` | none | examples |
-| 6 | Authentication | `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/refresh` (A3) | none | Properties 10, 11, 12, 36, 37, 38 |
-| 7 | Users | `GET/PATCH /api/users/me` | none | Properties 10, 17 |
+| 6 | Authentication | `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/refresh` (A3) | none | Properties 10, 11, 12, 36, 37, 38, 43 |
+| 7 | Users | `GET/PATCH /api/users/me`, no delete endpoint, seed-data fixture for soft-deleted users (A3, Testing Strategy) | none | Properties 9, 10, 17, 43 |
 | 8 | Boards | `/api/boards`, `/api/boards/<id>` (A9) | none | Properties 8, 13, 14, 15 |
 | 9 | Members | `/api/boards/<id>/members`, `/api/boards/<id>/members/<user_id>` | none | Properties 9, 13, 18 |
 | 10 | Columns | `/api/boards/<id>/columns`, `/api/columns/<id>`, `/api/boards/<id>/columns/reorder` | none | Properties 15, 16 |
@@ -1254,27 +1319,27 @@ Every requirement maps to at least one design element. Part references point to 
 | 13 | Notifications | `GET /api/notifications`, `PATCH /api/notifications/<id>/read` (A7) | none | Properties 21 to 23 |
 | 14 | Analytics | `GET /api/boards/<id>/analytics` (A8) | none | Property 24 |
 | 15 | Frontend structure | none | `web/` tree, `globals.css`, `.env.example`, `apiClient` env check (B1) | build smoke |
-| 16 | API client and toasts | none | `lib/apiClient.ts`, `lib/refreshSession.ts`, `lib/errors.ts`, `lib/toast.ts`, `hooks/useErrorHandler.ts` (B5) | Properties 26, 27, 39 |
-| 17 | Auth state and cookies | none | `AuthProvider`, `hooks/useAuth.ts`, `lib/authCookie.ts`, `lib/refreshSession.ts`, `lib/serverAuth.ts`, `middleware.ts` (B4) | Properties 28, 39 |
+| 16 | API client and toasts | none | `lib/apiClient.ts`, `lib/refreshSession.ts`, `lib/errors.ts`, `lib/toast.ts`, `hooks/useErrorHandler.ts` (B5) | Properties 26, 27, 39, 40 |
+| 17 | Auth state and cookies | none | `AuthProvider`, `hooks/useAuth.ts`, `lib/authCookie.ts`, `lib/refreshSession.ts`, `lib/serverAuth.ts`, `middleware.ts` (B4) | Properties 28, 39, 40 |
 | 18 | Shared components | none | `BaseButton`, `BaseBadge`, `BaseModal`, `Header`, `Footer` (B3) | RTL examples |
 | 19 | Register and Login pages | consumes endpoints 2, 3 | `/register`, `/login`, `RegisterForm`, `LoginForm` | Property 29, RTL |
 | 20 | Dashboard | consumes endpoints 6, 7 | `/` page, `BoardList`, `CreateBoardModal` | Property 29, E2E |
 | 21 | Board Detail | consumes endpoints 8, 11 to 17, 22, 29 | `/boards/[id]`, `BoardView`, `KanbanColumn`, `ColumnHeader`, `AddColumnForm`, `AddCardForm`, `CardSearchInput`, `MemberPanel`, `AnalyticsView`, `BoardAccessMessage`, `hooks/useDebouncedValue.ts` (B6) | Properties 29, 33 |
-| 22 | Drag and drop | consumes endpoint 21 | `hooks/useDragAndDrop.ts`, `lib/order.ts` (B6) | Properties 30, 31 |
+| 22 | Drag and drop | consumes endpoint 21 | `hooks/useDragAndDrop.ts` (mouse and touch paths), `lib/order.ts` (B6) | Properties 30, 31, 41, 42 |
 | 23 | Card detail and comments | consumes endpoints 19, 20, 23 to 26 | `CardDetailModal`, `CommentList`, `CommentItem`, `CommentForm` (B7) | Properties 34, 35 |
 | 24 | Notifications UI | consumes endpoints 27, 28 | `hooks/useNotifications.ts`, `NotificationBell`, `NotificationList`, `lib/format.ts` (B8) | Property 32 |
 | 25 | My Tasks | consumes endpoint 22 | `/my-tasks`, `MyTasksList` | Property 34 |
 | 26 | Profile | consumes endpoints 4, 5 | `/profile`, `ProfileForm` | Property 29 |
-| 27 | Responsive layout | none | Tailwind strategy (B9), `BaseModal`, `KanbanColumn` | Playwright viewport checks |
+| 27 | Responsive layout | none | Tailwind strategy and touch drag row (B9), `BaseModal`, `KanbanColumn` | Playwright viewport checks, touch unit tests (Properties 41, 42), manual DevTools device mode |
 | 28 | Security | `permissions.py`, `config.py`, log filter, LIKE escaping, token type enforcement (A3, A12) | access and refresh cookie options, no `dangerouslySetInnerHTML` | Properties 10, 13, 19, 37 |
 | 29 | Performance | board query plan (A9), indexes (Data Models) | none | Property 25, perf tests |
 | 30 | Maintainability and guidelines | split rule (Architecture) | one component per file | D2, lint script |
 | 31 | Backend tests | `app/tests/` (auth token tests, criterion 31.11) | none | Testing Strategy, Properties 36 to 38 |
-| 32 | Frontend unit tests | none | `web/__tests__/` (apiClient refresh tests, criterion 32.12) | Testing Strategy, Property 39 |
+| 32 | Frontend unit tests | none | `web/__tests__/` (apiClient refresh tests, criterion 32.12; touch tests, 32.13; server-side apiClient and cookie lifetime tests, 32.14) | Testing Strategy, Properties 39, 40, 41, 42 |
 | 33 | E2E tests | none | `web/e2e/`, `playwright.config.ts` | Testing Strategy |
 | 34 | Deployment | `vercel.json`, `wsgi.py`, config incl. `JWT_ACCESS_TOKEN_EXPIRES`, `JWT_REFRESH_TOKEN_EXPIRES` (D1) | Vercel project `web/` (D1) | verification checklist |
 | 35 | Repository hygiene | `.gitignore`, `.env.example` | `web/.env.example` | checklist |
-| 36 | Documentation | none | `README.md` incl. both-token XSS note and stateless refresh limitation (D3) | checklist |
+| 36 | Documentation | none | `README.md` incl. seven AI Workflow subsections (with Antigravity), both-token XSS note and stateless refresh limitation (D3) | checklist |
 
 ## Open issues
 
@@ -1284,7 +1349,7 @@ These are gaps or conflicts found while designing and revising. Items marked "as
 2. **Glossary versus Requirement 13.** The Notification glossary says comment notifications also go to users who commented on the Card. Criteria 13.2 and 13.3 name only the assignee and the Board_Admin. Design follows the criteria.
 3. **Completed this week uses `updated_at` (Requirement 14.2).** Any edit of a Card in `Done` moves it into the current week. There is no `completed_at` column. Design follows the requirement.
 4. **Resource directories (Requirement 15.4).** The list omits columns and analytics. Their components sit in `components/boards/`, which stretches "only files for that resource". Alternative: add `columns` and `analytics` directories.
-5. **HTML5 drag and drop on touch devices (Requirements 22, 34.8).** Native drag events do not fire on touch screens, so dragging on a real phone will not work. Desktop and Chrome DevTools device mode work. Mobile drag support would need a pointer-events fallback and a requirements change.
+5. **Touch drag verification (Requirements 22.12 to 22.17, 27.8, 33.4, 34.8). Resolved in V5 by adding touch support.** The hook now handles touch by a 300 ms long-press. Automated E2E covers the mouse drag through Playwright. The touch drag is verified manually in browser DevTools device mode and covered by React Testing Library unit tests (Requirement 32.13), because Playwright cannot simulate a long-press touch drag reliably. The mobile-viewport Playwright project therefore does not repeat the drag step.
 6. **FLOAT precision.** Repeated midpoints eventually produce equal values. Requirement 22.9 rejects only non-positive values. Recommendation: also treat a computed order equal to a neighbor as invalid and show the generic error. Rebalancing is not designed.
 7. **Extra shared modules.** The design adds `soft_delete.py`, `ordering.py`, and `health.py`, and extra columns `cards.board_id`, `notifications.board_id`. Requirement 1.5 lists only six shared modules and Requirement 2.2 lists no extra columns. These additions do not conflict but should be confirmed.
 8. **Primary key naming versus plural tables (Requirement 2.3).** Tables are plural (Requirement 1.9) while keys are singular (`user_id`, `board_membership_id`). Design uses singular keys.
@@ -1293,7 +1358,10 @@ These are gaps or conflicts found while designing and revising. Items marked "as
 11. **Health latency on cold start (Requirement 5.1).** The 500 ms limit may be missed on a Vercel cold start. Consider measuring on a warm instance.
 12. **Test database schema.** Requirement 31.10 means the test database needs its own manual `flask db upgrade`; this is an extra manual step beyond Requirement 3.3, which only names the local database.
 13. **Stateless refresh tokens cannot be revoked, and are not rotated (assumption, Requirement 6.15).** Logout only clears the cookies, so a copied refresh token stays valid for up to 7 days, and a refresh does not issue a new refresh token. Because there is no rotation, the middleware and the browser can refresh at the same time without invalidating each other. Alternative: store refresh token ids (`jti`) in a table or Redis, revoke on logout, and rotate on every refresh. That needs a new model and a requirements change.
-14. **Refresh cookie lifetime is a constant (assumption, Requirement 17.2).** The login response carries `expires_in` for the access token only, so the refresh cookie uses the constant `REFRESH_COOKIE_MAX_AGE = 604800`. If `JWT_REFRESH_TOKEN_EXPIRES` is changed from 604800, the constant must change too. Alternative: add `refresh_expires_in` to the login response (requires a requirements change). This replaces the earlier open issue about reading `exp` from the JWT, which is resolved by `expires_in`.
+14. **Refresh cookie lifetime (Requirement 17.2). Resolved in V5.** The login response now carries `refresh_expires_in`, and both cookie lifetimes come from response values (`expires_in`, `refresh_expires_in`). No frontend constant remains.
 15. **Middleware refresh on network error or 5xx (assumption, Requirement 17.7).** The middleware treats an unreachable or failing API during refresh like a failed refresh and redirects to `/login?expired=1`, which also deletes both cookies, so a short outage logs the user out. Alternative: keep the cookies and show an error page. Not chosen to avoid a redirect loop between `/login` and `/`.
 16. **Larger XSS impact (Requirement 28.8).** Both tokens sit in non-httpOnly cookies, and the refresh token lives 7 days, so an XSS exploit can steal a long-lived credential that cannot be revoked (item 13). The README documents this. Making the refresh cookie httpOnly would require a Next.js route handler that proxies login and refresh, which is a larger change not designed here.
 17. **Wrong token type defaults to 422 in Flask-JWT-Extended.** The design maps it to 401 in the `invalid_token_loader`. A backend test asserts this for both directions because the mapping depends on the library's callback behavior.
+18. **No edge auto-scroll during a touch drag (Requirements 22.13, 27.3).** While a touch drag is active, page scrolling is blocked, so a Card can only be dropped on a Column that is already visible. Reaching a Column off screen needs the board container to scroll when the finger nears its edge. This is not required and not designed. Workaround: scroll first, then drag. Alternative: add `requestAnimationFrame` edge scrolling to the hook.
+19. **Soft-deleted users exist only as test seed data (Requirement 7.7).** No endpoint creates the state that Requirements 6.6, 6.9, 6.13, and 31.11 test. The behavior is therefore only reachable through direct database writes, which production code never does. Tests insert the rows directly (Testing Strategy, soft-deleted user fixtures).
+20. **Browser-native drag on touch (Requirement 22.1 versus 22.12).** Some mobile browsers fire HTML5 `dragstart` on a long-press of a `draggable` element. The hook cancels the native event once the touch path is active (B6), but behavior differs between browsers, so it is verified manually in device mode and on a real phone before release.
