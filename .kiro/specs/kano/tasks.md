@@ -27,20 +27,20 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Requirements: 35.1, 35.3, 35.7_
     - _Design: D1 (Part D), D10_
 
-  - [ ] 1.2 Write `guidelines/backend.md`
+  - [x] 1.2 Write `guidelines/backend.md`
     - Entries in the fixed format `### G-BE-nn: title` with Rule (one sentence), Rationale (1 to 3 sentences), Kano Example (a path to a concrete Kano file or endpoint)
     - Topics: blueprint package layout and import rules, thin routes and service ownership, Response_Envelope and status mapping, Marshmallow validation at the boundary, permissions through `permissions.py`, 300-line split rule, PEP 8 naming, secrets and CORS from environment
     - _Requirements: 30.1, 30.2, 30.3, 1.15_
     - _Design: D2 (Part D)_
 
-  - [ ] 1.3 Write `guidelines/database.md`
+  - [x] 1.3 Write `guidelines/database.md`
     - Entries `### G-DB-nn` in the same three-part format
     - Topics: `<table>_id` UUID keys, named `fk_<child>_<parent>` constraints, SoftDeleteMixin and active-only queries, partial unique indexes, FLOAT order columns, indexes, cascade transactions, migrations are manual
     - No topic may repeat a topic from backend.md or frontend.md
     - _Requirements: 30.1, 30.2, 30.3_
     - _Design: D2 (Part D)_
 
-  - [ ] 1.4 Write `guidelines/frontend.md`
+  - [x] 1.4 Write `guidelines/frontend.md`
     - Entries `### G-FE-nn` in the same three-part format
     - Topics: Server versus Client split, one directory per API resource, one component per file, shared components and `BaseButton` only, `apiClient` only for HTTP, `useErrorHandler` for failures, Tailwind mobile-first and 44 px targets, no `dangerouslySetInnerHTML`
     - Do not add copies under `.kiro/steering/`
