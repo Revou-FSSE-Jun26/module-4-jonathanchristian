@@ -135,5 +135,5 @@
 ### Impact
 - Requirements: Project Brief, Glossary (Notification), 2.12, 6.1, 6.4, 7.2, 7.6, 7.7 (replaced), 9.1, 16.14 to 16.16 (scoped), 16.18 (new), 17.2, 17.7, 22.1, 22.12 to 22.17 (new), 27.8 (new), 31.11, 32.13 and 32.14 (new), 36.4, 36.6. No criterion was renumbered except that the old 7.7 was replaced by a new 7.7 with different content.
 - Design: see the Design edits list under Changes. New correctness properties 40 to 43. New open issues 18 to 20.
-- Tasks: `tasks.md` does not exist yet, so no task was changed. When it is generated it must include the `refresh_expires_in` field, the lowercase email normalization and check constraint, the server-side apiClient rule, the touch path of `useDragAndDrop`, the `make_deleted_user` test fixture, and the new tests.
+- Tasks: `tasks.md` does not exist yet, so no task was changed. When it is generated it must include the `refresh_expires_in` field, the lowercase email normalization and check constraint, the server-side apiClient rule, the touch path of `useDragAndDrop`, the `make_deleted_user` test fixture, and the new tests. Update: `tasks.md` was created from requirements V5 and design V5 (no new version).
 - Breaking changes: the login response shape gains a field (additive). Requests to `/api/users/me` with a deleted user's token now get 401 instead of 404.
