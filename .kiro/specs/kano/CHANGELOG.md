@@ -35,7 +35,7 @@
 ### Impact
 - Requirements: 1 (criteria 5 to 9 added, 10 to 15 renumbered), 30 (criterion 6 reworded, criterion 7 added). Requirement 3 reviewed, not changed.
 - Other sections: Folder Structure, Glossary (Blueprint_Package), version marker set to V2.
-- Design and tasks: `design.md` and `tasks.md` do not exist yet.
+- Design and tasks: `design.md` was created as part of the V3 initial design generation (version marker V3). `tasks.md` does not exist yet.
 
 ## V3 - 2026-11-14
 ### Changes
@@ -61,3 +61,38 @@
 ### Impact
 - Requirements: 4 only. Requirements 5, 16, and 31.3 were checked and are consistent; no other requirement was edited.
 - Design and tasks: `design.md` and `tasks.md` do not exist yet.
+
+## V4 - 2026-11-14
+### Changes
+- Specification change (user decision 1): login now issues an access token (expiry 3600 s) and a refresh token (expiry 604800 s). Both are Flask-JWT-Extended JWTs with `sub = user_id` and a `type` claim (`access` or `refresh`).
+- Specification change (assumption, to complete the refresh flow): new endpoint POST `/api/auth/refresh`. The client sends the refresh token as `Authorization: Bearer <refresh_token>`. Success returns 200 `{ "data": { "access_token", "token_type": "Bearer", "expires_in": 3600 } }`. There is no rotation and no server-side revocation, so logout only clears client cookies. A refresh token on a protected endpoint, an access token on `/api/auth/refresh`, an expired or invalid refresh token, and a refresh token of a soft-deleted or nonexistent user all return 401.
+- Specification change (assumption): login response data is `{ "access_token", "refresh_token", "token_type": "Bearer", "expires_in": 3600, "user" }`. Register is unchanged (no tokens).
+- Specification change (assumption): the single `JWT_EXPIRES_SECONDS` variable is replaced by `JWT_ACCESS_TOKEN_EXPIRES` (placeholder 3600) and `JWT_REFRESH_TOKEN_EXPIRES` (placeholder 604800). Both are required at startup and fail fast by name.
+- Specification change (assumption): frontend keeps two non-httpOnly cookies (`SameSite=Lax`, path `/`): the access cookie (3600 s, from `expires_in`) and the refresh cookie (604800 s, constant). The apiClient refreshes once on a 401 and retries once, with concurrent 401s sharing one in-flight refresh. A failed refresh clears both cookies and AuthContext and redirects to `/login`. `middleware.ts` refreshes an expired or missing access cookie from the refresh cookie before rendering and sets the new access cookie on the response. Logout and the 401 handler clear both cookies. Session restore calls GET `/api/users/me` with the access token, refreshing first when needed.
+- Implementation change: the empty `app/app.py` created while setting up the venv was deleted by the user (user decision 2). The related open issue and scaffolding note were removed from `design.md`.
+- Requirements edited (`requirements.md`, now V4): Introduction (core features), Glossary (JWT reworded; Access_Token and Refresh_Token added; Auth_Cookie and AuthContext reworded), Requirement 1 (criteria 12 and 13), Requirement 4 (criteria 3, 6, 13), Requirement 6 (criteria 4, 5, 6, 7, 9 reworded; criteria 10 to 15 added), Requirement 16 (criteria 5 and 13 reworded; criteria 14 to 17 added), Requirement 17 (rewritten and renumbered, now 11 criteria), Requirement 28 (criteria 6, 7, 8), Requirement 31 (criterion 11 added), Requirement 32 (criterion 7 reworded, criterion 12 added), Requirement 34 (criterion 4), Requirement 36 (criteria 3 and 11). Requirements 7, 33, and the other criteria of Requirement 4 were reviewed and left unchanged.
+- Design edited (`design.md`, now V4): decision D9, system context diagram, A1 (env table, `create_app` step 2, `.env.example`), A2 (JWT callbacks row), A3 (token types, type enforcement, refresh, login and refresh response, logout), A11 (new row 3a, row 3, legend), A12, B1 (file tree), B2 (login row, dashboard row, 401 note), B4 (cookies, AuthProvider, middleware, login sequence diagram, new middleware refresh diagram), B5 (apiClient refresh and retry, `lib/refreshSession.ts`, new refresh-on-401 sequence diagram, useErrorHandler), B10 (auth types), Correctness Properties (5, 11, 26 reworded; 28 rewritten; 36 to 39 added), Error Handling, Testing Strategy (backend, frontend), D1 (production env variables, verification order), D3, Traceability Matrix (rows 4, 6, 16, 17, 28, 31, 32, 34, 36), Open issues.
+
+#### Before / After
+- R6.4 before: "WHEN a client sends POST `/api/auth/login` with a valid email and password of a non-deleted User, THE Kano_API SHALL return status 200 with a JWT and the User profile excluding the password and password hash."
+- R6.4 after: "... THE Kano_API SHALL return status 200 with `{ "data": { "access_token", "refresh_token", "token_type": "Bearer", "expires_in": 3600, "user": <profile> } }`, where the profile excludes the password and password hash."
+- R6.5 before: "THE Kano_API SHALL set the JWT expiry from the configured expiry environment variable and SHALL include the `user_id` as the token subject."
+- R6.5 after: "THE Kano_API SHALL issue the Access_Token with `type` = `access` and an expiry of `JWT_ACCESS_TOKEN_EXPIRES` seconds (3600 in the default configuration), SHALL issue the Refresh_Token with `type` = `refresh` and an expiry of `JWT_REFRESH_TOKEN_EXPIRES` seconds (604800 in the default configuration), and SHALL include the `user_id` as the `sub` claim of both tokens."
+- R17.2 before: "WHEN a login succeeds, THE AuthContext SHALL store the JWT in memory and in the Auth_Cookie with a lifetime in seconds equal to the JWT expiry configured for Kano_API, path `/`, and `SameSite=Lax`."
+- R17.2 after: "WHEN a login succeeds, THE AuthContext SHALL store the Access_Token and the Refresh_Token in memory, SHALL store the Access_Token in the access cookie with a lifetime in seconds equal to the `expires_in` value of the login response (3600), and SHALL store the Refresh_Token in the refresh cookie with a lifetime of 604800 seconds, each cookie with path `/` and `SameSite=Lax`."
+- R17 criteria numbering: before 10 criteria (7 was the unauthenticated redirect, 9 was the Server Component token, 10 was `updateUser`). After 11 criteria (new 7 is the middleware refresh, 8 the unauthenticated redirect, 10 the Server Component token, 11 `updateUser`).
+- R1.12 before: "... read the database URL, JWT secret, JWT expiry (in seconds), and allowed CORS origins ..."
+- R1.12 after: "... read the database URL, JWT secret, Access_Token expiry `JWT_ACCESS_TOKEN_EXPIRES` (in seconds), Refresh_Token expiry `JWT_REFRESH_TOKEN_EXPIRES` (in seconds), and allowed CORS origins ..."
+- R16.13 before: "... SHALL clear the Auth_Cookie and the AuthContext User and JWT state, and redirect the User to `/login`."
+- R16.13 after: "... SHALL clear both the access cookie and the refresh cookie and the AuthContext User, Access_Token, and Refresh_Token state, and redirect the User to `/login`." Criteria 14 to 17 add the refresh-and-retry, single-flight, failure, and no-refresh-for-auth-endpoints rules.
+- Design open issue before: "Cookie lifetime source (Requirement 17.2). ... Design reads the `exp` claim from the JWT payload." After: resolved by `expires_in` and the 604800 constant. The `app/app.py` open issue was removed.
+
+### Reason
+- The user requested access and refresh tokens with 1 hour and 7 day expiry (decision 1) and deleted `app/app.py` (decision 2).
+- The refresh endpoint, response shapes, env variable names, cookie handling, single-flight refresh, middleware refresh, and the stateless (no rotation, no revocation) design are assumptions made by the assistant to complete the flow. The user can override each one.
+
+### Impact
+- Requirements: 1, 4, 6, 16, 17, 28, 31, 32, 34, 36, Introduction, and Glossary. Requirement 17 criteria were renumbered.
+- Design: see the list under Changes. New correctness properties 36 to 39. Open issues renumbered (12 retained, 5 new: 13 to 17).
+- Tasks: `tasks.md` does not exist yet, so no task was changed. When it is generated it must include the refresh endpoint, `lib/refreshSession.ts`, the middleware refresh, and the new tests.
+- New open questions: refresh tokens cannot be revoked on logout and are not rotated; the refresh cookie lifetime is a constant coupled to `JWT_REFRESH_TOKEN_EXPIRES`; a middleware refresh failure from a network error or 5xx logs the user out; the 7-day non-httpOnly refresh cookie raises the XSS impact; Flask-JWT-Extended answers 422 for a wrong token type by default and the design maps it to 401.

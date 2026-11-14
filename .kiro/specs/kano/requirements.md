@@ -1,6 +1,6 @@
 # Requirements Document
 
-**Version:** V3
+**Version:** V4
 
 ## Introduction
 
@@ -14,7 +14,7 @@ Kano is a Trello-like task management application. Users create boards, organize
 - Board_Admin: the user who created the board. Manages members, oversees all cards, and sees analytics and notifications for the board.
 - Board_Member: a user added to a board by email. Manages cards and comments on that board.
 
-**Core features.** JWT authentication; board, column, and card management; board members with roles; drag-and-drop with FLOAT ordering; comments; notifications on assignment and comment; card search; My Tasks view; user profile; board analytics.
+**Core features.** JWT authentication with short-lived access tokens and long-lived refresh tokens; board, column, and card management; board members with roles; drag-and-drop with FLOAT ordering; comments; notifications on assignment and comment; card search; My Tasks view; user profile; board analytics.
 
 **Tech stack.**
 - Backend: Python 3.14, Flask, SQLAlchemy, Flask-Migrate, Flask-JWT-Extended, Marshmallow, flask-cors, PostgreSQL (psycopg2-binary), python-dotenv, Gunicorn, pytest.
@@ -60,9 +60,11 @@ kano-app/
 - **Order_Value**: A FLOAT used to position Columns and Cards; a new position is computed so existing rows need not be renumbered.
 - **Soft_Delete**: Marking a row with `is_deleted = true` and a `deleted_at` timestamp instead of removing the row.
 - **Response_Envelope**: The JSON shape `{ "data": ... }` for success or `{ "error": "..." }` for failure.
-- **JWT**: A JSON Web Token with an expiry, issued at login.
-- **Auth_Cookie**: A regular (non-httpOnly) browser cookie holding the JWT so Server Components can read it.
-- **AuthContext**: The React context that holds the current User and JWT in Kano_Web.
+- **JWT**: A JSON Web Token signed by Flask-JWT-Extended, with an expiry, a `sub` claim holding the `user_id`, and a `type` claim.
+- **Access_Token**: A JWT with `type` = `access`, issued at login and at refresh, valid for 3600 seconds (1 hour), and accepted by every protected endpoint except POST `/api/auth/refresh`.
+- **Refresh_Token**: A JWT with `type` = `refresh`, issued at login, valid for 604800 seconds (7 days), and accepted only by POST `/api/auth/refresh`.
+- **Auth_Cookie**: A regular (non-httpOnly) browser cookie so Server Components and the middleware can read a token. There are two: the access cookie holding the Access_Token and the refresh cookie holding the Refresh_Token.
+- **AuthContext**: The React context that holds the current User, Access_Token, and Refresh_Token in Kano_Web.
 - **ApiError**: The typed error class in `web/lib/errors.ts` with `statusCode` and `message` fields.
 - **Migration_Step**: A manual user action: `flask db init`, `flask db migrate`, and `flask db upgrade`.
 - **Blueprint_Package**: A directory `app/blueprints/<feature>/` containing `routes.py`, `service.py`, and `schema.py` (Marshmallow schemas and SQLAlchemy models).
@@ -90,8 +92,8 @@ kano-app/
 9. THE application factory SHALL import the `schema.py` of every Blueprint_Package that defines a model before Flask-Migrate runs, so that `flask db migrate` detects all 7 tables (users, boards, board_memberships, columns, cards, comments, notifications).
 10. THE Kano_API SHALL install dependencies into the existing `app/venv` using `py -m pip install`.
 11. THE Kano_API SHALL list Flask, Flask-SQLAlchemy, Flask-Migrate, Flask-JWT-Extended, Marshmallow, flask-cors, psycopg2-binary, python-dotenv, Gunicorn, and pytest in `app/requirements.txt`, each pinned to an exact version (`name==version`).
-12. WHEN the Kano_API starts, THE Kano_API SHALL read the database URL, JWT secret, JWT expiry (in seconds), and allowed CORS origins (comma-separated list) from environment variables loaded by python-dotenv.
-13. IF a required environment variable (database URL, JWT secret, JWT expiry, or allowed CORS origins) is missing or empty at startup, THEN THE Kano_API SHALL fail to start and report an error naming the missing variable, without including any variable values.
+12. WHEN the Kano_API starts, THE Kano_API SHALL read the database URL, JWT secret, Access_Token expiry `JWT_ACCESS_TOKEN_EXPIRES` (in seconds), Refresh_Token expiry `JWT_REFRESH_TOKEN_EXPIRES` (in seconds), and allowed CORS origins (comma-separated list) from environment variables loaded by python-dotenv.
+13. IF a required environment variable (database URL, JWT secret, `JWT_ACCESS_TOKEN_EXPIRES`, `JWT_REFRESH_TOKEN_EXPIRES`, or allowed CORS origins) is missing or empty at startup, THEN THE Kano_API SHALL fail to start and report an error naming the missing variable, without including any variable values.
 14. THE Kano_API SHALL provide `app/.env.example` listing every environment variable read by the Kano_API, each with a placeholder value and no real secrets.
 15. THE Kano_API SHALL name classes in PascalCase and functions, variables, modules, and packages in snake_case, in conformance with PEP 8.
 
@@ -138,17 +140,17 @@ kano-app/
 
 1. WHEN a request succeeds, THE Kano_API SHALL return the exact success status code defined in criterion 3 with a JSON body whose only top-level key is `data`, in the form `{ "data": ... }`.
 2. THE Kano_API SHALL set the status code on the HTTP status line of every response and SHALL NOT repeat the status code as a field in the JSON body, and the JSON body SHALL contain no top-level key other than `data` or `error`.
-3. WHEN a POST request creates a resource (POST `/api/auth/register`, `/api/boards`, `/api/boards/<id>/members`, `/api/boards/<id>/columns`, `/api/columns/<id>/cards`, and `/api/cards/<id>/comments`), THE Kano_API SHALL return status 201, and WHEN any other request succeeds (POST `/api/auth/login`, every GET including `/api/health`, every PATCH including `/api/cards/<id>/position`, `/api/boards/<id>/columns/reorder`, and `/api/notifications/<id>/read`, and every DELETE), THE Kano_API SHALL return status 200.
+3. WHEN a POST request creates a resource (POST `/api/auth/register`, `/api/boards`, `/api/boards/<id>/members`, `/api/boards/<id>/columns`, `/api/columns/<id>/cards`, and `/api/cards/<id>/comments`), THE Kano_API SHALL return status 201, and WHEN any other request succeeds (POST `/api/auth/login`, POST `/api/auth/refresh`, every GET including `/api/health`, every PATCH including `/api/cards/<id>/position`, `/api/boards/<id>/columns/reorder`, and `/api/notifications/<id>/read`, and every DELETE), THE Kano_API SHALL return status 200.
 4. WHEN a DELETE request succeeds, THE Kano_API SHALL return status 200 with a body of the form `{ "data": ... }` containing a JSON object (for example the id of the deleted resource), and SHALL NOT return status 204 or an empty body.
 5. IF a request fails, THEN THE Kano_API SHALL return the exact HTTP status code defined in criterion 6 for the failure type, with a JSON body whose only top-level key is `error`, in the form `{ "error": "<message>" }`, where `<message>` is a non-empty string of at most 500 characters.
-6. THE Kano_API SHALL map failures to status codes as follows: request validation failure 400; missing, malformed, invalid, or expired JWT 401; permission or Board_Membership failure 403; missing or soft-deleted resource, or a path id that is not a valid UUID, 404; unsupported method 405; unique-constraint conflict (duplicate) 409; unhandled exception or database failure 500.
+6. THE Kano_API SHALL map failures to status codes as follows: request validation failure 400; missing, malformed, invalid, expired, or wrong-type JWT (a Refresh_Token on a protected endpoint or an Access_Token on POST `/api/auth/refresh`) 401; permission or Board_Membership failure 403; missing or soft-deleted resource, or a path id that is not a valid UUID, 404; unsupported method 405; unique-constraint conflict (duplicate) 409; unhandled exception or database failure 500.
 7. IF a requirement states that the Kano_API returns an error without naming a status code, THEN THE Kano_API SHALL apply the mapping in criterion 6, returning 409 for a unique-constraint violation, 400 for a foreign-key or NOT NULL violation, and 500 for any other unexpected failure.
 8. THE Kano_API SHALL return every error message as a human-readable string, and for status 500 the message SHALL be generic and contain no stack trace, SQL text, or database details.
 9. THE Kano_API SHALL validate every request body and query string with a Marshmallow schema defined in the Blueprint_Package `schema.py`.
 10. IF request validation fails, THEN THE Kano_API SHALL return status 400 with an error message that names each invalid field, and SHALL NOT change any stored data.
 11. IF an unhandled exception occurs, THEN THE Kano_API SHALL return status 500 with a generic error message that contains no stack trace, SQL text, or database details, SHALL log the exception, and SHALL roll back any uncommitted database changes from that request.
 12. IF a requested resource does not exist or is soft deleted, THEN THE Kano_API SHALL return status 404.
-13. IF a request to a protected endpoint has a missing, malformed, invalid-signature, or expired JWT, THEN THE Kano_API SHALL return status 401.
+13. IF a request to a protected endpoint has a missing, malformed, invalid-signature, expired, or wrong-type JWT (a Refresh_Token), THEN THE Kano_API SHALL return status 401.
 14. IF an authenticated User lacks permission for the requested resource, THEN THE Kano_API SHALL return status 403.
 15. THE Kano_API SHALL serialize every UUID as a lowercase hyphenated string of 36 characters and every timestamp as an ISO 8601 UTC string ending in `Z` or `+00:00`.
 16. THE Kano_API SHALL enable CORS only for the origins listed in the allowed-origins environment variable and SHALL allow the `Authorization` and `Content-Type` headers.
@@ -175,12 +177,18 @@ kano-app/
 1. WHEN a client sends POST `/api/auth/register` with a name of 1 to 100 characters, an email in valid format of up to 254 characters, and a password of 8 to 128 characters, THE Kano_API SHALL create a User with a salted password hash and return status 201 with the User profile (user id, name, email, created_at) excluding the password and password hash.
 2. IF the email in a registration request matches, case-insensitively, the email of a non-deleted User, THEN THE Kano_API SHALL return status 409 with an error message indicating the email is already registered and SHALL NOT create a User.
 3. IF a registration request has a missing or empty name, a name longer than 100 characters, a missing or malformed email, an email longer than 254 characters, or a missing password, a password shorter than 8 characters, or a password longer than 128 characters, THEN THE Kano_API SHALL return status 400 with an error message identifying the invalid field and SHALL NOT create a User.
-4. WHEN a client sends POST `/api/auth/login` with a valid email and password of a non-deleted User, THE Kano_API SHALL return status 200 with a JWT and the User profile excluding the password and password hash.
-5. THE Kano_API SHALL set the JWT expiry from the configured expiry environment variable and SHALL include the `user_id` as the token subject.
-6. IF a login request has an unknown email, a wrong password, or an email that belongs only to a soft-deleted User, THEN THE Kano_API SHALL return status 401 with an identical error message in every one of these cases and SHALL NOT issue a JWT.
-7. IF a login request has a missing or empty email or password, or a malformed email, THEN THE Kano_API SHALL return status 400 with an error message identifying the invalid field and SHALL NOT issue a JWT.
+4. WHEN a client sends POST `/api/auth/login` with a valid email and password of a non-deleted User, THE Kano_API SHALL return status 200 with `{ "data": { "access_token", "refresh_token", "token_type": "Bearer", "expires_in": 3600, "user": <profile> } }`, where the profile excludes the password and password hash.
+5. THE Kano_API SHALL issue the Access_Token with `type` = `access` and an expiry of `JWT_ACCESS_TOKEN_EXPIRES` seconds (3600 in the default configuration), SHALL issue the Refresh_Token with `type` = `refresh` and an expiry of `JWT_REFRESH_TOKEN_EXPIRES` seconds (604800 in the default configuration), and SHALL include the `user_id` as the `sub` claim of both tokens.
+6. IF a login request has an unknown email, a wrong password, or an email that belongs only to a soft-deleted User, THEN THE Kano_API SHALL return status 401 with an identical error message in every one of these cases and SHALL NOT issue an Access_Token or a Refresh_Token.
+7. IF a login request has a missing or empty email or password, or a malformed email, THEN THE Kano_API SHALL return status 400 with an error message identifying the invalid field and SHALL NOT issue an Access_Token or a Refresh_Token.
 8. THE Kano_API SHALL store only salted password hashes and SHALL exclude the password hash from every API response.
-9. WHEN a client sends a request to a protected endpoint with a JWT whose subject belongs to a soft-deleted or nonexistent User, THE Kano_API SHALL return status 401.
+9. WHEN a client sends a request to a protected endpoint with an Access_Token whose subject belongs to a soft-deleted or nonexistent User, THE Kano_API SHALL return status 401.
+10. WHEN a client sends POST `/api/auth/refresh` with the header `Authorization: Bearer <refresh_token>` carrying a valid, unexpired Refresh_Token whose subject belongs to a non-deleted User, THE Kano_API SHALL return status 200 with `{ "data": { "access_token", "token_type": "Bearer", "expires_in": 3600 } }`, where the new Access_Token has `type` = `access`, the same `sub`, and an expiry of `JWT_ACCESS_TOKEN_EXPIRES` seconds, and SHALL NOT return a new Refresh_Token.
+11. IF a POST `/api/auth/refresh` request has a missing, malformed, invalid-signature, or expired Refresh_Token, THEN THE Kano_API SHALL return status 401.
+12. IF a POST `/api/auth/refresh` request carries an Access_Token, THEN THE Kano_API SHALL return status 401 and SHALL NOT issue a token.
+13. IF a POST `/api/auth/refresh` request carries a Refresh_Token whose subject belongs to a soft-deleted or nonexistent User, THEN THE Kano_API SHALL return status 401 and SHALL NOT issue a token.
+14. IF a request to any protected endpoint other than POST `/api/auth/refresh` carries a Refresh_Token, THEN THE Kano_API SHALL return status 401 and SHALL NOT perform the action.
+15. THE Kano_API SHALL keep Refresh_Tokens stateless, with no server-side storage, rotation, or revocation, so a Refresh_Token remains usable until it expires, and a client logout SHALL only clear the tokens held by the client.
 
 ### Requirement 7: Users
 
@@ -347,7 +355,7 @@ kano-app/
 2. WHILE running in a Client Component, THE apiClient SHALL read the base URL from `NEXT_PUBLIC_API_BASE_URL`.
 3. WHILE running in a Server Component, THE apiClient SHALL read the base URL from `API_BASE_URL`.
 4. IF the base URL variable for the current runtime is missing or empty, THEN THE apiClient SHALL throw an ApiError with `statusCode` 0 and a message indicating that the API base URL is not configured, without sending a request.
-5. WHERE a JWT is available, THE apiClient SHALL attach the header `Authorization: Bearer <token>`, and WHERE no JWT is available, THE apiClient SHALL omit the `Authorization` header.
+5. WHERE an Access_Token is available, THE apiClient SHALL attach the header `Authorization: Bearer <access_token>`, and WHERE no Access_Token is available, THE apiClient SHALL omit the `Authorization` header.
 6. IF a response has a non-2xx status, THEN THE apiClient SHALL throw an ApiError with the response `statusCode` and the `error` message from the Response_Envelope.
 7. IF a response has a non-2xx status and its body is not a valid Response_Envelope, THEN THE apiClient SHALL throw an ApiError with the response `statusCode` and a generic message indicating an unexpected server response.
 8. IF a request fails because of a network error or does not receive a response within 10 seconds, THEN THE apiClient SHALL throw an ApiError with `statusCode` 0 and a message indicating that the server could not be reached.
@@ -355,7 +363,11 @@ kano-app/
 10. THE Kano_Web SHALL provide `lib/toast.ts` with `showSuccess`, `showError`, and `showLoading` helpers that call `toast.success()`, `toast.error()`, and `toast.loading()` from react-hot-toast, each accepting a message string of 1 to 200 characters.
 11. WHEN the `hooks/useErrorHandler.ts` hook receives an ApiError with status 400, 401, 403, 404, 409, or 500, THE useErrorHandler hook SHALL show one error toast with a distinct message for that status code.
 12. IF the useErrorHandler hook receives an ApiError with a status code not in the set 400, 401, 403, 404, 409, 500, or an error that is not an ApiError, THEN THE useErrorHandler hook SHALL show one error toast with a generic message.
-13. WHEN the useErrorHandler hook handles an ApiError with status 401, THE useErrorHandler hook SHALL clear the Auth_Cookie and the AuthContext User and JWT state, and redirect the User to `/login`.
+13. WHEN the useErrorHandler hook handles an ApiError with status 401, THE useErrorHandler hook SHALL clear both the access cookie and the refresh cookie and the AuthContext User, Access_Token, and Refresh_Token state, and redirect the User to `/login`.
+14. WHEN a protected request sent by the apiClient with an Access_Token returns status 401 and a Refresh_Token is available, THE apiClient SHALL send POST `/api/auth/refresh` once with `Authorization: Bearer <refresh_token>`, store the returned Access_Token in AuthContext memory and in the access cookie, and retry the original request once with the new Access_Token.
+15. WHILE a refresh request is in flight, THE apiClient SHALL share that single request among all protected requests that receive status 401, and SHALL NOT send a second refresh request.
+16. IF the refresh request returns status 401, or the retried original request returns status 401, THEN THE apiClient SHALL clear both cookies and the AuthContext state, redirect to `/login`, and throw an ApiError with `statusCode` 401.
+17. THE apiClient SHALL NOT attempt a refresh for a 401 response from POST `/api/auth/login`, POST `/api/auth/register`, or POST `/api/auth/refresh`.
 
 ### Requirement 17: Authentication State and Cookie
 
@@ -363,16 +375,17 @@ kano-app/
 
 #### Acceptance Criteria
 
-1. THE Kano_Web SHALL provide an AuthContext holding the current User and JWT, with `login`, `logout`, and `updateUser` functions.
-2. WHEN a login succeeds, THE AuthContext SHALL store the JWT in memory and in the Auth_Cookie with a lifetime in seconds equal to the JWT expiry configured for Kano_API, path `/`, and `SameSite=Lax`.
-3. WHEN the application loads and an Auth_Cookie exists, THE AuthContext SHALL restore the session by calling GET `/api/users/me` and, on success, set the current User and JWT from the response and the cookie.
-4. IF the GET `/api/users/me` call during session restoration returns status 401, THEN THE AuthContext SHALL clear the Auth_Cookie, clear the User and JWT state, and redirect to `/login`.
-5. IF the GET `/api/users/me` call during session restoration fails with a network error or a status of 500 or above, THEN THE AuthContext SHALL keep the Auth_Cookie, leave the User unset, and trigger the useErrorHandler toast.
-6. WHEN a User logs out, THE AuthContext SHALL clear the Auth_Cookie, clear the User and JWT state, and redirect to `/login`.
-7. WHEN an unauthenticated visitor requests a protected route, THE Kano_Web SHALL redirect the visitor to `/login` before rendering any protected page content. An unauthenticated visitor is one with no Auth_Cookie or with an Auth_Cookie whose JWT is expired.
-8. WHEN an authenticated User requests `/login` or `/register`, THE Kano_Web SHALL redirect the User to `/`.
-9. WHEN a Server Component fetches data, THE Kano_Web SHALL read the JWT from the Auth_Cookie and pass the JWT to the apiClient.
-10. WHEN `updateUser` is called with a User object, THE AuthContext SHALL replace the current User state with that object without changing the JWT or the Auth_Cookie.
+1. THE Kano_Web SHALL provide an AuthContext holding the current User, Access_Token, and Refresh_Token, with `login`, `logout`, and `updateUser` functions.
+2. WHEN a login succeeds, THE AuthContext SHALL store the Access_Token and the Refresh_Token in memory, SHALL store the Access_Token in the access cookie with a lifetime in seconds equal to the `expires_in` value of the login response (3600), and SHALL store the Refresh_Token in the refresh cookie with a lifetime of 604800 seconds, each cookie with path `/` and `SameSite=Lax`.
+3. WHEN the application loads and an access cookie or a refresh cookie exists, THE AuthContext SHALL restore the session by calling GET `/api/users/me` with the Access_Token (refreshing it first through POST `/api/auth/refresh` when only the refresh cookie exists) and, on success, set the current User and both tokens from the response and the cookies.
+4. IF session restoration ends with status 401 after the refresh flow of Requirement 16 criteria 14 to 16, THEN THE AuthContext SHALL clear both cookies, clear the User, Access_Token, and Refresh_Token state, and redirect to `/login`.
+5. IF the GET `/api/users/me` call during session restoration fails with a network error or a status of 500 or above, THEN THE AuthContext SHALL keep both cookies, leave the User unset, and trigger the useErrorHandler toast.
+6. WHEN a User logs out, THE AuthContext SHALL clear both cookies, clear the User, Access_Token, and Refresh_Token state, and redirect to `/login`, without sending any request to the Kano_API.
+7. WHEN a visitor requests a protected route and the access cookie is missing or expired while a valid refresh cookie exists, THE Kano_Web middleware SHALL send POST `/api/auth/refresh` with the Refresh_Token, set the new access cookie on the response (lifetime 3600 seconds, path `/`, `SameSite=Lax`), and let the request continue, before any protected page content renders.
+8. WHEN an unauthenticated visitor requests a protected route, THE Kano_Web SHALL redirect the visitor to `/login` before rendering any protected page content. An unauthenticated visitor is one with no usable access cookie and no valid refresh cookie, or one whose refresh request returned status 401 (in which case the middleware also deletes both cookies).
+9. WHEN an authenticated User requests `/login` or `/register`, THE Kano_Web SHALL redirect the User to `/`.
+10. WHEN a Server Component fetches data, THE Kano_Web SHALL read the Access_Token from the access cookie and pass it to the apiClient.
+11. WHEN `updateUser` is called with a User object, THE AuthContext SHALL replace the current User state with that object without changing the tokens or the cookies.
 
 ### Requirement 18: Shared Components
 
@@ -560,9 +573,9 @@ kano-app/
 3. THE Kano_API SHALL execute every database access through SQLAlchemy parameterized queries and SHALL NOT build SQL statements by concatenating or formatting request values into SQL text.
 4. WHEN a request value contains SQL metacharacters (for example `'`, `;`, or `--`) in any field or query parameter, THE Kano_API SHALL treat the value as literal data and SHALL NOT change the executed SQL structure.
 5. THE Kano_API SHALL read the JWT secret and database credentials from environment variables and SHALL NOT include any real secret value in any file committed to the repository.
-6. IF the JWT secret environment variable is missing or empty at application startup, THEN THE Kano_API SHALL fail to start and report the missing variable name without printing any secret value.
-7. THE Kano_Web SHALL set the Auth_Cookie without the httpOnly attribute so that Server Components can read the Auth_Cookie.
-8. THE README.md SHALL document the XSS exposure that results from the non-httpOnly Auth_Cookie and SHALL list these mitigations: the JWT expiry, escaping of user content by React, and no use of `dangerouslySetInnerHTML` in `web/`.
+6. IF the JWT secret environment variable (used to sign both the Access_Token and the Refresh_Token) is missing or empty at application startup, THEN THE Kano_API SHALL fail to start and report the missing variable name without printing any secret value.
+7. THE Kano_Web SHALL set the access cookie and the refresh cookie without the httpOnly attribute so that Server Components and the middleware can read them.
+8. THE README.md SHALL document the XSS exposure that results from the non-httpOnly access cookie and refresh cookie, which covers both tokens, SHALL state that the 7-day Refresh_Token cookie raises the impact of an XSS compromise, and SHALL list these mitigations: the short Access_Token expiry (3600 seconds), the Refresh_Token expiry, escaping of user content by React, and no use of `dangerouslySetInnerHTML` in `web/`.
 9. THE Kano_Web SHALL NOT use `dangerouslySetInnerHTML` in any file under `web/`.
 10. WHEN an endpoint that requires Board_Membership or a specific role receives a request, THE Kano_API SHALL verify the Board_Membership and role on the server before performing the action, regardless of any frontend control state.
 11. IF an authenticated User sends a request to an endpoint for which the User lacks the required Board_Membership or role, THEN THE Kano_API SHALL return status 403, leave all data unchanged, and not disclose data of the target resource in the response.
@@ -611,6 +624,7 @@ kano-app/
 8. WHEN `pytest -v` is run from `app/` against the test PostgreSQL database after the manual Migration_Step is complete, THE Kano_API test suite SHALL finish with 0 failures and 0 errors.
 9. WHILE the manual Migration_Step is incomplete, THE tests that require database tables SHALL be treated as blocked.
 10. IF the test database is unreachable or the schema has not been applied, THEN THE Kano_API test run SHALL stop with an error message that names the unavailable test database and SHALL NOT run tests against the development database.
+11. THE Kano_API auth tests SHALL cover: login returning an Access_Token with `type` = `access` and expiry 3600 seconds and a Refresh_Token with `type` = `refresh` and expiry 604800 seconds, both with `sub` equal to the `user_id`; POST `/api/auth/refresh` returning 200 with a new Access_Token that is accepted by GET `/api/users/me`; status 401 for a refresh request with an expired Refresh_Token, a missing token, an Access_Token, or a Refresh_Token of a soft-deleted User; and status 401 when a Refresh_Token is sent to GET `/api/users/me` or any other protected endpoint.
 
 ### Requirement 32: Frontend Unit Tests
 
@@ -624,11 +638,12 @@ kano-app/
 4. THE Kano_Web SHALL provide React Testing Library tests for the login form that assert a field-level error is shown and no request is submitted for an empty email and for an empty password, and that a valid form is submitted.
 5. THE Kano_Web SHALL provide React Testing Library tests for CommentList that assert edit and delete controls are shown for a Comment owned by the current User and hidden for a Comment owned by another User.
 6. THE Kano_Web SHALL provide React Testing Library tests for NotificationBell that assert the unread count is shown for counts of 1 and 99 and that no count is shown when the unread count is 0.
-7. THE Kano_Web SHALL provide apiClient tests, with the network mocked, that assert the header `Authorization: Bearer <token>` is sent when a JWT is available and omitted when no JWT is available. The tests SHALL also assert that the `data` field is returned for a 2xx response, and that an ApiError carrying the response `statusCode` and the `error` message is thrown for each of the statuses 400, 401, 403, 404, 409, and 500.
+7. THE Kano_Web SHALL provide apiClient tests, with the network mocked, that assert the header `Authorization: Bearer <token>` is sent when an Access_Token is available and omitted when none is available. The tests SHALL also assert that the `data` field is returned for a 2xx response, and that an ApiError carrying the response `statusCode` and the `error` message is thrown for each of the statuses 400, 401 (with no Refresh_Token available), 403, 404, 409, and 500.
 8. THE Kano_Web SHALL provide useDragAndDrop tests, with the position request mocked to fail, that assert the Card is restored to its original Column and Order_Value and that the useErrorHandler toast is triggered once. The tests SHALL also assert that the Card is moved in local state before the mocked request resolves.
 9. THE Kano_Web unit tests SHALL run without network access and without a running Kano_API, using mocked API responses only.
 10. WHEN `npm test` is run from `web/`, THE Kano_Web test suite SHALL execute once without watch mode, pass every test with zero failures, and exit with code 0.
 11. IF any Kano_Web unit test fails, THEN THE `npm test` command SHALL exit with a non-zero code and print the name of each failed test.
+12. THE Kano_Web SHALL provide apiClient tests, with the network mocked, that assert: a 401 from a protected request triggers exactly one POST `/api/auth/refresh` and one retry of the original request with the new Access_Token; two concurrent 401 responses share a single refresh request; a refresh response of 401 clears both cookies and the AuthContext state and redirects to `/login`; and a 401 from POST `/api/auth/login` does not trigger a refresh.
 
 ### Requirement 33: End-to-End Tests
 
@@ -657,7 +672,7 @@ kano-app/
 1. THE Kano_API SHALL be deployed as one Vercel project and Kano_Web SHALL be deployed as a separate Vercel project, each reachable over HTTPS at its own public URL without requiring a Vercel login.
 2. WHERE Railway is chosen as an alternative for the Kano_API, THE deployment documentation SHALL describe the Railway configuration with Gunicorn, including the start command, the required environment variable names, and the Railway public URL.
 3. WHEN the Kano_API is deployed, THE user SHALL apply the schema to the production database by running `flask db upgrade` as a manual Migration_Step before the deployed Kano_API is verified.
-4. WHEN the deployed Kano_API is verified, THE GET `/api/health` request SHALL return status 200 with `{ "data": { "status": "ok" } }`, THE POST `/api/auth/register` request SHALL return status 201, and THE POST `/api/auth/login` request SHALL return status 200 with a JWT, each sent from Postman against the public URL.
+4. WHEN the deployed Kano_API is verified, THE GET `/api/health` request SHALL return status 200 with `{ "data": { "status": "ok" } }`, THE POST `/api/auth/register` request SHALL return status 201, and THE POST `/api/auth/login` request SHALL return status 200 with an Access_Token and a Refresh_Token, each sent from Postman against the public URL.
 5. WHEN the deployed Kano_API is verified, THE deployed Kano_API SHALL answer at least one request to each of the eight Blueprint_Package groups (auth, boards, columns, cards, comments, notifications, analytics, users) with a body in the Response_Envelope form.
 6. WHEN the deployed Kano_Web is verified, THE deployed Kano_Web SHALL load each of the Dashboard, Board Detail, Card Detail Modal, My Tasks, Profile, Register, and Login pages against the deployed Kano_API, with no failed network requests (status 4xx or 5xx caused by configuration) and no uncaught errors in the browser console.
 7. THE deployment configuration SHALL set the Kano_API allowed-origins environment variable to the exact public URL of the deployed Kano_Web, and THE deployment configuration SHALL set `NEXT_PUBLIC_API_BASE_URL` and `API_BASE_URL` to the public URL of the deployed Kano_API.
@@ -687,7 +702,7 @@ kano-app/
 
 1. THE README.md SHALL be located in the repository root and SHALL contain the sections Overview, AI Workflow Summary, Features, Technologies, Local Run Steps, Test Steps, and Screenshots, each under its own heading.
 2. THE README.md Overview section SHALL state what Kano is in 1 to 5 sentences and name the two deployed projects (Kano_API and Kano_Web) with their public URLs.
-3. THE README.md Features section SHALL list at least one entry for each of: JWT authentication, board management, column management, card management, board members with roles, drag-and-drop with FLOAT ordering, comments, notifications, card search, My Tasks view, user profile, and board analytics.
+3. THE README.md Features section SHALL list at least one entry for each of: JWT authentication with access and refresh tokens, board management, column management, card management, board members with roles, drag-and-drop with FLOAT ordering, comments, notifications, card search, My Tasks view, user profile, and board analytics.
 4. THE AI Workflow Summary SHALL contain one subsection for each of the following topics, with at least 3 sentences per subsection: how the project brief was written, how Kiro generated and iterated the specifications, how Guidelines were authored and applied, how code was reviewed against the Guidelines, how violations were documented and resolved, and how Claude Code generated and refined tests and documentation.
 5. THE AI Workflow Summary SHALL link to the Guidelines, the violation report, and the before/after comparison required by Requirement 30, and every link SHALL resolve to an existing file in the repository.
 6. THE README.md Technologies section SHALL list Next.js, React, TypeScript, Tailwind CSS, react-hot-toast, Playwright, Flask, SQLAlchemy, Flask-Migrate, Flask-JWT-Extended, Marshmallow, PostgreSQL, python-dotenv, Gunicorn, Vercel, Railway (marked as an optional alternative), Kiro, and Claude Code.
@@ -695,5 +710,5 @@ kano-app/
 8. THE README.md Local Run Steps SHALL state the prerequisite versions (Python 3.14, Node.js, and PostgreSQL) and the local URLs where Kano_API and Kano_Web are reachable after startup.
 9. THE README.md Test Steps SHALL list the commands `pytest -v` (run in `app/`), `npm test` (run in `web/`), `npx playwright install`, `npx playwright test`, and `npx playwright show-report`, and SHALL name the environment variable that holds the live Vercel frontend URL for the Playwright run.
 10. THE README.md Screenshots section SHALL include image files, each with a caption naming its subject, for: a Postman run covering all eight Blueprint_Package endpoint groups against the public URL, the Dashboard, Board Detail, Card Detail Modal, My Tasks, Profile, Register, and Login pages, a Card being dragged between Columns, the notification bell showing an unread count greater than zero, and the Playwright HTML report showing all tests passed.
-11. THE README.md SHALL document the XSS exposure of the non-httpOnly Auth_Cookie and its mitigations, as required by Requirement 28 criterion 8.
+11. THE README.md SHALL document the XSS exposure of the non-httpOnly access cookie and refresh cookie (both tokens) and its mitigations, and SHALL document that Refresh_Tokens are stateless and cannot be revoked on logout, as required by Requirement 28 criterion 8 and Requirement 6 criterion 15.
 12. IF a link or image path in README.md does not resolve to an existing file or URL, THEN THE repository SHALL be treated as failing this requirement until the link or image path is corrected.
