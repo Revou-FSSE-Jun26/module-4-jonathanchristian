@@ -1,6 +1,6 @@
 # Requirements Document
 
-**Version:** V2
+**Version:** V3
 
 ## Introduction
 
@@ -136,18 +136,24 @@ kano-app/
 
 #### Acceptance Criteria
 
-1. WHEN a request succeeds, THE Kano_API SHALL return a 2xx status with a JSON body whose only top-level key is `data`, in the form `{ "data": ... }`.
-2. IF a request fails, THEN THE Kano_API SHALL return the HTTP status code that matches the failure type, with a JSON body whose only top-level key is `error`, in the form `{ "error": "<message>" }`, where `<message>` is a non-empty string of at most 500 characters.
-3. THE Kano_API SHALL validate every request body and query string with a Marshmallow schema defined in the Blueprint_Package `schema.py`.
-4. IF request validation fails, THEN THE Kano_API SHALL return status 400 with an error message that names each invalid field, and SHALL NOT change any stored data.
-5. IF an unhandled exception occurs, THEN THE Kano_API SHALL return status 500 with a generic error message that contains no stack trace, SQL text, or database details, SHALL log the exception, and SHALL roll back any uncommitted database changes from that request.
-6. IF a requested resource does not exist or is soft deleted, THEN THE Kano_API SHALL return status 404.
-7. IF a request to a protected endpoint has a missing, malformed, invalid-signature, or expired JWT, THEN THE Kano_API SHALL return status 401.
-8. IF an authenticated User lacks permission for the requested resource, THEN THE Kano_API SHALL return status 403.
-9. THE Kano_API SHALL serialize every UUID as a lowercase hyphenated string of 36 characters and every timestamp as an ISO 8601 UTC string ending in `Z` or `+00:00`.
-10. THE Kano_API SHALL enable CORS only for the origins listed in the allowed-origins environment variable and SHALL allow the `Authorization` and `Content-Type` headers.
-11. IF a request comes from an origin that is not in the allowed-origins environment variable, THEN THE Kano_API SHALL omit the CORS allow-origin header from the response.
-12. IF a request is sent to a path or method that the Kano_API does not define, THEN THE Kano_API SHALL return status 404 or 405 respectively, in the `{ "error": "<message>" }` form.
+1. WHEN a request succeeds, THE Kano_API SHALL return the exact success status code defined in criterion 3 with a JSON body whose only top-level key is `data`, in the form `{ "data": ... }`.
+2. THE Kano_API SHALL set the status code on the HTTP status line of every response and SHALL NOT repeat the status code as a field in the JSON body, and the JSON body SHALL contain no top-level key other than `data` or `error`.
+3. WHEN a POST request creates a resource (POST `/api/auth/register`, `/api/boards`, `/api/boards/<id>/members`, `/api/boards/<id>/columns`, `/api/columns/<id>/cards`, and `/api/cards/<id>/comments`), THE Kano_API SHALL return status 201, and WHEN any other request succeeds (POST `/api/auth/login`, every GET including `/api/health`, every PATCH including `/api/cards/<id>/position`, `/api/boards/<id>/columns/reorder`, and `/api/notifications/<id>/read`, and every DELETE), THE Kano_API SHALL return status 200.
+4. WHEN a DELETE request succeeds, THE Kano_API SHALL return status 200 with a body of the form `{ "data": ... }` containing a JSON object (for example the id of the deleted resource), and SHALL NOT return status 204 or an empty body.
+5. IF a request fails, THEN THE Kano_API SHALL return the exact HTTP status code defined in criterion 6 for the failure type, with a JSON body whose only top-level key is `error`, in the form `{ "error": "<message>" }`, where `<message>` is a non-empty string of at most 500 characters.
+6. THE Kano_API SHALL map failures to status codes as follows: request validation failure 400; missing, malformed, invalid, or expired JWT 401; permission or Board_Membership failure 403; missing or soft-deleted resource, or a path id that is not a valid UUID, 404; unsupported method 405; unique-constraint conflict (duplicate) 409; unhandled exception or database failure 500.
+7. IF a requirement states that the Kano_API returns an error without naming a status code, THEN THE Kano_API SHALL apply the mapping in criterion 6, returning 409 for a unique-constraint violation, 400 for a foreign-key or NOT NULL violation, and 500 for any other unexpected failure.
+8. THE Kano_API SHALL return every error message as a human-readable string, and for status 500 the message SHALL be generic and contain no stack trace, SQL text, or database details.
+9. THE Kano_API SHALL validate every request body and query string with a Marshmallow schema defined in the Blueprint_Package `schema.py`.
+10. IF request validation fails, THEN THE Kano_API SHALL return status 400 with an error message that names each invalid field, and SHALL NOT change any stored data.
+11. IF an unhandled exception occurs, THEN THE Kano_API SHALL return status 500 with a generic error message that contains no stack trace, SQL text, or database details, SHALL log the exception, and SHALL roll back any uncommitted database changes from that request.
+12. IF a requested resource does not exist or is soft deleted, THEN THE Kano_API SHALL return status 404.
+13. IF a request to a protected endpoint has a missing, malformed, invalid-signature, or expired JWT, THEN THE Kano_API SHALL return status 401.
+14. IF an authenticated User lacks permission for the requested resource, THEN THE Kano_API SHALL return status 403.
+15. THE Kano_API SHALL serialize every UUID as a lowercase hyphenated string of 36 characters and every timestamp as an ISO 8601 UTC string ending in `Z` or `+00:00`.
+16. THE Kano_API SHALL enable CORS only for the origins listed in the allowed-origins environment variable and SHALL allow the `Authorization` and `Content-Type` headers.
+17. IF a request comes from an origin that is not in the allowed-origins environment variable, THEN THE Kano_API SHALL omit the CORS allow-origin header from the response.
+18. IF a request is sent to a path or method that the Kano_API does not define, THEN THE Kano_API SHALL return status 404 or 405 respectively, in the `{ "error": "<message>" }` form.
 
 ### Requirement 5: Health Check
 

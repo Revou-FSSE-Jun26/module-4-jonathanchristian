@@ -36,3 +36,28 @@
 - Requirements: 1 (criteria 5 to 9 added, 10 to 15 renumbered), 30 (criterion 6 reworded, criterion 7 added). Requirement 3 reviewed, not changed.
 - Other sections: Folder Structure, Glossary (Blueprint_Package), version marker set to V2.
 - Design and tasks: `design.md` and `tasks.md` do not exist yet.
+
+## V3 - 2026-11-14
+### Changes
+- Specification change (Requirement 4 only, option A approved by the user): the Response_Envelope stays exactly as in `kano.md` (success `{ "data": ... }`, error `{ "error": "<message>" }`, no `status` or `message` field in the body). The status code is carried only by the HTTP status line, and every response carries the exact code. The frontend reads it from `response.status` (Requirements 16.6 and 16.7, unchanged).
+- Requirement 4 now has 18 criteria (was 12). New criteria 2, 3, 4, 6, 7, 8. Criteria 1 and 5 amended. Former criteria 3 to 12 are now 9 to 18 with unchanged wording.
+- Version marker in `requirements.md` set to V3.
+
+#### Before / After
+- R4.1 before: "WHEN a request succeeds, THE Kano_API SHALL return a 2xx status with a JSON body whose only top-level key is `data`, in the form `{ "data": ... }`."
+- R4.1 after: "WHEN a request succeeds, THE Kano_API SHALL return the exact success status code defined in criterion 3 with a JSON body whose only top-level key is `data`, in the form `{ "data": ... }`."
+- R4.2 before: "IF a request fails, THEN THE Kano_API SHALL return the HTTP status code that matches the failure type, with a JSON body whose only top-level key is `error`, in the form `{ "error": "<message>" }`, where `<message>` is a non-empty string of at most 500 characters."
+- R4.5 after (former R4.2): "IF a request fails, THEN THE Kano_API SHALL return the exact HTTP status code defined in criterion 6 for the failure type, with a JSON body whose only top-level key is `error`, in the form `{ "error": "<message>" }`, where `<message>` is a non-empty string of at most 500 characters."
+- R4.2 (new): the status code is set on the HTTP status line of every response, is not repeated as a body field, and the body has no top-level key other than `data` or `error`.
+- R4.3 (new): POST requests that create a resource (`/api/auth/register`, `/api/boards`, `/api/boards/<id>/members`, `/api/boards/<id>/columns`, `/api/columns/<id>/cards`, `/api/cards/<id>/comments`) return 201. All other successful requests (POST `/api/auth/login`, every GET including `/api/health`, every PATCH including `/api/cards/<id>/position`, `/api/boards/<id>/columns/reorder`, `/api/notifications/<id>/read`, every DELETE) return 200.
+- R4.4 (new): DELETE returns 200 with `{ "data": ... }` containing a JSON object, never 204 or an empty body.
+- R4.6 (new): failure mapping: validation 400; JWT 401; permission or membership 403; missing, soft-deleted, or invalid-UUID path id 404; unsupported method 405; unique conflict 409; unhandled exception or database failure 500.
+- R4.7 (new): where another requirement says "return an error" without a code, the R4.6 mapping applies (unique violation 409, foreign-key or NOT NULL violation 400, anything unexpected 500).
+- R4.8 (new): error messages are human-readable strings and generic for status 500.
+
+### Reason
+- The user asked whether every response carries the status code. Option A keeps the `kano.md` envelope unchanged and puts the status in the HTTP status line.
+
+### Impact
+- Requirements: 4 only. Requirements 5, 16, and 31.3 were checked and are consistent; no other requirement was edited.
+- Design and tasks: `design.md` and `tasks.md` do not exist yet.
