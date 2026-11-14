@@ -1,6 +1,6 @@
 # Requirements Document
 
-**Version:** V1
+**Version:** V2
 
 ## Introduction
 
@@ -8,7 +8,7 @@ Kano is a Trello-like task management application. Users create boards, organize
 
 ### Project Brief
 
-**Overview.** Kano lets teams plan work on boards. Each board has columns, and each column holds cards ordered by a FLOAT order value. The project is built through an AI-driven workflow using Kiro (specifications, guidelines, code generation) and Claude Code (tests and documentation).
+**Overview.** Kano lets teams plan work on boards. Each board has columns, and each column holds cards ordered by a FLOAT order value. The project is built through an AI-driven workflow using Kiro, Antigravity, and Claude Code (specifications, guidelines, code generation, tests and documentation).
 
 **User roles (per board).**
 - Board_Admin: the user who created the board. Manages members, oversees all cards, and sees analytics and notifications for the board.
@@ -31,10 +31,13 @@ kano-app/
 |-- .kiro/specs/kano/        (requirements.md, design.md, tasks.md, CHANGELOG.md)
 |-- guidelines/              (frontend.md, backend.md, database.md)
 |-- app/                     (Flask backend, project root of the backend)
-|   |-- blueprints/<feature>/  (routes.py, service.py, schema.py)
-|   |-- routes/                (route handlers, one file per resource)
-|   |-- services/              (business logic, one file per resource)
-|   |-- models/                (one file per model)
+|   |-- __init__.py            (application factory create_app)
+|   |-- config.py              (environment configuration)
+|   |-- extensions.py          (SQLAlchemy, Migrate, JWTManager instances)
+|   |-- errors.py              (error handlers, Response_Envelope helpers)
+|   |-- permissions.py         (shared Board_Membership and role checks)
+|   |-- wsgi.py                (entry point)
+|   |-- blueprints/<feature>/  (routes.py, service.py, schema.py incl. SQLAlchemy models)
 |   |-- tests/
 |   |-- migrations/            (generated manually by the user)
 |   `-- venv/                  (already exists)
@@ -62,7 +65,7 @@ kano-app/
 - **AuthContext**: The React context that holds the current User and JWT in Kano_Web.
 - **ApiError**: The typed error class in `web/lib/errors.ts` with `statusCode` and `message` fields.
 - **Migration_Step**: A manual user action: `flask db init`, `flask db migrate`, and `flask db upgrade`.
-- **Blueprint_Package**: A directory `app/blueprints/<feature>/` containing `routes.py`, `service.py`, and `schema.py`.
+- **Blueprint_Package**: A directory `app/blueprints/<feature>/` containing `routes.py`, `service.py`, and `schema.py` (Marshmallow schemas and SQLAlchemy models).
 - **Guidelines**: The documents `guidelines/frontend.md`, `guidelines/backend.md`, and `guidelines/database.md`.
 - **E2E_Suite**: The Playwright test suite run against the live Vercel frontend URL.
 
@@ -76,16 +79,21 @@ kano-app/
 
 #### Acceptance Criteria
 
-1. THE Kano_API SHALL use `app/` as the backend project root with the directories `blueprints/`, `routes/`, `services/`, `models/`, `tests/`, and `migrations/`.
+1. THE Kano_API SHALL use `app/` as the backend project root with the directories `blueprints/`, `tests/`, and `migrations/`.
 2. THE Kano_API SHALL provide exactly one Blueprint_Package under `app/blueprints/` for each of auth, boards, columns, cards, comments, notifications, analytics, and users (8 packages in total), each containing `routes.py`, `service.py`, and `schema.py`.
-3. THE Kano_API SHALL implement `routes.py` and `service.py` in each Blueprint_Package as entry points that contain no business logic and only delegate to the matching per-resource files in `app/routes/` and `app/services/`, and `schema.py` SHALL contain the Marshmallow schemas for that feature.
-4. THE Kano_API SHALL define exactly one model class per file under `app/models/`, with one file for each of User, Board, Board_Membership, Column, Card, Comment, and Notification.
-5. THE Kano_API SHALL install dependencies into the existing `app/venv` using `py -m pip install`.
-6. THE Kano_API SHALL list Flask, Flask-SQLAlchemy, Flask-Migrate, Flask-JWT-Extended, Marshmallow, flask-cors, psycopg2-binary, python-dotenv, Gunicorn, and pytest in `app/requirements.txt`, each pinned to an exact version (`name==version`).
-7. WHEN the Kano_API starts, THE Kano_API SHALL read the database URL, JWT secret, JWT expiry (in seconds), and allowed CORS origins (comma-separated list) from environment variables loaded by python-dotenv.
-8. IF a required environment variable (database URL, JWT secret, JWT expiry, or allowed CORS origins) is missing or empty at startup, THEN THE Kano_API SHALL fail to start and report an error naming the missing variable, without including any variable values.
-9. THE Kano_API SHALL provide `app/.env.example` listing every environment variable read by the Kano_API, each with a placeholder value and no real secrets.
-10. THE Kano_API SHALL name classes in PascalCase and functions, variables, modules, and packages in snake_case, in conformance with PEP 8.
+3. THE Kano_API SHALL implement in each Blueprint_Package the Flask route handlers of that feature in `routes.py`, the business and data-access logic of that feature in `service.py`, and the Marshmallow schemas and SQLAlchemy model(s) of that feature in `schema.py`.
+4. THE Kano_API SHALL define each of the models User, Board, Board_Membership, Column, Card, Comment, and Notification exactly once, in the `schema.py` of its owning Blueprint_Package (users: User; boards: Board and Board_Membership; columns: Column; cards: Card; comments: Comment; notifications: Notification), with no `app/models/` directory, and the auth and analytics Blueprint_Packages SHALL define no model.
+5. THE Kano_API SHALL provide in `app/` the shared modules `__init__.py` (application factory `create_app`), `config.py`, `extensions.py` (SQLAlchemy, Migrate, and JWTManager instances), `errors.py` (error handlers and Response_Envelope helpers), `permissions.py` (shared Board_Membership and role check helpers), and `wsgi.py` (entry point).
+6. THE `service.py` of every Blueprint_Package that enforces Board_Membership or a role SHALL perform the check through the helpers in `app/permissions.py`, as required by Requirement 28 criterion 10.
+7. THE Kano_API SHALL allow a Blueprint_Package to import the models of another Blueprint_Package only from the `schema.py` of that package, and to call functions from the `service.py` of another Blueprint_Package, and SHALL NOT allow a Blueprint_Package to import the `routes.py` of another Blueprint_Package.
+8. THE Kano_API SHALL reference a model of another Blueprint_Package by string name in every relationship and foreign key that points to that model, so that no circular import occurs.
+9. THE application factory SHALL import the `schema.py` of every Blueprint_Package that defines a model before Flask-Migrate runs, so that `flask db migrate` detects all 7 tables (users, boards, board_memberships, columns, cards, comments, notifications).
+10. THE Kano_API SHALL install dependencies into the existing `app/venv` using `py -m pip install`.
+11. THE Kano_API SHALL list Flask, Flask-SQLAlchemy, Flask-Migrate, Flask-JWT-Extended, Marshmallow, flask-cors, psycopg2-binary, python-dotenv, Gunicorn, and pytest in `app/requirements.txt`, each pinned to an exact version (`name==version`).
+12. WHEN the Kano_API starts, THE Kano_API SHALL read the database URL, JWT secret, JWT expiry (in seconds), and allowed CORS origins (comma-separated list) from environment variables loaded by python-dotenv.
+13. IF a required environment variable (database URL, JWT secret, JWT expiry, or allowed CORS origins) is missing or empty at startup, THEN THE Kano_API SHALL fail to start and report an error naming the missing variable, without including any variable values.
+14. THE Kano_API SHALL provide `app/.env.example` listing every environment variable read by the Kano_API, each with a placeholder value and no real secrets.
+15. THE Kano_API SHALL name classes in PascalCase and functions, variables, modules, and packages in snake_case, in conformance with PEP 8.
 
 ### Requirement 2: Database Models and Soft Delete
 
@@ -576,7 +584,8 @@ kano-app/
 3. THE Guidelines SHALL contain no two entries, within one file or across the three files, that address the same topic, and no two entries that give conflicting instructions.
 4. THE repository SHALL contain one before/after comparison document that shows, for at least 1 AI-generated output produced without the Guidelines and the same output produced with the Guidelines, the count of Guideline violations in each version, with the count lower in the "after" version.
 5. THE repository SHALL contain a violation report listing at least 3 Guideline violations found in AI-generated code, and each entry SHALL name the violated guideline, the file where the violation occurred, and the fix applied.
-6. IF a source file in `app/` or `web/` defines code for more than one resource (for example, routes or services for both Cards and Comments) or more than one React component, THEN THE file SHALL be split so that each file contains code for exactly one resource or one component.
+6. THE repository SHALL contain in `app/` only Python source files that each contain code for exactly one feature (Blueprint_Package) or one shared concern, in `web/` only React component files that each define exactly one component, and no source file in `app/` or `web/` that exceeds 300 lines.
+7. IF a source file in `app/` or `web/` exceeds 300 lines, or a Python source file in `app/` mixes code of more than one feature, THEN THE file SHALL be split, and a split Python module SHALL become a package of the same name containing one module per resource (for example `app/blueprints/boards/service/`) whose `__init__.py` keeps `routes`, `service`, and `schema` importable under those names.
 
 ## Part D: Testing
 
