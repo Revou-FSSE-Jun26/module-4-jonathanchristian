@@ -1,8 +1,11 @@
 """Card model and cards Marshmallow schemas."""
 import uuid
 
+from marshmallow import Schema, fields
 from sqlalchemy.dialects import postgresql
 
+from app.blueprints.users.schema import UserRefSchema
+from app.errors import UtcDateTime, UuidField
 from app.extensions import db
 from app.soft_delete import SoftDeleteMixin
 
@@ -38,3 +41,19 @@ class Card(SoftDeleteMixin, db.Model):
         db.Index("ix_cards_board_id", "board_id"),
         db.Index("ix_cards_assignee_id", "assignee_id"),
     )
+
+
+class CardSchema(Schema):
+    """Output schema for a Card. `assignee` must be loaded (joinedload) before dumping."""
+
+    card_id = UuidField()
+    board_id = UuidField()
+    column_id = UuidField()
+    title = fields.String()
+    description = fields.String(allow_none=True)
+    due_date = fields.Date(allow_none=True)
+    labels = fields.List(fields.String())
+    assignee = fields.Nested(UserRefSchema, allow_none=True)
+    order = fields.Float()
+    created_at = UtcDateTime()
+    updated_at = UtcDateTime()

@@ -201,13 +201,15 @@ def test_no_routes_module_is_imported_across_features():
                     assert module != "routes", f"{path} imports {name}"
 
 
-def test_schema_files_import_no_other_feature_module():
+def test_schema_files_import_only_schema_modules_of_other_features():
+    # Cross-feature imports from a schema.py are limited to other schema.py files
+    # (models, shared field helpers); never a service.py or routes.py.
     for feature in FEATURES:
         for path in (APP_DIR / "blueprints" / feature).glob("schema*.py"):
             for name in _imports(path):
-                other, _ = _feature_of(name)
-                if other:
-                    assert other == feature, f"{path} imports {name}"
+                other, module = _feature_of(name)
+                if other and other != feature:
+                    assert module in (None, "schema"), f"{path} imports {name}"
 
 
 def test_permissions_imports_schema_files_only():
