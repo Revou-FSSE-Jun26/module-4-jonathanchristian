@@ -30,4 +30,27 @@ Tick the matching boxes in `tasks.md` yourself when you review.
 - [x] 8.2 board members
 - [x] 8.3 boards tests
 - [x] 8.4 members and roles tests
-- [ ] 9.1 columns (next, paused after 8.4 at the user's request)
+- [x] 9.1 columns package
+- [x] 9.2 columns tests
+- [x] 10.1 notifications package
+- [x] 10.2 notifications tests
+- [x] 11.1 card create, update, delete, position (`cards/service/` package)
+- [x] 11.2 card search and My Tasks (`GET /api/cards`)
+- [x] 11.3 card CRUD and position tests
+- [x] 11.4 search, My Tasks, and SQL metacharacter tests
+- [x] 11.5 assignment notification tests
+- [x] 12.1 comments package
+- [x] 12.2 comments tests
+- [x] 12.3 comment notification tests (in `tests/test_comments.py`)
+- [x] 13.1 analytics package
+- [x] 13.2 analytics tests
+- [x] 14.1 role and membership matrix (`tests/test_enforcement_matrix.py`)
+- [x] 14.2 soft-delete and cascade tests (`tests/test_soft_delete.py`)
+- [x] 14.3 envelope and status tests (`tests/test_envelope_status.py`)
+- [x] 14.4 database failure and hygiene tests (`tests/test_hygiene.py`)
+- [x] 14.5 performance and query-count tests (`tests/test_performance.py`, marker `perf`)
+- [x] 15.1 300-line check (`scripts/check_file_size.py`, `app/tests/test_file_size.py`)
+- [ ] 15.2 [MANUAL] run the API locally (yours)
+- [ ] 16 backend checkpoint (waits for 15.2)
+
+Full run after 15.1: `694 passed, 3 skipped` (the skips are the public-endpoint cases of the 401 test).
