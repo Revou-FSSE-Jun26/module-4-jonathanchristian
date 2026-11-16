@@ -1,9 +1,10 @@
 """Column model and columns Marshmallow schemas."""
 import uuid
 
-from marshmallow import Schema, fields
+from marshmallow import RAISE, Schema, fields, pre_load, validate
 
-from app.errors import UuidField
+from app.blueprints.users.schema import clean_text_fields
+from app.errors import OrderField, UuidField
 from app.extensions import db
 from app.soft_delete import SoftDeleteMixin
 
@@ -22,6 +23,29 @@ class Column(SoftDeleteMixin, db.Model):
         db.CheckConstraint('"order" > 0', name="ck_columns_order_positive"),
         db.Index("ix_columns_board_id_order", "board_id", "order"),
     )
+
+
+class ColumnCreateSchema(Schema):
+    class Meta:
+        unknown = RAISE
+
+    name = fields.String(required=True, validate=validate.Length(min=1, max=100))
+
+    @pre_load
+    def _clean(self, data, **kwargs):
+        return clean_text_fields(data, "name")
+
+
+class ColumnUpdateSchema(ColumnCreateSchema):
+    pass
+
+
+class ColumnReorderSchema(Schema):
+    class Meta:
+        unknown = RAISE
+
+    column_id = UuidField(required=True)
+    order = OrderField(required=True)
 
 
 class ColumnSchema(Schema):
