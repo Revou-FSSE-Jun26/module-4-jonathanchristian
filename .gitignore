@@ -1,0 +1,25 @@
+# Environment files (only the .env.example files are committed)
+.env
+.env.local
+.env*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.hypothesis/
+app/venv/
+
+# Node / Next.js
+node_modules/
+.next/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Vercel
+.vercel/
