@@ -5,7 +5,7 @@ import uuid
 from datetime import timezone
 
 from flask import jsonify, request
-from marshmallow import ValidationError, fields
+from marshmallow import ValidationError, fields, validate
 from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 from werkzeug.exceptions import HTTPException
 
@@ -90,6 +90,20 @@ class UuidField(fields.UUID):
         if not isinstance(value, str) or not _UUID_PATTERN.match(value):
             raise ValidationError("Not a valid UUID.")
         return uuid.UUID(value)
+
+
+class OrderField(fields.Float):
+    """Order_Value input: a finite JSON number greater than 0 (strings and booleans are rejected)."""
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("allow_nan", False)
+        kwargs.setdefault("validate", validate.Range(min=0, min_inclusive=False))
+        super().__init__(**kwargs)
+
+    def _validated(self, value):
+        if isinstance(value, (str, bool)):
+            raise self.make_error("invalid")
+        return super()._validated(value)
 
 
 class UtcDateTime(fields.Field):
