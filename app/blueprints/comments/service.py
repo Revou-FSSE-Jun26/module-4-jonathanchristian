@@ -37,9 +37,10 @@ def _board_admin_id(board_id):
     ).scalar_one_or_none()
 
 
-def create_comment(user, card_id, data):
+def create_comment(user, card_id, load_data):
     """Add the Comment and its notifications in one transaction."""
     card, board, _membership = get_card_for_member(card_id, user.user_id)
+    data = load_data()
     comment = Comment(card_id=card_id, author_id=user.user_id, content=data["content"])
     db.session.add(comment)
     db.session.flush()
@@ -70,8 +71,9 @@ def _owned_comment(user, comment_id):
     return comment
 
 
-def update_comment(user, comment_id, data):
+def update_comment(user, comment_id, load_data):
     comment = _owned_comment(user, comment_id)
+    data = load_data()
     comment.content = data["content"]
     comment.updated_at = utcnow()
     db.session.commit()

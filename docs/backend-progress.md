@@ -54,3 +54,8 @@ Tick the matching boxes in `tasks.md` yourself when you review.
 - [ ] 16 backend checkpoint (waits for 15.2)
 
 Full run after 15.1: `694 passed, 3 skipped` (the skips are the public-endpoint cases of the 401 test).
+
+## Change notes
+
+- **Permission checks now run before body validation** (after 15.1). Previously a non-member (or non-admin) sending an invalid body got 400 because routes validated the body before the service checked access. Now the service checks 404, then 403 (non-member), then 403 (non-admin) first and validates the body afterwards through a `load_data` callable that the route passes in (`lambda: load_json(schema)`). Affected endpoints: `PATCH /api/boards/<id>`, `POST /api/boards/<id>/members`, column create/rename/reorder, card create/update/position, comment create/update. A missing resource with an invalid body now returns 404 instead of 400. Tests: `tests/test_enforcement_matrix.py` expects 403 regardless of the body. Full run: `690 passed, 3 skipped` (performance tests not re-run).
+- `openapi.yaml` in `app/` documents the API for frontend development.

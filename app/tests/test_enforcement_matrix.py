@@ -60,7 +60,7 @@ def test_removed_member_is_locked_out_of_every_endpoint(app, client, auth_header
 # Feature: kano, Property 13: Role and membership enforcement
 @settings(max_examples=100, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(endpoint_id=st.sampled_from(ENDPOINT_IDS), actor=st.sampled_from(ACTORS), body_ok=st.booleans())
-def test_property_forbidden_or_invalid_requests_never_leak_or_change_data(
+def test_property_forbidden_requests_get_403_before_validation_and_never_leak(
     app, client, auth_header, make_user, make_board, make_member, make_column, make_card, make_comment,
     reset_database, endpoint_id, actor, body_ok,
 ):
@@ -72,9 +72,8 @@ def test_property_forbidden_or_invalid_requests_never_leak_or_change_data(
     response = call(client, endpoint, w, auth_header(w.actors[actor]), body)
     invalid = body != "default"
     if actor not in endpoint.allowed:
-        # The route validates the body before the service checks membership, so a forbidden
-        # caller with an invalid body gets 400; with a valid body the answer is always 403.
-        message = assert_envelope(response, 400 if invalid else 403)
+        # Membership and role are checked before the body is validated: always 403.
+        message = assert_envelope(response, 403)
         assert all(secret not in message for secret in SECRETS.values())
         assert snapshot(app) == before
     elif invalid:

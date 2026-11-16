@@ -22,7 +22,7 @@ query_schema = CardQuerySchema()
 @bp.post("/columns/<uuid:column_id>/cards")
 @jwt_required()
 def create_card(column_id):
-    return ok(service.create_card(current_user, column_id, load_json(create_schema)), 201)
+    return ok(service.create_card(current_user, column_id, lambda: load_json(create_schema)), 201)
 
 
 @bp.get("/cards")
@@ -34,7 +34,7 @@ def search_cards():
 @bp.patch("/cards/<uuid:card_id>")
 @jwt_required()
 def update_card(card_id):
-    return ok(service.update_card(current_user, card_id, load_json(update_schema)))
+    return ok(service.update_card(current_user, card_id, lambda: load_json(update_schema)))
 
 
 @bp.delete("/cards/<uuid:card_id>")
@@ -46,4 +46,4 @@ def delete_card(card_id):
 @bp.patch("/cards/<uuid:card_id>/position")
 @jwt_required()
 def move_card(card_id):
-    return ok(service.move_card(current_user, card_id, load_json(position_schema)))
+    return ok(service.move_card(current_user, card_id, lambda: load_json(position_schema)))

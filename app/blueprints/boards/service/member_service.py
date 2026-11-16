@@ -17,8 +17,9 @@ def serialize_member(member_user, role):
     return member_schema.dump(member_user)
 
 
-def add_member(user, board_id, data):
+def add_member(user, board_id, load_data):
     require_board_admin(board_id, user.user_id)
+    data = load_data()  # validated after the 404/403 checks
     target = db.session.execute(
         select(User).where(User.email == data["email"], active(User))
     ).scalar_one_or_none()

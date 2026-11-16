@@ -34,7 +34,7 @@ def get_board(board_id):
 @bp.patch("/boards/<uuid:board_id>")
 @jwt_required()
 def update_board(board_id):
-    return ok(service.update_board(current_user, board_id, load_json(update_schema)))
+    return ok(service.update_board(current_user, board_id, lambda: load_json(update_schema)))
 
 
 @bp.delete("/boards/<uuid:board_id>")
@@ -46,7 +46,7 @@ def delete_board(board_id):
 @bp.post("/boards/<uuid:board_id>/members")
 @jwt_required()
 def add_member(board_id):
-    return ok(service.add_member(current_user, board_id, load_json(member_add_schema)), 201)
+    return ok(service.add_member(current_user, board_id, lambda: load_json(member_add_schema)), 201)
 
 
 @bp.get("/boards/<uuid:board_id>/members")

@@ -9,9 +9,10 @@ from app.permissions import get_card_for_member
 from app.soft_delete import active
 
 
-def move_card(user, card_id, data):
+def move_card(user, card_id, load_data):
     """Store the client-supplied order; the target Column must be active and in the same Board."""
     card, board, _membership = get_card_for_member(card_id, user.user_id)
+    data = load_data()
     target = db.session.execute(
         select(Column.column_id).where(
             Column.column_id == data["column_id"],

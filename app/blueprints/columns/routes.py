@@ -20,13 +20,13 @@ reorder_schema = ColumnReorderSchema()
 @bp.post("/boards/<uuid:board_id>/columns")
 @jwt_required()
 def create_column(board_id):
-    return ok(service.create_column(current_user, board_id, load_json(create_schema)), 201)
+    return ok(service.create_column(current_user, board_id, lambda: load_json(create_schema)), 201)
 
 
 @bp.patch("/columns/<uuid:column_id>")
 @jwt_required()
 def rename_column(column_id):
-    return ok(service.rename_column(current_user, column_id, load_json(update_schema)))
+    return ok(service.rename_column(current_user, column_id, lambda: load_json(update_schema)))
 
 
 @bp.delete("/columns/<uuid:column_id>")
@@ -38,4 +38,4 @@ def delete_column(column_id):
 @bp.patch("/boards/<uuid:board_id>/columns/reorder")
 @jwt_required()
 def reorder_column(board_id):
-    return ok(service.reorder_column(current_user, board_id, load_json(reorder_schema)))
+    return ok(service.reorder_column(current_user, board_id, lambda: load_json(reorder_schema)))

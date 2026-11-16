@@ -78,8 +78,9 @@ def get_board_detail(user, board_id):
     return board_detail_schema.dump(board)
 
 
-def update_board(user, board_id, data):
+def update_board(user, board_id, load_data):
     board, membership = require_board_admin(board_id, user.user_id)
+    data = load_data()  # validated after the 404/403 checks
     board.name = data["name"]
     db.session.commit()
     return serialize_board(board, membership.role)

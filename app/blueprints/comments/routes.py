@@ -15,7 +15,7 @@ update_schema = CommentUpdateSchema()
 @bp.post("/cards/<uuid:card_id>/comments")
 @jwt_required()
 def create_comment(card_id):
-    return ok(service.create_comment(current_user, card_id, load_json(create_schema)), 201)
+    return ok(service.create_comment(current_user, card_id, lambda: load_json(create_schema)), 201)
 
 
 @bp.get("/cards/<uuid:card_id>/comments")
@@ -27,7 +27,7 @@ def list_comments(card_id):
 @bp.patch("/comments/<uuid:comment_id>")
 @jwt_required()
 def update_comment(comment_id):
-    return ok(service.update_comment(current_user, comment_id, load_json(update_schema)))
+    return ok(service.update_comment(current_user, comment_id, lambda: load_json(update_schema)))
 
 
 @bp.delete("/comments/<uuid:comment_id>")

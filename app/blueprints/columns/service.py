@@ -13,9 +13,10 @@ from app.soft_delete import active, soft_delete_where, utcnow
 column_schema = ColumnSchema()
 
 
-def create_column(user, board_id, data):
+def create_column(user, board_id, load_data):
     """Create a Column after the last active one (order 1.0 for the first)."""
     require_board_member(board_id, user.user_id)
+    data = load_data()
     current_max = db.session.execute(
         select(func.max(Column.order)).where(Column.board_id == board_id, active(Column))
     ).scalar_one()
@@ -25,8 +26,9 @@ def create_column(user, board_id, data):
     return column_schema.dump(column)
 
 
-def rename_column(user, column_id, data):
+def rename_column(user, column_id, load_data):
     column, _board, _membership = get_column_for_member(column_id, user.user_id)
+    data = load_data()
     column.name = data["name"]
     db.session.commit()
     return column_schema.dump(column)
@@ -44,9 +46,10 @@ def delete_column(user, column_id):
     return {"column_id": str(column_id)}
 
 
-def reorder_column(user, board_id, data):
+def reorder_column(user, board_id, load_data):
     """Store the client-supplied order; the Column must belong to this Board (else 400)."""
     require_board_member(board_id, user.user_id)
+    data = load_data()
     column = db.session.execute(
         select(Column).where(
             Column.column_id == data["column_id"], Column.board_id == board_id, active(Column)
