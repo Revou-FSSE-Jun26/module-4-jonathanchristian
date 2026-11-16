@@ -19,8 +19,8 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
 
 ## Tasks
 
-- [ ] 1. Phase 0: Repository foundation and guidelines
-  - [ ] 1.1 Create root `.gitignore` and `.vercelignore`
+- [x] 1. Phase 0: Repository foundation and guidelines
+  - [x] 1.1 Create root `.gitignore` and `.vercelignore`
     - `.gitignore` excludes `.env`, `.env.local`, every `.env*` except `.env.example`, `__pycache__/`, `.next/`, `node_modules/`, `app/venv/`
     - `.vercelignore` excludes `web/`, `app/venv/`, `.kiro/`
     - Do not exclude `web/playwright-report/` (it must be committed)
@@ -47,15 +47,15 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Requirements: 30.1, 30.2, 30.3, 28.9_
     - _Design: D2 (Part D)_
 
-  - [ ] 1.5 Create placeholder documents for the guideline evidence
+  - [x] 1.5 Create placeholder documents for the guideline evidence
     - Create `docs/violation-report.md` with a table header (Guideline id, File, Violation, Fix applied) and `docs/guideline-comparison.md` with a header for before and after violation counts
     - Both are filled in task 23.1 and 23.2; add a short note on how the "without guidelines" sample will be produced
     - _Requirements: 30.4, 30.5_
     - _Design: D2 (Part D)_
     - Depends on: 1.2, 1.3, 1.4
 
-- [ ] 2. Phase 1: Backend setup (no database needed)
-  - [ ] 2.1 Install dependencies and create `app/requirements.txt`
+- [x] 2. Phase 1: Backend setup (no database needed)
+  - [x] 2.1 Install dependencies and create `app/requirements.txt`
     - Run `py -m pip install` inside the existing `app/venv` for Flask, Flask-SQLAlchemy, Flask-Migrate, Flask-JWT-Extended, Marshmallow, flask-cors, psycopg2-binary, python-dotenv, Gunicorn, pytest, plus Hypothesis (property tests)
     - Write `app/requirements.txt` with each package pinned `name==version` (use `py -m pip freeze` for the chosen set)
     - Create `app/.env.example` with placeholders for `DATABASE_URL`, `JWT_SECRET_KEY`, `JWT_ACCESS_TOKEN_EXPIRES=3600`, `JWT_REFRESH_TOKEN_EXPIRES=604800`, `CORS_ORIGINS`, `TEST_DATABASE_URL`
@@ -65,27 +65,27 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Requirements: 1.10, 1.11, 1.14, 35.2_
     - _Design: A1, Backend folder layout_
 
-  - [ ] 2.2 Implement `app/config.py` and `app/extensions.py`
+  - [x] 2.2 Implement `app/config.py` and `app/extensions.py`
     - `Config.from_env()` loads python-dotenv, requires `DATABASE_URL`, `JWT_SECRET_KEY`, `JWT_ACCESS_TOKEN_EXPIRES`, `JWT_REFRESH_TOKEN_EXPIRES` (positive integers), `CORS_ORIGINS` (comma-separated list)
     - Raise `ConfigError("Missing required environment variable: NAME")` naming each missing variable and never printing values
     - `extensions.py` holds `db`, `migrate`, `jwt` instances
     - _Requirements: 1.5, 1.12, 1.13, 28.5, 28.6_
     - _Design: A1_
 
-  - [ ] 2.3 Implement `app/soft_delete.py` and `app/ordering.py`
+  - [x] 2.3 Implement `app/soft_delete.py` and `app/ordering.py`
     - `SoftDeleteMixin` (`created_at`, `updated_at` with onupdate, `deleted_at`, `is_deleted` default false), `utcnow()`, `active(model)`, `soft_delete_where(...)`, `start_of_week_utc(now)`
     - `ordering.py`: `next_last_order`, `midpoint_order`, `before_first_order`
     - _Requirements: 2.5, 2.6, 2.7, 2.8, 10.1, 11.1, 14.2_
     - _Design: A5, A6, A8_
 
-  - [ ] 2.4 Implement `app/errors.py`
+  - [x] 2.4 Implement `app/errors.py`
     - `ok`, `fail`, `ApiError` family (400, 401, 403, 404, 409), `load_json(schema)` and query loader, error handlers for `ApiError`, `ValidationError`, werkzeug 404 and 405, `IntegrityError` (pgcode mapping), `OperationalError`, `ProgrammingError`, generic `Exception` (rollback, log, generic 500), JWT callbacks (unauthorized, invalid token incl. wrong type, expired, user lookup error) all returning 401 envelopes
     - Messages at most 500 characters, generic for 500, no SQL text
     - `UuidField` and `UtcDateTime` serialization helpers (lowercase 36-character UUID, ISO 8601 ending `Z`)
     - _Requirements: 3.6, 3.7, 4.1, 4.2, 4.5, 4.6, 4.7, 4.8, 4.9, 4.10, 4.11, 4.12, 4.13, 4.14, 4.15, 4.18, 2.14_
     - _Design: A2_
 
-  - [ ] 2.5 Create the eight Blueprint_Package skeletons, `health.py`, and `create_app`
+  - [x] 2.5 Create the eight Blueprint_Package skeletons, `health.py`, and `create_app`
     - Create `app/blueprints/{auth,users,boards,columns,cards,comments,notifications,analytics}/` each with `__init__.py`, `routes.py` (a Blueprint), `service.py`, `schema.py`
     - `app/health.py`: `GET /api/health` returns `{ "data": { "status": "ok" } }` with no database access
     - `app/__init__.py`: `create_app(config_overrides=None)` builds Config, sets JWT lifetimes as `timedelta`, inits db and jwt, registers error handlers, health blueprint and the 8 feature blueprints under `/api`
@@ -95,7 +95,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A1, Backend folder layout_
     - Depends on: 2.2, 2.3, 2.4
 
-  - [ ] 2.6 Add `app/wsgi.py`, CORS, and the log filter
+  - [x] 2.6 Add `app/wsgi.py`, CORS, and the log filter
     - `wsgi.py` inserts the repository root into `sys.path` and exposes `app = create_app()`
     - `CORS(app, resources={r"/api/*": {...}})` with the configured origins, headers `Authorization` and `Content-Type`, `supports_credentials=False`
     - Logging filter that drops records containing `password` or `Bearer` text; never log request bodies or Authorization headers
@@ -103,7 +103,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A1 step 4 and 6, D10_
     - Depends on: 2.5
 
-  - [ ] 2.7 Write unit tests for configuration (no database)
+  - [x] 2.7 Write unit tests for configuration (no database)
     - Property test (Hypothesis, at least 100 examples): **Property 5: Configuration fails fast**
     - Example tests: missing variable named in the message, no value leaked, non-positive expiry rejected, `.env.example` lists every variable the config reads
     - Tag comments `# Feature: kano, Property 5: ...`
@@ -111,15 +111,15 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Requirements: 1.12, 1.13, 1.14, 28.6, 31.1_
     - Depends on: 2.6
 
-  - [ ] 2.8 Write unit tests for helpers, envelope, health, and CORS (no database)
+  - [x] 2.8 Write unit tests for helpers, envelope, health, and CORS (no database)
     - Tests in `app/tests/`: ordering formulas and edge cases, `start_of_week_utc` (Monday 00:00 UTC, within 7 days), serializers, `ok` and `fail`, unknown path 404 and wrong method 405 envelopes, health 200 within budget and 405 for POST, CORS allow-origin present only for configured origins
     - Property tests: **Property 3: Serialization format**, **Property 4: CORS origin filtering**; partial **Property 1** and **Property 2** on routes that need no database (health, 404, 405)
     - **Validates: Requirements 4.1, 4.2, 4.15, 4.16, 4.17, 4.18, 5.1, 5.3**
     - _Requirements: 4.1, 4.2, 4.15, 4.16, 4.17, 4.18, 5.1, 5.2, 5.3, 5.4, 14.2, 31.1_
     - Depends on: 2.6
 
-- [ ] 3. Phase 2: Backend models and permissions (code only, no database needed)
-  - [ ] 3.1 Define the User, Board, and Board_Membership models
+- [x] 3. Phase 2: Backend models and permissions (code only, no database needed)
+  - [x] 3.1 Define the User, Board, and Board_Membership models
     - `users/schema.py`: `User` with `user_id` UUID PK (`uuid.uuid4`), `name`, `email` (always lowercase), `password_hash`, mixin; check `ck_users_email_lowercase`; partial unique index `uq_users_email_active` where `is_deleted = false`; `normalize_email()` helper
     - `boards/schema.py`: `Board` (`board_id`, `name`, `created_by`) and `BoardMembership` (`board_membership_id`, `board_id`, `user_id`, `role`) with named FKs (`fk_boards_users`, `fk_board_memberships_boards`, `fk_board_memberships_users`), role check constraint, partial unique index on (`board_id`, `user_id`), indexes on `user_id` and `board_id`
     - Relationships use string names and `lazy="raise"`; plan the `boards/schema/` package split when Marshmallow schemas are added
@@ -128,7 +128,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Data Models, D3, D7_
     - Depends on: 2.5
 
-  - [ ] 3.2 Define the Column, Card, Comment, and Notification models
+  - [x] 3.2 Define the Column, Card, Comment, and Notification models
     - `columns/schema.py`: `Column` with `order` `db.Float` not null, check `order > 0`, index (`board_id`, `order`)
     - `cards/schema.py`: `Card` with `db.Column(db.Float)` order, `board_id` (denormalized), `column_id`, `assignee_id`, `labels` ARRAY, checks, indexes (`column_id`, `order`), `board_id`, `assignee_id`
     - `comments/schema.py`: `Comment` (content check 1 to 2000, index `card_id`, `created_at`)
@@ -138,7 +138,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Data Models, ER diagram, D11_
     - Depends on: 2.5
 
-  - [ ] 3.3 Implement `app/permissions.py`
+  - [x] 3.3 Implement `app/permissions.py`
     - `get_board_or_404`, `require_board_member`, `require_board_admin`, `get_column_for_member`, `get_card_for_member`, `get_comment_for_member`, `assert_assignee_is_member`
     - One joined query per helper selecting the resource, its Board, and the caller's active membership; order: 404, then 403 non-member, then 403 non-admin; generic 403 message with no resource data
     - Imports only `schema.py` modules, never a `service.py`
@@ -146,14 +146,14 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A4, D5_
     - Depends on: 3.1, 3.2
 
-  - [ ] 3.4 Wire model imports and Flask-Migrate into `create_app`
+  - [x] 3.4 Wire model imports and Flask-Migrate into `create_app`
     - Import every model-defining `schema.py` (users, boards, columns, cards, comments, notifications) before `migrate.init_app(app, db)` so `flask db migrate` detects all 7 tables
     - Do not create any migration file
     - _Requirements: 1.9, 3.1, 3.2_
     - _Design: A1 step 2, Module dependency rule 5_
     - Depends on: 3.1, 3.2, 2.6
 
-  - [ ] 3.5 Write model metadata tests (no database)
+  - [x] 3.5 Write model metadata tests (no database)
     - Inspect `db.metadata`: exactly 7 tables, PK names, UUID types, `Card.order` and `Column.order` are Float and not nullable, FK names follow the pattern, partial unique indexes and the indexes of Requirement 29.3 exist, every model has the four soft-delete columns, no `app/models/` directory
     - Import-rule test: no `routes.py` is imported across features; no `service.py` is imported by `permissions.py`
     - _Requirements: 1.4, 1.7, 1.9, 2.2, 2.3, 2.4, 2.5, 2.6, 2.12, 29.3, 31.1_
