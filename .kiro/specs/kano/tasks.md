@@ -266,8 +266,8 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Requirements: 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, 9.9, 9.10, 9.11, 9.12, 31.2, 31.3_
     - Depends on: 8.2, 5.1
 
-- [ ] 9. Phase 4e: Columns
-  - [ ] 9.1 Implement the columns Blueprint_Package
+- [x] 9. Phase 4e: Columns
+  - [x] 9.1 Implement the columns Blueprint_Package
     - `schema.py`: `ColumnCreateSchema`, `ColumnUpdateSchema`, `ColumnReorderSchema` (`column_id` UUID, `order` finite float > 0), `ColumnSchema`
     - `service.py`: create with `next_last_order` (1.0 for the first), rename, delete (soft delete Column, its Cards, and their Comments with one `deleted_at`), reorder (400 if the Column is of another Board)
     - `routes.py`: `POST /api/boards/<uuid:id>/columns` (201), `PATCH/DELETE /api/columns/<uuid:id>`, `PATCH /api/boards/<uuid:id>/columns/reorder`; all member-level
@@ -275,15 +275,15 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A5, A6, A11 rows 14 to 17_
     - Depends on: 3.3, 4.3, 8.1
 
-  - [ ] 9.2 Write pytest tests for columns
+  - [x] 9.2 Write pytest tests for columns
     - 201 first order 1.0 and later greater than the maximum, rename, delete cascade to Cards and Comments, reorder success, 400 for another Board's Column, non-UUID id, order 0 or negative, 403 non-member, 404 missing or soft-deleted
     - Property tests: **Property 15: Server order allocation** (columns), **Property 16: Position and reorder persistence** (reorder), **Property 12** (column name boundaries 0, 1, 100, 101)
     - **Validates: Requirements 10.1 to 10.9**
     - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7, 10.8, 10.9, 31.1, 31.2, 31.3_
     - Depends on: 9.1, 5.1
 
-- [ ] 10. Phase 4f: Notifications (before cards and comments, which call it)
-  - [ ] 10.1 Implement the notifications Blueprint_Package
+- [x] 10. Phase 4f: Notifications (before cards and comments, which call it)
+  - [x] 10.1 Implement the notifications Blueprint_Package
     - `schema.py`: `NotificationQuerySchema` (`page`, `per_page` integers 1 to 2147483647, `per_page` at most 100, defaults 1 and 20), `NotificationSchema`, `NotificationPageSchema`
     - `service.py`: `create_notification(recipient_id, type, card, message)` with message shortened to at most 255 characters; pure `comment_recipients(author_id, assignee_id, admin_id)`; paginated list newest first (`created_at` desc, `notification_id` desc) with `total` and `unread_count`; idempotent mark read (403 for another user, 404 missing)
     - `routes.py`: `GET /api/notifications`, `PATCH /api/notifications/<uuid:id>/read`
@@ -291,7 +291,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A7, A11 rows 27 and 28_
     - Depends on: 3.3, 4.3
 
-  - [ ] 10.2 Write pytest tests for notifications
+  - [x] 10.2 Write pytest tests for notifications
     - Pure tests of `comment_recipients` (no duplicates, never the author, assignee and admin rules), pagination (defaults, page beyond last, `per_page` 101, `page` 0, non-integer, 2147483648), only own notifications, mark read idempotent, 403 other user, 404 missing, 401
     - Notification rows are seeded through factories
     - Property tests: **Property 21: Notification recipients** (pure part), **Property 22: Notification pagination**, **Property 23: Mark-read idempotence**
@@ -299,8 +299,8 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Requirements: 13.1, 13.2, 13.3, 13.4, 13.5, 13.6, 13.7, 13.8, 13.9, 13.10, 13.11, 31.2, 31.3_
     - Depends on: 10.1, 5.1
 
-- [ ] 11. Phase 4g: Cards
-  - [ ] 11.1 Implement card create, update, delete, and position
+- [x] 11. Phase 4g: Cards
+  - [x] 11.1 Implement card create, update, delete, and position
     - `schema.py`: `CardCreateSchema`, `CardUpdateSchema` (partial; title 1 to 200, description at most 5000, ISO due date, labels at most 10 of 1 to 30), `CardPositionSchema` (`column_id` UUID, `order` float > 0), `CardSchema`
     - `service.py`: create with `next_last_order` and `board_id` set from the Column; update only supplied fields; delete soft-deletes the Card and its Comments; position validates the target Column belongs to the same Board and is not deleted (400); assignee must be a member (`assert_assignee_is_member`, 400); assignment notification through `notifications/service` in the same transaction
     - `routes.py`: `POST /api/columns/<uuid:id>/cards` (201), `PATCH/DELETE /api/cards/<uuid:id>`, `PATCH /api/cards/<uuid:id>/position`
@@ -309,21 +309,21 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A6, A7, A11 rows 18 to 21_
     - Depends on: 9.1, 10.1
 
-  - [ ] 11.2 Implement card search and My Tasks (`GET /api/cards`)
+  - [x] 11.2 Implement card search and My Tasks (`GET /api/cards`)
     - `CardQuerySchema`: valid combinations only `assignee=me`, or `q` (1 to 100) with optional `board_id`; anything else 400
     - `search_service.py`: LIKE-escape `\`, `%`, `_`; `ilike` on title or description; join Column, Board, and the caller's active membership; return `board_id`, `board_name`, `column_name`; `board_id` with non-member gives 403; `assignee=me` excludes soft-deleted Cards and Boards
     - _Requirements: 11.10, 11.11, 11.12, 11.13, 11.14, 28.3, 28.4_
     - _Design: A10, A11 row 22_
     - Depends on: 11.1
 
-  - [ ] 11.3 Write pytest tests for card CRUD and position
+  - [x] 11.3 Write pytest tests for card CRUD and position
     - 201 order rules, partial update, delete cascade, validation boundaries (title 0, 1, 200, 201; description 5000 and 5001; labels 10 and 11; label length 0, 30, 31; invalid date), assignee not a member 400, position to another Board's Column 400, to a soft-deleted Column 400, non-UUID `column_id` 400, order 0 or negative 400, 403 non-member, 404
     - Property tests: **Property 12** (card fields), **Property 15** (cards), **Property 16** (position), **Property 17** (card partial update), **Property 18** (assignee must be a member)
     - **Validates: Requirements 11.1 to 11.9, 11.15**
     - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7, 11.8, 11.9, 11.15, 31.1, 31.2, 31.3_
     - Depends on: 11.1, 5.1
 
-  - [ ] 11.4 Write pytest tests for search, My Tasks, and SQL metacharacters
+  - [x] 11.4 Write pytest tests for search, My Tasks, and SQL metacharacters
     - Search matches title or description case-insensitively across the caller's Boards only, `board_id` restriction, 403 for a non-member Board, 400 for empty `q`, `q` of 101 characters, invalid `board_id`, no parameters; empty list when none match; `assignee=me` result shape
     - Values containing `%`, `_`, `\`, `'`, `;`, `--` are treated as literal data
     - Property test: **Property 19: Search and My Tasks semantics**
@@ -331,15 +331,15 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Requirements: 11.10, 11.11, 11.12, 11.13, 11.14, 28.3, 28.4, 31.2_
     - Depends on: 11.2, 5.1
 
-  - [ ] 11.5 Write pytest tests for assignment notifications
+  - [x] 11.5 Write pytest tests for assignment notifications
     - Notification created on create with assignee other than the current user and on assignee change; none for self-assignment or an unchanged assignee; message contains the Card title and is at most 255 characters
     - Property test: **Property 21: Notification recipients** (assignment part)
     - **Validates: Requirements 13.1**
     - _Requirements: 13.1, 13.4, 31.2_
     - Depends on: 11.1, 10.1, 5.1
 
-- [ ] 12. Phase 4h: Comments
-  - [ ] 12.1 Implement the comments Blueprint_Package
+- [x] 12. Phase 4h: Comments
+  - [x] 12.1 Implement the comments Blueprint_Package
     - `schema.py`: `CommentCreateSchema`, `CommentUpdateSchema` (1 to 2000 characters with a non-whitespace character), `CommentSchema` with `author`
     - `service.py`: create (member of the Card's Board), list by creation ascending, update and delete only for the owner (403 for everyone else, including the Board_Admin), notifications through `notifications/service` using `comment_recipients` in the same transaction
     - `routes.py`: `POST/GET /api/cards/<uuid:id>/comments`, `PATCH/DELETE /api/comments/<uuid:id>`
@@ -347,21 +347,21 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A7, A11 rows 23 to 26_
     - Depends on: 11.1, 10.1
 
-  - [ ] 12.2 Write pytest tests for comments
+  - [x] 12.2 Write pytest tests for comments
     - 201 success, 400 missing content, 400 empty content, 400 whitespace-only, 400 content 2001 characters, 401 unauthenticated, 403 non-owner edit and delete including the Board_Admin, 403 non-member create and list, 404 missing or soft-deleted, empty list 200, ordering
     - Property tests: **Property 20: Comment ownership**, **Property 12** (comment content)
     - **Validates: Requirements 12.1 to 12.9**
     - _Requirements: 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 12.7, 12.8, 12.9, 31.4_
     - Depends on: 12.1, 5.1
 
-  - [ ] 12.3 Write pytest tests for comment notifications
+  - [x] 12.3 Write pytest tests for comment notifications
     - Assignee notified unless author; Board_Admin notified unless author or already notified as assignee; at most one notification per recipient; author never notified
     - **Validates: Requirements 13.2, 13.3**
     - _Requirements: 13.2, 13.3, 13.4, 31.2_
     - Depends on: 12.1, 5.1
 
-- [ ] 13. Phase 4i: Analytics
-  - [ ] 13.1 Implement the analytics Blueprint_Package
+- [x] 13. Phase 4i: Analytics
+  - [x] 13.1 Implement the analytics Blueprint_Package
     - `schema.py`: `AnalyticsSchema`
     - `service.py`: SQLAlchemy joins and aggregates only: cards per non-deleted Column (outer join, 0 for empty), completed this week (Column named `Done` case-insensitive, `updated_at` from Monday 00:00 UTC to now, 0 when there is no Done Column), member activity (assigned Cards and Comments per active member); exclude soft-deleted rows everywhere
     - `routes.py`: `GET /api/boards/<uuid:id>/analytics` (admin only)
@@ -369,29 +369,29 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A8, A11 row 29_
     - Depends on: 3.3, 4.3, 11.1, 12.1
 
-  - [ ] 13.2 Write pytest tests for analytics
+  - [x] 13.2 Write pytest tests for analytics
     - Counts per Column including empty Columns, no Done Column gives 0, Done with different letter case, week boundary (Monday 00:00 UTC included, earlier excluded, future excluded), member activity zeros, soft-deleted rows excluded, 403 for a non-admin member, 404, 401
     - Property test: **Property 24: Analytics equals a naive model**
     - **Validates: Requirements 14.1 to 14.9**
     - _Requirements: 14.1, 14.2, 14.3, 14.4, 14.5, 14.6, 14.7, 14.8, 14.9, 31.2, 31.3_
     - Depends on: 13.1, 5.1
 
-- [ ] 14. Phase 4j: Cross-cutting backend tests
-  - [ ] 14.1 Write the role and membership enforcement matrix
+- [x] 14. Phase 4j: Cross-cutting backend tests
+  - [x] 14.1 Write the role and membership enforcement matrix
     - Parametrized non-member, member, admin over Board, Column, Card, Comment, member, update, delete, and analytics endpoints; 403 body contains no data of the target resource; data unchanged after 403
     - Property test: **Property 13: Role and membership enforcement**
     - **Validates: Requirements 28.10, 28.11, 8.6, 8.7, 9.9, 9.10, 10.7, 11.15, 12.8, 14.7**
     - _Requirements: 28.10, 28.11, 31.5_
     - Depends on: 12.1, 13.1, 8.2, 5.1
 
-  - [ ] 14.2 Write soft-delete exclusion and cascade tests
+  - [x] 14.2 Write soft-delete exclusion and cascade tests
     - Soft deleting a Board, a Column, and a Card sets `is_deleted` and the same `deleted_at` on the children, leaves other columns and unrelated rows unchanged, and later GETs return 404; every list, search, count, analytics, and notification query excludes soft-deleted rows; a failed cascade (fault injection) leaves all rows unchanged with a 500 envelope; a soft-deleted email or membership does not block a new row
     - Property tests: **Property 6: Soft-deleted rows never appear**, **Property 7: Soft delete is a cascade that preserves data**, **Property 8: Cascade atomicity**, **Property 9**
     - **Validates: Requirements 2.7 to 2.13, 8.9, 12.9, 13.5, 14.6**
     - _Requirements: 2.7, 2.8, 2.9, 2.10, 2.11, 2.12, 2.13, 31.6_
     - Depends on: 12.1, 13.1, 5.1
 
-  - [ ] 14.3 Write envelope, status code, and serialization tests across all endpoints
+  - [x] 14.3 Write envelope, status code, and serialization tests across all endpoints
     - Parametrized over the 29 endpoints (design A11) plus `3a`: assert the body has exactly one top-level key (`data` or `error`), 201 only for the six creating POSTs, 200 elsewhere (DELETE returns a JSON object), each failure type maps to the right status, error messages at most 500 characters, UUID and timestamp formats
     - Unique violation gives 409, FK and NOT NULL violations give 400, no database details in any error body
     - Property tests: **Property 1: Envelope shape**, **Property 2: Status code by outcome**, **Property 3**
@@ -399,7 +399,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 4.10, 4.11, 4.12, 4.13, 4.14, 4.15, 4.18, 2.14, 31.3_
     - Depends on: 12.1, 13.1, 5.1
 
-  - [ ] 14.4 Write database failure and server-side hygiene tests
+  - [x] 14.4 Write database failure and server-side hygiene tests
     - Missing table (using a connection to an empty schema or patched session) and unreachable database return the generic 500 envelope, the process keeps serving later requests, the exception is logged
     - Log output contains no `password`, `Bearer`, or token text for 400, 401, and 500 requests; static check that no SQL is built by string formatting (search the `app/` sources for f-strings or `%` formatting passed to `text(`/`execute(`)
     - Test `dangerous` input values (SQL metacharacters) in register and board name fields are stored as literal data
@@ -407,7 +407,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A1 step 6, A2_
     - Depends on: 12.1, 5.1
 
-  - [ ] 14.5 Write performance and query-count tests (marker `perf`)
+  - [x] 14.5 Write performance and query-count tests (marker `perf`)
     - Seed 20 Columns and 500 Cards; 100 consecutive `GET /api/boards/<id>` requests, p95 under 500 ms, at most 5 queries and an identical count for 10 and 500 Cards
     - Seed 20 Boards with 2000 Cards for the caller; 100 requests each of `GET /api/cards?q=` and `GET /api/cards?assignee=me`, p95 under 500 ms
     - On failure print the measured p95 in ms and mark the check failed
@@ -416,8 +416,8 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Requirements: 29.1, 29.2, 29.3, 29.4, 29.5_
     - Depends on: 11.2, 8.1, 5.1
 
-- [ ] 15. Phase 5a: Backend gates
-  - [ ] 15.1 Add the 300-line file-size check
+- [] 15. Phase 5a: Backend gates
+  - [x] 15.1 Add the 300-line file-size check
     - `scripts/check_file_size.py` scans `app/` (excluding `venv/`, `migrations/`) and `web/` (excluding `node_modules/`, `.next/`) for `.py`, `.ts`, `.tsx` files over 300 lines and exits non-zero listing them
     - A pytest wrapper `app/tests/test_file_size.py` runs the script on `app/`; the same script is reused in task 19.1 for `web/`
     - Split any backend file that fails the check into a package whose `__init__.py` keeps `routes`, `service`, and `schema` importable
