@@ -110,4 +110,4 @@ def query_counter(app):
 
 
 
-pytest_plugins = ["data_fixtures"]
+pytest_plugins = ["data_fixtures", "endpoints"]

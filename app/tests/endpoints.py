@@ -1,0 +1,175 @@
+"""Endpoint table (design A11, board-scoped rows) and the `world` fixture shared by the
+cross-cutting tests (loaded as a pytest plugin by conftest)."""
+from dataclasses import dataclass
+from types import SimpleNamespace
+from typing import Callable, Optional
+
+import pytest
+from sqlalchemy import select
+
+# Distinctive text so a leak of resource data into an error body is detectable.
+SECRETS = {
+    "board": "SecretBoardName",
+    "column": "SecretColumnName",
+    "card": "SecretCardTitle",
+    "comment": "SecretCommentText",
+    "member": "SecretMemberName",
+    "admin": "SecretAdminName",
+}
+MEMBER_AND_ADMIN = frozenset({"member", "admin"})
+ADMIN_ONLY = frozenset({"admin"})
+OWNER_ONLY = frozenset({"member"})  # the world's comment is written by `member`
+
+
+@dataclass(frozen=True)
+class Endpoint:
+    """One Board-scoped endpoint: how to call it and which actors succeed."""
+
+    name: str
+    method: str
+    path: Callable
+    body: Optional[Callable]
+    allowed: frozenset
+    success: int
+    bad_body: Optional[dict] = None  # an invalid body for this endpoint (400), if it has one
+    has_id: bool = True  # False when the path has no resource id to break
+
+    @property
+    def id(self):
+        return self.name
+
+
+def _b(w):
+    return f"/api/boards/{w.board.board_id}"
+
+
+ENDPOINTS = [
+    Endpoint("get_board", "GET", lambda w: _b(w), None, MEMBER_AND_ADMIN, 200),
+    Endpoint("patch_board", "PATCH", lambda w: _b(w), lambda w: {"name": "Renamed"}, ADMIN_ONLY, 200, {"name": ""}),
+    Endpoint("delete_board", "DELETE", lambda w: _b(w), None, ADMIN_ONLY, 200),
+    Endpoint("add_member", "POST", lambda w: _b(w) + "/members", lambda w: {"email": w.newbie.email}, ADMIN_ONLY, 201, {"email": "x"}),
+    Endpoint("list_members", "GET", lambda w: _b(w) + "/members", None, MEMBER_AND_ADMIN, 200),
+    Endpoint("remove_member", "DELETE", lambda w: _b(w) + f"/members/{w.extra.user_id}", None, ADMIN_ONLY, 200),
+    Endpoint("create_column", "POST", lambda w: _b(w) + "/columns", lambda w: {"name": "New"}, MEMBER_AND_ADMIN, 201, {"name": ""}),
+    Endpoint("rename_column", "PATCH", lambda w: f"/api/columns/{w.column.column_id}", lambda w: {"name": "Renamed"}, MEMBER_AND_ADMIN, 200, {"name": ""}),
+    Endpoint("delete_column", "DELETE", lambda w: f"/api/columns/{w.column.column_id}", None, MEMBER_AND_ADMIN, 200),
+    Endpoint(
+        "reorder_column", "PATCH", lambda w: _b(w) + "/columns/reorder",
+        lambda w: {"column_id": str(w.column.column_id), "order": 5.0}, MEMBER_AND_ADMIN, 200, {"order": 0},
+    ),
+    Endpoint("create_card", "POST", lambda w: f"/api/columns/{w.column.column_id}/cards", lambda w: {"title": "New"}, MEMBER_AND_ADMIN, 201, {"title": ""}),
+    Endpoint("update_card", "PATCH", lambda w: f"/api/cards/{w.card.card_id}", lambda w: {"title": "Renamed"}, MEMBER_AND_ADMIN, 200, {"title": ""}),
+    Endpoint("delete_card", "DELETE", lambda w: f"/api/cards/{w.card.card_id}", None, MEMBER_AND_ADMIN, 200),
+    Endpoint(
+        "move_card", "PATCH", lambda w: f"/api/cards/{w.card.card_id}/position",
+        lambda w: {"column_id": str(w.column2.column_id), "order": 2.0}, MEMBER_AND_ADMIN, 200, {"order": -1},
+    ),
+    Endpoint("search_cards", "GET", lambda w: f"/api/cards?q=Card&board_id={w.board.board_id}", None, MEMBER_AND_ADMIN, 200, has_id=False),
+    Endpoint("create_comment", "POST", lambda w: f"/api/cards/{w.card.card_id}/comments", lambda w: {"content": "Hello"}, MEMBER_AND_ADMIN, 201, {"content": ""}),
+    Endpoint("list_comments", "GET", lambda w: f"/api/cards/{w.card.card_id}/comments", None, MEMBER_AND_ADMIN, 200),
+    Endpoint("update_comment", "PATCH", lambda w: f"/api/comments/{w.comment.comment_id}", lambda w: {"content": "Edited"}, OWNER_ONLY, 200, {"content": ""}),
+    Endpoint("delete_comment", "DELETE", lambda w: f"/api/comments/{w.comment.comment_id}", None, OWNER_ONLY, 200),
+    Endpoint("get_analytics", "GET", lambda w: _b(w) + "/analytics", None, ADMIN_ONLY, 200),
+]
+ENDPOINT_IDS = [endpoint.id for endpoint in ENDPOINTS]
+
+
+def call(client, endpoint, world, headers=None, body="default"):
+    """Send the endpoint's request; `body="default"` uses the endpoint's own valid body."""
+    payload = endpoint.body(world) if (body == "default" and endpoint.body) else (None if body == "default" else body)
+    kwargs = {"headers": headers or {}}
+    if payload is not None:
+        kwargs["json"] = payload
+    return getattr(client, endpoint.method.lower())(endpoint.path(world), **kwargs)
+
+
+def snapshot(app):
+    """Every row of every table, as strings, in primary-key order."""
+    from app.extensions import db
+
+    with app.app_context():
+        return {
+            table.name: [
+                tuple(map(str, row))
+                for row in db.session.execute(select(table).order_by(*table.primary_key.columns)).all()
+            ]
+            for table in db.metadata.sorted_tables
+        }
+
+
+def build_world(make_user, make_board, make_member, make_column, make_card, make_comment):
+    """One Board with an admin, a member (who wrote the comment), and an outsider."""
+    admin = make_user(name=SECRETS["admin"])
+    member = make_user(name=SECRETS["member"])
+    board = make_board(admin, name=SECRETS["board"])
+    make_member(board, member)
+    extra = make_member(board).member
+    column = make_column(board, SECRETS["column"])
+    column2 = make_column(board, "Other column")
+    card = make_card(column, SECRETS["card"])
+    comment = make_comment(card, member, SECRETS["comment"])
+    outsider = make_user()
+    return SimpleNamespace(
+        admin=admin, member=member, outsider=outsider, newbie=make_user(), extra=extra,
+        board=board, column=column, column2=column2, card=card, comment=comment,
+        actors={"nonmember": outsider, "member": member, "admin": admin},
+    )
+
+
+@pytest.fixture
+def world(make_user, make_board, make_member, make_column, make_card, make_comment):
+    return build_world(make_user, make_board, make_member, make_column, make_card, make_comment)
+
+
+# --- user-level endpoints (design A11 rows 1 to 7, 27, 28, 3a) -------------------------------------
+# Acting user is `world.member`; `auth` says which credential the request carries.
+USER_ENDPOINTS = [
+    (Endpoint("health", "GET", lambda w: "/api/health", None, frozenset(), 200, has_id=False), "none"),
+    (
+        Endpoint(
+            "register", "POST", lambda w: "/api/auth/register",
+            lambda w: {"name": "Fresh", "email": "fresh@example.com", "password": "password123"},
+            frozenset(), 201, {"email": "x"}, has_id=False,
+        ),
+        "none",
+    ),
+    (
+        Endpoint(
+            "login", "POST", lambda w: "/api/auth/login",
+            lambda w: {"email": w.member.email, "password": w.member.password},
+            frozenset(), 200, {"email": "x"}, has_id=False,
+        ),
+        "none",
+    ),
+    (Endpoint("refresh", "POST", lambda w: "/api/auth/refresh", None, frozenset(), 200, has_id=False), "refresh"),
+    (Endpoint("get_me", "GET", lambda w: "/api/users/me", None, frozenset(), 200, has_id=False), "member"),
+    (
+        Endpoint(
+            "patch_me", "PATCH", lambda w: "/api/users/me", lambda w: {"name": "New Name"},
+            frozenset(), 200, {"password": "x"}, has_id=False,
+        ),
+        "member",
+    ),
+    (
+        Endpoint(
+            "create_board", "POST", lambda w: "/api/boards", lambda w: {"name": "Fresh board"},
+            frozenset(), 201, {"name": ""}, has_id=False,
+        ),
+        "member",
+    ),
+    (Endpoint("list_boards", "GET", lambda w: "/api/boards", None, frozenset(), 200, has_id=False), "member"),
+    (Endpoint("list_notifications", "GET", lambda w: "/api/notifications", None, frozenset(), 200, has_id=False), "member"),
+    (
+        Endpoint("mark_read", "PATCH", lambda w: f"/api/notifications/{w.note.notification_id}/read", None, frozenset(), 200),
+        "member",
+    ),
+]
+
+
+def with_auth():
+    """Every endpoint (29 rows plus 3a) as `(endpoint, auth)`; `auth` is none, refresh, member, or admin."""
+    board_level = [(e, "admin" if "admin" in e.allowed else "member") for e in ENDPOINTS]
+    return USER_ENDPOINTS + board_level
+
+
+CREATING_POSTS = {"register", "create_board", "add_member", "create_column", "create_card", "create_comment"}
