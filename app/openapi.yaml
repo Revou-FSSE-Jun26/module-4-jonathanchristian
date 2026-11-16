@@ -1,0 +1,1178 @@
+openapi: 3.0.3
+info:
+  title: Kano API
+  version: "1.0.0"
+  description: |
+    REST API of Kano, a Trello-like task management app. Reference for frontend development.
+
+    **Response envelope.** Every body is exactly `{ "data": ... }` on success or `{ "error": "<message, max 500 chars>" }` on failure. The status code is never part of the body.
+
+    **Status codes.** 201 only for the six creating POSTs (register, create board, add member, create column, create card, create comment). Every other success is 200, and DELETE returns 200 with a `data` object (never 204).
+    Failures: 400 validation, 401 missing/invalid/expired/wrong-type token, 403 not allowed, 404 missing, soft-deleted, or malformed id, 405 wrong method, 409 duplicate, 500 `"Internal server error"`.
+
+    **Authentication.** `POST /api/auth/login` returns an access token and a refresh token. Send the access token as `Authorization: Bearer <token>`. A refresh token is accepted only by `POST /api/auth/refresh`; on any other endpoint it gets 401.
+
+    **Check order.** For board-scoped endpoints the server checks 401, then 404 (resource missing or soft-deleted), then 403 (not a member, then not an admin / not the owner), and only then validates the body (400). A 403 body never contains resource data.
+
+    **Formats.** Ids are lowercase hyphenated UUID strings. Timestamps are ISO 8601 UTC ending in `Z`. `due_date` is an ISO date (`YYYY-MM-DD`). `order` values are floats greater than 0; the server allocates the last position on create, the client computes the value for moves (midpoint of neighbours, or half of the first).
+
+    **Deletes** are soft deletes with cascades: a Board deletes its memberships, columns, cards, and comments; a Column deletes its cards and comments; a Card deletes its comments.
+servers:
+  - url: http://localhost:5000
+    description: Local development (`flask run`)
+tags:
+  - name: Health
+  - name: Auth
+  - name: Users
+  - name: Boards
+  - name: Members
+  - name: Columns
+  - name: Cards
+  - name: Comments
+  - name: Notifications
+  - name: Analytics
+security:
+  - bearerAuth: []
+
+paths:
+  /api/health:
+    get:
+      tags: [Health]
+      summary: Health check (no database access)
+      security: []
+      responses:
+        "200":
+          description: Service is up
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthEnvelope"
+              example:
+                data: { status: ok }
+        "405": { $ref: "#/components/responses/MethodNotAllowed" }
+
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegisterRequest" }
+            example: { name: Ada Lovelace, email: ada@example.com, password: s3cretpass }
+      responses:
+        "201":
+          description: User created (email is stored lowercased)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserEnvelope" }
+              example:
+                data:
+                  user_id: 3f2b1c1e-7d54-4c1a-9a43-0b5e2f6f1d11
+                  name: Ada Lovelace
+                  email: ada@example.com
+                  created_at: "2026-11-16T10:15:30.123456Z"
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "409":
+          description: Email already registered (case-insensitive)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+              example: { error: Email already registered }
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+            example: { email: ada@example.com, password: s3cretpass }
+      responses:
+        "200":
+          description: Tokens and the user profile
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoginEnvelope" }
+              example:
+                data:
+                  access_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.access
+                  refresh_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.refresh
+                  token_type: Bearer
+                  expires_in: 3600
+                  refresh_expires_in: 604800
+                  user:
+                    user_id: 3f2b1c1e-7d54-4c1a-9a43-0b5e2f6f1d11
+                    name: Ada Lovelace
+                    email: ada@example.com
+                    created_at: "2026-11-16T10:15:30.123456Z"
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401":
+          description: Unknown email, wrong password, or deleted user (identical message for all three)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+              example: { error: Invalid email or password }
+
+  /api/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Get a new access token
+      description: Send the **refresh** token as the Bearer token. No body. Refresh tokens are stateless and are not rotated.
+      security:
+        - refreshAuth: []
+      responses:
+        "200":
+          description: A new access token
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RefreshEnvelope" }
+              example:
+                data:
+                  access_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.newaccess
+                  token_type: Bearer
+                  expires_in: 3600
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/users/me:
+    get:
+      tags: [Users]
+      summary: Current user profile
+      responses:
+        "200":
+          description: Profile
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserEnvelope" }
+              example:
+                data:
+                  user_id: 3f2b1c1e-7d54-4c1a-9a43-0b5e2f6f1d11
+                  name: Ada Lovelace
+                  email: ada@example.com
+                  created_at: "2026-11-16T10:15:30.123456Z"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    patch:
+      tags: [Users]
+      summary: Update name and/or email
+      description: At least one of `name` or `email` is required. Any other field (for example `password`) is rejected with 400.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UserUpdateRequest" }
+            example: { name: Ada King }
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UserEnvelope" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409":
+          description: Email already used by another user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
+  /api/boards:
+    post:
+      tags: [Boards]
+      summary: Create a board (the creator becomes its admin)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NameRequest" }
+            example: { name: Product roadmap }
+      responses:
+        "201":
+          description: Board created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BoardEnvelope" }
+              example:
+                data:
+                  board_id: 9c1f6a52-2d0e-4f9c-8f64-6d5d3f7a0c01
+                  name: Product roadmap
+                  my_role: admin
+                  created_at: "2026-11-16T10:20:00.000000Z"
+                  updated_at: "2026-11-16T10:20:00.000000Z"
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    get:
+      tags: [Boards]
+      summary: List my boards (newest first)
+      responses:
+        "200":
+          description: Boards where the caller is an active member
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Board" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/boards/{board_id}:
+    parameters:
+      - $ref: "#/components/parameters/BoardId"
+    get:
+      tags: [Boards]
+      summary: Board detail with columns and cards
+      description: Members and admins see every non-deleted card. Columns are ordered by `order`, cards by `order` within their column. Runs a fixed number of queries regardless of card count.
+      responses:
+        "200":
+          description: Board with nested columns and cards
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BoardDetailEnvelope" }
+              example:
+                data:
+                  board_id: 9c1f6a52-2d0e-4f9c-8f64-6d5d3f7a0c01
+                  name: Product roadmap
+                  my_role: member
+                  created_at: "2026-11-16T10:20:00.000000Z"
+                  updated_at: "2026-11-16T10:20:00.000000Z"
+                  columns:
+                    - column_id: 5a7c0f3e-91b2-4b47-a4c5-0c0d8f2d1e22
+                      board_id: 9c1f6a52-2d0e-4f9c-8f64-6d5d3f7a0c01
+                      name: To Do
+                      order: 1.0
+                      cards:
+                        - card_id: c2d5e4a1-0b6f-4e3d-9d1c-7f8e9a0b1c33
+                          board_id: 9c1f6a52-2d0e-4f9c-8f64-6d5d3f7a0c01
+                          column_id: 5a7c0f3e-91b2-4b47-a4c5-0c0d8f2d1e22
+                          title: Write the spec
+                          description: First draft
+                          due_date: "2026-12-01"
+                          labels: [docs]
+                          assignee: { user_id: 3f2b1c1e-7d54-4c1a-9a43-0b5e2f6f1d11, name: Ada Lovelace }
+                          order: 1.0
+                          created_at: "2026-11-16T10:25:00.000000Z"
+                          updated_at: "2026-11-16T10:25:00.000000Z"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Boards]
+      summary: Rename the board (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NameRequest" }
+            example: { name: Roadmap 2027 }
+      responses:
+        "200":
+          description: Updated board
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BoardEnvelope" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Boards]
+      summary: Soft delete the board and everything in it (admin only)
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BoardIdEnvelope" }
+              example: { data: { board_id: 9c1f6a52-2d0e-4f9c-8f64-6d5d3f7a0c01 } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/boards/{board_id}/members:
+    parameters:
+      - $ref: "#/components/parameters/BoardId"
+    post:
+      tags: [Members]
+      summary: Add a member by email (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MemberAddRequest" }
+            example: { email: grace@example.com }
+      responses:
+        "201":
+          description: Member added with role `member`
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MemberEnvelope" }
+              example:
+                data:
+                  user_id: 7e9a2b44-5c1d-4a8e-b2f0-1d3c5e7a9b55
+                  name: Grace Hopper
+                  email: grace@example.com
+                  role: member
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404":
+          description: Board not found, or no user with that email
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+              example: { error: No user with that email }
+        "409":
+          description: Already a member
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+              example: { error: User is already a member of this board }
+    get:
+      tags: [Members]
+      summary: List members (oldest first, any member)
+      responses:
+        "200":
+          description: Members
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Member" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/boards/{board_id}/members/{user_id}:
+    parameters:
+      - $ref: "#/components/parameters/BoardId"
+      - name: user_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    delete:
+      tags: [Members]
+      summary: Remove a member (admin only)
+      description: Clears the removed user's assignments on this board's cards in the same transaction. An admin cannot remove themselves (400).
+      responses:
+        "200":
+          description: Removed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      user_id: { type: string, format: uuid }
+              example: { data: { user_id: 7e9a2b44-5c1d-4a8e-b2f0-1d3c5e7a9b55 } }
+        "400":
+          description: Tried to remove yourself
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404":
+          description: Board not found, or the user is not a member
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+
+  /api/boards/{board_id}/columns:
+    parameters:
+      - $ref: "#/components/parameters/BoardId"
+    post:
+      tags: [Columns]
+      summary: Create a column (any member)
+      description: Placed after the last active column (`order` 1.0 for the first).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NameRequest" }
+            example: { name: To Do }
+      responses:
+        "201":
+          description: Column created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ColumnEnvelope" }
+              example:
+                data:
+                  column_id: 5a7c0f3e-91b2-4b47-a4c5-0c0d8f2d1e22
+                  board_id: 9c1f6a52-2d0e-4f9c-8f64-6d5d3f7a0c01
+                  name: To Do
+                  order: 1.0
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/boards/{board_id}/columns/reorder:
+    parameters:
+      - $ref: "#/components/parameters/BoardId"
+    patch:
+      tags: [Columns]
+      summary: Set a column's order (any member)
+      description: Stores the client-supplied `order`. A column of another board, or a deleted/unknown column, gives 400.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OrderRequest" }
+            example: { column_id: 5a7c0f3e-91b2-4b47-a4c5-0c0d8f2d1e22, order: 0.5 }
+      responses:
+        "200":
+          description: Updated column
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ColumnEnvelope" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/columns/{column_id}:
+    parameters:
+      - name: column_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      tags: [Columns]
+      summary: Rename a column (any member)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NameRequest" }
+            example: { name: Doing }
+      responses:
+        "200":
+          description: Updated column
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ColumnEnvelope" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Columns]
+      summary: Soft delete a column with its cards and comments (any member)
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      column_id: { type: string, format: uuid }
+              example: { data: { column_id: 5a7c0f3e-91b2-4b47-a4c5-0c0d8f2d1e22 } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/columns/{column_id}/cards:
+    parameters:
+      - name: column_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    post:
+      tags: [Cards]
+      summary: Create a card in a column (any member)
+      description: Placed after the last active card of the column. If `assignee_id` is another board member, that user gets an `assignment` notification.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CardCreateRequest" }
+            example:
+              title: Write the spec
+              description: First draft
+              due_date: "2026-12-01"
+              labels: [docs]
+              assignee_id: 3f2b1c1e-7d54-4c1a-9a43-0b5e2f6f1d11
+      responses:
+        "201":
+          description: Card created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CardEnvelope" }
+              example:
+                data:
+                  card_id: c2d5e4a1-0b6f-4e3d-9d1c-7f8e9a0b1c33
+                  board_id: 9c1f6a52-2d0e-4f9c-8f64-6d5d3f7a0c01
+                  column_id: 5a7c0f3e-91b2-4b47-a4c5-0c0d8f2d1e22
+                  title: Write the spec
+                  description: First draft
+                  due_date: "2026-12-01"
+                  labels: [docs]
+                  assignee: { user_id: 3f2b1c1e-7d54-4c1a-9a43-0b5e2f6f1d11, name: Ada Lovelace }
+                  order: 1.0
+                  created_at: "2026-11-16T10:25:00.000000Z"
+                  updated_at: "2026-11-16T10:25:00.000000Z"
+        "400":
+          description: Validation error, or the assignee is not a board member
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/cards:
+    get:
+      tags: [Cards]
+      summary: Search cards, or list my tasks
+      description: |
+        Valid combinations only: `assignee=me`, or `q` with an optional `board_id`. Anything else (no parameters, empty `q`, `q` over 100 chars, bad `board_id`, `assignee` together with `q`, unknown parameters) gives 400.
+        Search matches title or description case-insensitively across the caller's boards; `%`, `_`, and `\` are literal. `board_id` restricts the search; a board the caller is not a member of gives 403. Soft-deleted cards, columns, and boards are excluded. Results are ordered by board name, column order, card order.
+      parameters:
+        - name: assignee
+          in: query
+          schema: { type: string, enum: [me] }
+        - name: q
+          in: query
+          schema: { type: string, minLength: 1, maxLength: 100 }
+        - name: board_id
+          in: query
+          description: Only valid together with `q`
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Matching cards (empty list when none)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/CardSearchResult" }
+              example:
+                data:
+                  - card_id: c2d5e4a1-0b6f-4e3d-9d1c-7f8e9a0b1c33
+                    board_id: 9c1f6a52-2d0e-4f9c-8f64-6d5d3f7a0c01
+                    column_id: 5a7c0f3e-91b2-4b47-a4c5-0c0d8f2d1e22
+                    title: Write the spec
+                    description: First draft
+                    due_date: "2026-12-01"
+                    labels: [docs]
+                    assignee: { user_id: 3f2b1c1e-7d54-4c1a-9a43-0b5e2f6f1d11, name: Ada Lovelace }
+                    order: 1.0
+                    created_at: "2026-11-16T10:25:00.000000Z"
+                    updated_at: "2026-11-16T10:25:00.000000Z"
+                    board_name: Product roadmap
+                    column_name: To Do
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/cards/{card_id}:
+    parameters:
+      - $ref: "#/components/parameters/CardId"
+    patch:
+      tags: [Cards]
+      summary: Update a card (any member)
+      description: Partial update; only supplied fields change. `description`, `due_date`, and `assignee_id` may be `null` to clear them; `title` and `labels` may not be null. An empty body is a no-op. Changing the assignee to another user creates an `assignment` notification.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CardUpdateRequest" }
+            example: { title: Write the final spec, assignee_id: null }
+      responses:
+        "200":
+          description: Updated card
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CardEnvelope" }
+        "400":
+          description: Validation error, or the assignee is not a board member
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Cards]
+      summary: Soft delete a card and its comments (any member)
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      card_id: { type: string, format: uuid }
+              example: { data: { card_id: c2d5e4a1-0b6f-4e3d-9d1c-7f8e9a0b1c33 } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/cards/{card_id}/position:
+    parameters:
+      - $ref: "#/components/parameters/CardId"
+    patch:
+      tags: [Cards]
+      summary: Move a card to a column and order (drag and drop; any member)
+      description: Stores the client-supplied `order`. The target column must be active and in the same board as the card, otherwise 400.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/OrderRequest" }
+            example: { column_id: 5a7c0f3e-91b2-4b47-a4c5-0c0d8f2d1e22, order: 1.5 }
+      responses:
+        "200":
+          description: Updated card
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CardEnvelope" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/cards/{card_id}/comments:
+    parameters:
+      - $ref: "#/components/parameters/CardId"
+    post:
+      tags: [Comments]
+      summary: Add a comment (any member)
+      description: Notifies the card's assignee and the board admin (type `comment`), never the author, at most once per person.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CommentRequest" }
+            example: { content: Looks good to me }
+      responses:
+        "201":
+          description: Comment created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CommentEnvelope" }
+              example:
+                data:
+                  comment_id: a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c44
+                  card_id: c2d5e4a1-0b6f-4e3d-9d1c-7f8e9a0b1c33
+                  content: Looks good to me
+                  author: { user_id: 3f2b1c1e-7d54-4c1a-9a43-0b5e2f6f1d11, name: Ada Lovelace }
+                  created_at: "2026-11-16T10:30:00.000000Z"
+                  updated_at: "2026-11-16T10:30:00.000000Z"
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    get:
+      tags: [Comments]
+      summary: List comments (oldest first, any member)
+      responses:
+        "200":
+          description: Comments (empty list when none)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/Comment" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/comments/{comment_id}:
+    parameters:
+      - name: comment_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      tags: [Comments]
+      summary: Edit a comment (owner only, even admins get 403)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CommentRequest" }
+            example: { content: Looks great }
+      responses:
+        "200":
+          description: Updated comment (`updated_at` refreshed)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CommentEnvelope" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [Comments]
+      summary: Soft delete a comment (owner only)
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      comment_id: { type: string, format: uuid }
+              example: { data: { comment_id: a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c44 } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/notifications:
+    get:
+      tags: [Notifications]
+      summary: My notifications (newest first, paginated)
+      description: "`page` and `per_page` must be plain positive integers up to 2147483647; `per_page` is at most 100. A page past the last returns an empty `items` list with the same `total` and `unread_count`. `unread_count` covers all of the caller's unread notifications, not just this page."
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 2147483647, default: 1 }
+        - name: per_page
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        "200":
+          description: A page of notifications
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NotificationPageEnvelope" }
+              example:
+                data:
+                  items:
+                    - notification_id: d4c3b2a1-f6e5-4b7a-9c8d-1e0f3a2b5c66
+                      type: assignment
+                      message: 'Assigned to you: "Write the spec"'
+                      card_id: c2d5e4a1-0b6f-4e3d-9d1c-7f8e9a0b1c33
+                      board_id: 9c1f6a52-2d0e-4f9c-8f64-6d5d3f7a0c01
+                      is_read: false
+                      created_at: "2026-11-16T10:26:00.000000Z"
+                  page: 1
+                  per_page: 20
+                  total: 1
+                  unread_count: 1
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/notifications/{notification_id}/read:
+    parameters:
+      - name: notification_id
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    patch:
+      tags: [Notifications]
+      summary: Mark a notification as read (recipient only, idempotent)
+      description: No body. Repeating the request returns 200 with `is_read` still true.
+      responses:
+        "200":
+          description: The notification
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NotificationEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/boards/{board_id}/analytics:
+    parameters:
+      - $ref: "#/components/parameters/BoardId"
+    get:
+      tags: [Analytics]
+      summary: Board analytics (admin only)
+      description: Cards per non-deleted column (0 for empty ones, in column order); cards completed this week (cards in a column named `Done`, case-insensitive, updated from Monday 00:00 UTC up to now; 0 when there is no such column); assigned cards and written comments for every active member.
+      responses:
+        "200":
+          description: Analytics
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AnalyticsEnvelope" }
+              example:
+                data:
+                  cards_per_column:
+                    - { column_id: 5a7c0f3e-91b2-4b47-a4c5-0c0d8f2d1e22, name: To Do, count: 3 }
+                    - { column_id: 6b8d1a4f-02c3-4c58-b5d6-1d1e9a3e2f33, name: Done, count: 0 }
+                  completed_this_week: 0
+                  member_activity:
+                    - { user_id: 3f2b1c1e-7d54-4c1a-9a43-0b5e2f6f1d11, name: Ada Lovelace, assigned_cards: 2, comments: 5 }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token (`type=access`) from login or refresh.
+    refreshAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Refresh token (`type=refresh`), accepted only by `POST /api/auth/refresh`.
+
+  parameters:
+    BoardId:
+      name: board_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    CardId:
+      name: card_id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    ValidationError:
+      description: Validation failed (unknown fields are rejected too). The message lists the failing fields.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+          example: { error: "name: Length must be between 1 and 100." }
+    Unauthorized:
+      description: Missing, malformed, expired, or wrong-type token, or the token's user was deleted
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+          example: { error: Authentication required }
+    Forbidden:
+      description: Not a board member, not an admin, or not the owner. The message never contains resource data.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+          example: { error: You do not have permission to perform this action }
+    NotFound:
+      description: The resource does not exist, is soft deleted, or the id is not a valid UUID
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+          example: { error: Resource not found }
+    MethodNotAllowed:
+      description: Method not allowed
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+          example: { error: Method not allowed }
+
+  schemas:
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, maxLength: 500 }
+    HealthEnvelope:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            status: { type: string, example: ok }
+
+    # --- requests ---
+    RegisterRequest:
+      type: object
+      additionalProperties: false
+      required: [name, email, password]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100, description: Trimmed }
+        email: { type: string, format: email, maxLength: 254, description: Trimmed and lowercased }
+        password: { type: string, minLength: 8, maxLength: 128 }
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, maxLength: 254 }
+        password: { type: string, minLength: 1 }
+    UserUpdateRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        email: { type: string, format: email, maxLength: 254 }
+    NameRequest:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100, description: Trimmed; blank is rejected }
+    MemberAddRequest:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties:
+        email: { type: string, format: email, maxLength: 254 }
+    OrderRequest:
+      type: object
+      additionalProperties: false
+      required: [column_id, order]
+      properties:
+        column_id: { type: string, format: uuid }
+        order:
+          type: number
+          format: double
+          exclusiveMinimum: true
+          minimum: 0
+          description: Finite JSON number greater than 0 (strings, booleans, NaN, and Infinity are rejected)
+    CardCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [title]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200, description: Trimmed }
+        description: { type: string, maxLength: 5000, nullable: true }
+        due_date: { type: string, format: date, nullable: true, description: "ISO date, e.g. 2026-12-01 (date-times are rejected)" }
+        labels:
+          type: array
+          maxItems: 10
+          items: { type: string, minLength: 1, maxLength: 30 }
+        assignee_id: { type: string, format: uuid, nullable: true, description: Must be a member of the card's board }
+    CardUpdateRequest:
+      type: object
+      additionalProperties: false
+      description: Same fields as create, all optional. `title` cannot be null.
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        description: { type: string, maxLength: 5000, nullable: true }
+        due_date: { type: string, format: date, nullable: true }
+        labels:
+          type: array
+          maxItems: 10
+          items: { type: string, minLength: 1, maxLength: 30 }
+        assignee_id: { type: string, format: uuid, nullable: true }
+    CommentRequest:
+      type: object
+      additionalProperties: false
+      required: [content]
+      properties:
+        content: { type: string, minLength: 1, maxLength: 2000, description: Must contain a non-whitespace character; stored as sent }
+
+    # --- resources ---
+    User:
+      type: object
+      properties:
+        user_id: { type: string, format: uuid }
+        name: { type: string }
+        email: { type: string, format: email }
+        created_at: { type: string, format: date-time }
+    UserRef:
+      type: object
+      properties:
+        user_id: { type: string, format: uuid }
+        name: { type: string }
+    Board:
+      type: object
+      properties:
+        board_id: { type: string, format: uuid }
+        name: { type: string }
+        my_role: { type: string, enum: [admin, member], description: The caller's role on this board }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    Member:
+      type: object
+      properties:
+        user_id: { type: string, format: uuid }
+        name: { type: string }
+        email: { type: string, format: email }
+        role: { type: string, enum: [admin, member] }
+    Column:
+      type: object
+      properties:
+        column_id: { type: string, format: uuid }
+        board_id: { type: string, format: uuid }
+        name: { type: string }
+        order: { type: number, format: double }
+    Card:
+      type: object
+      properties:
+        card_id: { type: string, format: uuid }
+        board_id: { type: string, format: uuid }
+        column_id: { type: string, format: uuid }
+        title: { type: string }
+        description: { type: string, nullable: true }
+        due_date: { type: string, format: date, nullable: true }
+        labels: { type: array, items: { type: string } }
+        assignee:
+          allOf:
+            - $ref: "#/components/schemas/UserRef"
+          nullable: true
+        order: { type: number, format: double }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    CardSearchResult:
+      allOf:
+        - $ref: "#/components/schemas/Card"
+        - type: object
+          properties:
+            board_name: { type: string }
+            column_name: { type: string }
+    ColumnWithCards:
+      allOf:
+        - $ref: "#/components/schemas/Column"
+        - type: object
+          properties:
+            cards:
+              type: array
+              items: { $ref: "#/components/schemas/Card" }
+    BoardDetail:
+      allOf:
+        - $ref: "#/components/schemas/Board"
+        - type: object
+          properties:
+            columns:
+              type: array
+              items: { $ref: "#/components/schemas/ColumnWithCards" }
+    Comment:
+      type: object
+      properties:
+        comment_id: { type: string, format: uuid }
+        card_id: { type: string, format: uuid }
+        content: { type: string }
+        author: { $ref: "#/components/schemas/UserRef" }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    Notification:
+      type: object
+      properties:
+        notification_id: { type: string, format: uuid }
+        type: { type: string, enum: [assignment, comment] }
+        message: { type: string, maxLength: 255 }
+        card_id: { type: string, format: uuid }
+        board_id: { type: string, format: uuid, description: Use it to navigate to the board without a card lookup }
+        is_read: { type: boolean }
+        created_at: { type: string, format: date-time }
+    NotificationPage:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Notification" }
+        page: { type: integer }
+        per_page: { type: integer }
+        total: { type: integer }
+        unread_count: { type: integer }
+    Analytics:
+      type: object
+      properties:
+        cards_per_column:
+          type: array
+          items:
+            type: object
+            properties:
+              column_id: { type: string, format: uuid }
+              name: { type: string }
+              count: { type: integer }
+        completed_this_week: { type: integer }
+        member_activity:
+          type: array
+          items:
+            type: object
+            properties:
+              user_id: { type: string, format: uuid }
+              name: { type: string }
+              assigned_cards: { type: integer }
+              comments: { type: integer }
+
+    # --- envelopes ---
+    UserEnvelope:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/User" }
+    LoginEnvelope:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            access_token: { type: string }
+            refresh_token: { type: string }
+            token_type: { type: string, example: Bearer }
+            expires_in: { type: integer, description: Access token lifetime in seconds (from server configuration) }
+            refresh_expires_in: { type: integer, description: Refresh token lifetime in seconds (from server configuration) }
+            user: { $ref: "#/components/schemas/User" }
+    RefreshEnvelope:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            access_token: { type: string }
+            token_type: { type: string, example: Bearer }
+            expires_in: { type: integer }
+    BoardEnvelope:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/Board" }
+    BoardDetailEnvelope:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/BoardDetail" }
+    BoardIdEnvelope:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            board_id: { type: string, format: uuid }
+    MemberEnvelope:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/Member" }
+    ColumnEnvelope:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/Column" }
+    CardEnvelope:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/Card" }
+    CommentEnvelope:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/Comment" }
+    NotificationEnvelope:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/Notification" }
+    NotificationPageEnvelope:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/NotificationPage" }
+    AnalyticsEnvelope:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/Analytics" }
