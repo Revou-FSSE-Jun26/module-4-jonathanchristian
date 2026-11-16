@@ -180,8 +180,8 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - Depends on: 4.2
     - _Requirements: 3.3, 3.4, 3.5, 31.9_
 
-- [ ] 5. Phase 4a: Backend test infrastructure
-  - [ ] 5.1 Create `app/tests/conftest.py` and test factories
+- [x] 5. Phase 4a: Backend test infrastructure
+  - [x] 5.1 Create `app/tests/conftest.py` and test factories
     - Session start: read `TEST_DATABASE_URL`; refuse to run if it equals `DATABASE_URL` or the database name does not end with `_test`; `pytest.exit("Test database <name> unavailable or schema not applied")` when unreachable or the 7 tables are missing; never use `db.create_all()`
     - Autouse fixture: `TRUNCATE ... RESTART IDENTITY CASCADE` on the 7 tables after each test, so tests are order independent and re-runnable
     - Factories: `make_user`, `make_board` (with admin membership), `make_member`, `make_column`, `make_card`, `make_comment`, `make_notification`, `auth_header(user)` (access token), `refresh_header(user)`, `make_deleted_user(email)` (inserts a `User` row with `is_deleted = true` and `deleted_at` directly)
@@ -190,8 +190,8 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Testing Strategy (Backend)_
     - Depends on: 4.3
 
-- [ ] 6. Phase 4b: Users
-  - [ ] 6.1 Implement the users Blueprint_Package
+- [x] 6. Phase 4b: Users
+  - [x] 6.1 Implement the users Blueprint_Package
     - `schema.py`: `UserSchema`, `UserUpdateSchema` (`unknown = RAISE`, so `password` fails with 400, at least one of name or email, email normalized by `pre_load`)
     - `service.py`: get profile, update profile (lowercased email, 409 on duplicate among non-deleted users), plus the `jwt.user_lookup_loader` that loads the non-deleted User once per request into `flask.g`
     - `routes.py`: `GET /api/users/me`, `PATCH /api/users/me`
@@ -200,15 +200,15 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A3, A11 rows 4 and 5_
     - Depends on: 4.3
 
-  - [ ] 6.2 Write pytest tests for users
+  - [x] 6.2 Write pytest tests for users
     - Success and error paths with envelope and status assertions: GET and PATCH profile, 400 for password field, empty name, malformed email, empty body; 409 duplicate email in a different letter case; 401 for no token, wrong-type token, token of a soft-deleted user (via `make_deleted_user`)
     - Property tests: **Property 17: Partial update** (user), **Property 43: Deleted or unknown token subject yields 401**, user part of **Property 9**
     - **Validates: Requirements 7.1 to 7.6, 6.9**
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 31.2, 31.3_
     - Depends on: 6.1, 5.1
 
-- [ ] 7. Phase 4c: Authentication
-  - [ ] 7.1 Implement the auth Blueprint_Package
+- [x] 7. Phase 4c: Authentication
+  - [x] 7.1 Implement the auth Blueprint_Package
     - `schema.py`: `RegisterSchema`, `LoginSchema` (email normalized, name 1 to 100, email at most 254, password 8 to 128, `unknown = RAISE`)
     - `service.py`: register (salted `generate_password_hash`, 409 case-insensitive), login (dummy hash check for unknown email, identical 401 message for unknown, wrong password, soft-deleted), refresh (loads non-deleted user, issues access token only), calls `users/service`
     - `routes.py`: `POST /api/auth/register` (201), `POST /api/auth/login` (200 with `access_token`, `refresh_token`, `token_type`, `expires_in`, `refresh_expires_in`, `user`), `POST /api/auth/refresh` with `@jwt_required(refresh=True)` returning `access_token`, `token_type`, `expires_in`
@@ -217,7 +217,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A3, A11 rows 2, 3, 3a_
     - Depends on: 6.1
 
-  - [ ] 7.2 Write pytest tests for register and login
+  - [x] 7.2 Write pytest tests for register and login
     - Register: 201, 400 per invalid field (boundaries: name 0, 1, 100, 101; password 7, 8, 128, 129; email 254 and 255), 409 for the same email in another letter case, response has no `password` or `password_hash`
     - Login: 200 shape, 401 identical message for unknown email, wrong password, and soft-deleted user email, 400 for missing or malformed fields
     - Property tests: **Property 9** (email normalization and soft-deleted uniqueness), **Property 10: Password handling**, **Property 11: Register then login round trip**, **Property 12** (auth fields)
@@ -225,7 +225,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.6, 6.7, 6.8, 28.1, 31.1, 31.2, 31.3_
     - Depends on: 7.1, 5.1
 
-  - [ ] 7.3 Write pytest tests for tokens and refresh
+  - [x] 7.3 Write pytest tests for tokens and refresh
     - Login returns access (`type=access`, 3600 s) and refresh (`type=refresh`, 604800 s) tokens with `sub = user_id`, plus `expires_in = 3600` and `refresh_expires_in = 604800`
     - Refresh: 200 and the new token works on `GET /api/users/me`; 401 for an expired token (short test lifetime or patched clock), missing token, malformed token, access token, and refresh token of a soft-deleted user (seed data)
     - A refresh token is rejected with 401 on `GET /api/users/me` and on every other protected endpoint (parametrized); an access token of a soft-deleted user gets 401 on `GET` and `PATCH /api/users/me` and one more protected endpoint
@@ -234,8 +234,8 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Requirements: 6.4, 6.5, 6.9, 6.10, 6.11, 6.12, 6.13, 6.14, 6.15, 4.6, 4.13, 31.11_
     - Depends on: 7.1, 5.1
 
-- [ ] 8. Phase 4d: Boards and members
-  - [ ] 8.1 Implement boards (create, list, detail, update, delete)
+- [x] 8. Phase 4d: Boards and members
+  - [x] 8.1 Implement boards (create, list, detail, update, delete)
     - `boards/schema.py`: `BoardCreateSchema`, `BoardUpdateSchema` (name 1 to 100, not blank), `BoardSchema`, `BoardDetailSchema` with `my_role`
     - `boards/service.py`: create Board and admin membership in one transaction (rollback on failure); list by `created_at` descending; detail with exactly 4 queries (user lookup, board plus membership, columns, cards with assignee `joinedload`); update and delete admin-only; delete cascades Memberships, Columns, Cards, Comments with one `deleted_at` in one transaction (`cascade.py`); read Column, Card, Comment models directly from their `schema.py` (design D4)
     - `routes.py`: `POST/GET /api/boards`, `GET/PATCH/DELETE /api/boards/<uuid:id>`; planned split into `boards/service/` and `boards/schema/` packages when over 300 lines
@@ -243,7 +243,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A5, A9, A11 rows 6 to 10, D4_
     - Depends on: 3.3, 4.3, 6.1
 
-  - [ ] 8.2 Implement board members
+  - [x] 8.2 Implement board members
     - `MemberAddSchema` (email normalized, at most 254), `MemberSchema`
     - `service`: add by lowercased email (404 unknown, 409 duplicate, 400 invalid), list by creation ascending, remove (400 for self, 404 for non-member); on removal set `assignee_id` to null on that user's non-deleted Cards of the Board in the same transaction
     - `routes`: `POST/GET /api/boards/<uuid:id>/members`, `DELETE /api/boards/<uuid:id>/members/<uuid:user_id>`; admin-only for POST and DELETE, member for GET
@@ -251,7 +251,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A4, A11 rows 11 to 13_
     - Depends on: 8.1
 
-  - [ ] 8.3 Write pytest tests for boards
+  - [x] 8.3 Write pytest tests for boards
     - Create makes the creator admin, list order and role, detail columns and cards ordered, 403 for non-member and for non-admin on PATCH and DELETE, 404 for missing, soft-deleted, and non-UUID ids, 400 name boundaries (0, whitespace, 1, 100, 101)
     - Atomic creation test (fault injection after the Board insert leaves no rows, 500 envelope)
     - Property tests: **Property 14: Board creation makes the creator admin**, **Property 15: Server order allocation** (listing order), **Property 8: Cascade atomicity** (Board create part)
@@ -259,7 +259,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8, 8.9, 8.10, 11.16, 31.2, 31.3_
     - Depends on: 8.1, 5.1
 
-  - [ ] 8.4 Write pytest tests for members and roles
+  - [x] 8.4 Write pytest tests for members and roles
     - Add (201), 400, 404, 409, list order, remove (200, 400 self, 404), 403 for non-admin and non-member, a removed member gets 403 afterwards, assignee cleared on removal
     - Property tests: **Property 9** (membership uniqueness ignores soft-deleted rows), **Property 18: Assignee must be a member and removal clears assignment** (removal part)
     - **Validates: Requirements 9.1 to 9.12**
