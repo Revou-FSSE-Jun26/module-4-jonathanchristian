@@ -160,21 +160,21 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Data Models, Module dependency direction_
     - Depends on: 3.4
 
-- [ ] 4. Phase 3: Manual database setup and migrations (user-owned)
-  - [ ] 4.1 [MANUAL] Create the local PostgreSQL databases
+- [x] 4. Phase 3: Manual database setup and migrations (user-owned)
+  - [x] 4.1 [MANUAL] Create the local PostgreSQL databases
     - NOT executed by the agent. The user creates the development database and a separate test database whose name ends in `_test`, then copies `app/.env.example` to `app/.env` and sets `DATABASE_URL`, `TEST_DATABASE_URL`, `JWT_SECRET_KEY`, `JWT_ACCESS_TOKEN_EXPIRES`, `JWT_REFRESH_TOKEN_EXPIRES`, `CORS_ORIGINS`
     - `TEST_DATABASE_URL` must differ from `DATABASE_URL`
     - Depends on: 3.5
     - _Requirements: 3.3, 31.10_
 
-  - [ ] 4.2 [MANUAL] Run `flask db init`, `flask db migrate`, `flask db upgrade` against the development database
+  - [x] 4.2 [MANUAL] Run `flask db init`, `flask db migrate`, `flask db upgrade` against the development database
     - NOT executed by the agent. From `app/` with the venv active, in that order, against the local development database
     - Check that the 7 tables exist: users, boards, board_memberships, columns, cards, comments, notifications
     - Commit the generated `app/migrations/` yourself; no task generates or edits migration scripts
     - Depends on: 4.1
     - _Requirements: 3.2, 3.3, 3.5_
 
-  - [ ] 4.3 [MANUAL] Apply the schema to the test database
+  - [x] 4.3 [MANUAL] Apply the schema to the test database
     - NOT executed by the agent. Run `flask db upgrade` with `DATABASE_URL` pointed at the `*_test` database
     - When this task is checked, every task marked `Depends on: 4.3` is unblocked
     - Depends on: 4.2
