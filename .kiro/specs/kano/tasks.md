@@ -431,7 +431,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - Depends on: 14.5
     - _Requirements: 5.1, 6.1, 6.4, 4.1_
 
-- [ ] 16. Backend checkpoint
+- [x] 16. Backend checkpoint
   - Run `pytest -v` from `app/` against the test database: 0 failures and 0 errors (Requirement 31.8); the file-size test passes
   - Ensure all tests pass, ask the user if questions arise
   - Frontend tasks (17 onward) depend on this checkpoint
