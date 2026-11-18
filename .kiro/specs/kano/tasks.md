@@ -416,7 +416,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Requirements: 29.1, 29.2, 29.3, 29.4, 29.5_
     - Depends on: 11.2, 8.1, 5.1
 
-- [] 15. Phase 5a: Backend gates
+- [x] 15. Phase 5a: Backend gates
   - [x] 15.1 Add the 300-line file-size check
     - `scripts/check_file_size.py` scans `app/` (excluding `venv/`, `migrations/`) and `web/` (excluding `node_modules/`, `.next/`) for `.py`, `.ts`, `.tsx` files over 300 lines and exits non-zero listing them
     - A pytest wrapper `app/tests/test_file_size.py` runs the script on `app/`; the same script is reused in task 19.1 for `web/`
@@ -425,7 +425,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: File size and split rule_
     - Depends on: 14.5
 
-  - [ ] 15.2 [MANUAL] Run the API locally and sanity check it
+  - [x] 15.2 [MANUAL] Run the API locally and sanity check it
     - NOT executed by the agent. From `app/`, run `flask run`, then call `GET /api/health`, register, login, and one board call from Postman or `curl`
     - Confirm the responses use the envelope and the status codes of Requirement 4
     - Depends on: 14.5
