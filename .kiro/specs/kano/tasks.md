@@ -437,8 +437,8 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
   - Frontend tasks (17 onward) depend on this checkpoint
   - _Requirements: 31.8_
 
-- [ ] 17. Phase 6: Frontend setup, libraries, shared components, and hooks
-  - [ ] 17.1 Scaffold `web/` and configure tooling
+- [x] 17. Phase 6: Frontend setup, libraries, shared components, and hooks
+  - [x] 17.1 Scaffold `web/` and configure tooling
     - Scaffold Next.js (App Router, TypeScript, Tailwind) inside `web/` with no `src/` directory; add `react-hot-toast`, Vitest, jsdom, React Testing Library, fast-check, and Playwright as dependencies
     - `package.json` script `test` is `vitest --run` (no watch); Tailwind scans `app/`, `components/`, `hooks/` (`@source` lines in `globals.css` for Tailwind v4)
     - Create `web/.env.example` with exactly `NEXT_PUBLIC_API_BASE_URL` and `API_BASE_URL`; create the directories `components/shared`, `components/{auth,boards,cards,comments,notifications,users}`, `hooks`, `lib`, `__tests__`, `e2e`
@@ -447,7 +447,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B1, Open issue 9_
     - Depends on: 16
 
-  - [ ] 17.2 Create `lib/errors.ts`, `lib/types.ts`, `lib/toast.ts`, and `lib/format.ts`
+  - [x] 17.2 Create `lib/errors.ts`, `lib/types.ts`, `lib/toast.ts`, and `lib/format.ts`
     - `ApiError` with numeric `statusCode` and string `message`; typed API models of design B10
     - `toast.ts`: `showSuccess`, `showError`, `showLoading` for messages of 1 to 200 characters
     - `format.ts`: `formatBadge(n)` (empty for 0, decimal 1 to 99, `"99+"` above 99), `groupByBoard(cards)`, `diffCardFields(original, edited)`
@@ -455,14 +455,14 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B5, B10_
     - Depends on: 17.1
 
-  - [ ] 17.3 Create `lib/validation.ts` with unit and property tests
+  - [x] 17.3 Create `lib/validation.ts` with unit and property tests
     - Validators for name (1 to 100 after trim), email (`local@domain.tld`, at most 254), password (8 to 128), board name, column name, card title (1 to 200), comment text (non-whitespace, at most 2000), profile fields; each mirrors the server rule
     - fast-check test: **Property 29: Client validators mirror server rules**
     - **Validates: Requirements 19.2, 19.7, 20.3, 21.3, 21.7, 23.3, 23.9, 26.3**
     - _Requirements: 19.2, 19.7, 20.3, 21.3, 21.7, 23.3, 23.9, 26.3_
     - Depends on: 17.1
 
-  - [ ] 17.4 Create `lib/order.ts` with unit and property tests
+  - [x] 17.4 Create `lib/order.ts` with unit and property tests
     - `computeDropOrder`, `isValidOrder`, `moveCardInState`, `restoreCardInState`, `computeDropIndex`, `LONG_PRESS_MS`, `MOVE_TOLERANCE_PX`, and the pure `touchGestureStep` state machine
     - fast-check tests: **Property 30: Client drop order computation**, **Property 31: Optimistic move and revert**, **Property 41: Touch drop index from the touch point**, **Property 42: Touch gesture state machine**
     - **Validates: Requirements 22.2 to 22.5, 22.8, 22.12 to 22.16**
@@ -470,7 +470,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B6_
     - Depends on: 17.1
 
-  - [ ] 17.5 Create `lib/authCookie.ts` and `lib/serverAuth.ts` with tests
+  - [x] 17.5 Create `lib/authCookie.ts` and `lib/serverAuth.ts` with tests
     - Constants `ACCESS_COOKIE` and `REFRESH_COOKIE`; `setAccessCookie(token, expiresIn)`, `setRefreshCookie(token, refreshExpiresIn)`, `getAccessToken`, `getRefreshToken`, `clearAuthCookies`, `decodeJwtExp`, pure `guardDecision`; cookies path `/`, `SameSite=Lax`, not httpOnly; lifetimes come only from the response values (no constants)
     - `serverAuth.ts`: `getServerToken()` using `cookies()` from `next/headers`
     - fast-check test: **Property 28: Route guard decision**; example tests with lifetimes other than 3600 and 604800
@@ -479,7 +479,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B4_
     - Depends on: 17.1
 
-  - [ ] 17.6 Create `lib/refreshSession.ts` and `lib/apiClient.ts` with tests
+  - [x] 17.6 Create `lib/refreshSession.ts` and `lib/apiClient.ts` with tests
     - `apiRequest<T>`: base URL from `NEXT_PUBLIC_API_BASE_URL` (browser) or `API_BASE_URL` (server), `ApiError(0, ...)` when missing without sending a request, Bearer header only when a token exists, 10 s timeout and network error as `ApiError(0, ...)`, returns `data`, throws `ApiError(status, error)` or `"Unexpected server response"`
     - Browser only: on 401 with a refresh token (not for login, register, refresh), call single-flight `refreshAccessToken()` once and retry once; refresh 401 or retry 401 calls `sessionExpired()` and throws `ApiError(401)`; network error or 5xx on refresh keeps the cookies
     - Server runtime: never refresh, never write or delete cookies, throw `ApiError(401)` on 401
@@ -490,7 +490,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B5_
     - Depends on: 17.2, 17.5
 
-  - [ ] 17.7 Create `AuthProvider`, `lib/authContext.ts`, and `hooks/useAuth.ts` with tests
+  - [x] 17.7 Create `AuthProvider`, `lib/authContext.ts`, and `hooks/useAuth.ts` with tests
     - `components/auth/AuthProvider.tsx` receives `initialAccessToken` and `initialRefreshToken`; exposes `login`, `logout` (no API call), `updateUser`, `setAccessToken`, `status`; session restore through `GET /api/users/me` (refresh first when only the refresh cookie exists); 401 after the refresh flow clears everything and redirects to `/login`; network error or 5xx keeps cookies and triggers the error handler; registers hooks with `refreshSession`
     - Tests: login sets access cookie lifetime from `expires_in` and refresh cookie lifetime from `refresh_expires_in` (use values other than 3600 and 604800), logout clears both and sends no request, `updateUser` changes only the user, restore success and failure paths
     - **Validates: Requirements 17.1 to 17.6, 17.11, 32.14**
@@ -498,7 +498,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B4_
     - Depends on: 17.6
 
-  - [ ] 17.8 Create `middleware.ts` (or `proxy.ts` if the installed Next version requires it) with tests
+  - [x] 17.8 Create `middleware.ts` (or `proxy.ts` if the installed Next version requires it) with tests
     - Matcher excludes `_next`, static files, `favicon.ico`; uses `guardDecision`; on `refresh` posts to `${API_BASE_URL}/api/auth/refresh` with the refresh token, forwards the new access cookie on the request and sets it on the response with `Max-Age` from `expires_in`; 401 redirects to `/login` and deletes both cookies; network error or 5xx redirects to `/login?expired=1`; `/login?expired=1` always allowed and deletes both cookies
     - Tests with a mocked fetch for each decision branch, unauthenticated redirect, authenticated redirect from `/login` and `/register` to `/`
     - **Validates: Requirements 17.7, 17.8, 17.9, 26.7**
@@ -506,7 +506,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B4, Open issues 9 and 15_
     - Depends on: 17.5, 17.7
 
-  - [ ] 17.9 Create `hooks/useErrorHandler.ts` with tests
+  - [x] 17.9 Create `hooks/useErrorHandler.ts` with tests
     - `handleError(err)`: one toast per call; distinct messages for 400, 401, 403, 404, 409, 500 from a constant map; generic message for any other status or non-ApiError; for 401 clear both cookies and auth state and push `/login`
     - fast-check test: **Property 27: Error handler mapping**
     - **Validates: Requirements 16.11, 16.12, 16.13**
@@ -514,7 +514,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B5_
     - Depends on: 17.7
 
-  - [ ] 17.10 Create shared components with tests
+  - [x] 17.10 Create shared components with tests
     - `components/shared/BaseButton.tsx` (variants `primary` default, `secondary`, `destructive`; disabled ignores click and sets `aria-disabled`; 44 px minimum), `BaseBadge.tsx` (at least 4 color variants, one class map), `BaseModal.tsx` (portal, Escape and backdrop close, content click stays open, focus first focusable or container, Tab trap, focus restore, `role="dialog"`, mobile `max-h-[100dvh] overflow-y-auto`, width inside the viewport), `ConfirmDialog.tsx`, `ErrorPanel.tsx`
     - RTL tests: each BaseButton variant has a distinct class and `onClick` fires once, disabled click ignored; BaseModal absent when closed, present when open, Escape, backdrop, content click, focus in, focus restore
     - **Validates: Requirements 18.1 to 18.12, 32.1, 32.2**
@@ -522,7 +522,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B3, B9_
     - Depends on: 17.1
 
-  - [ ] 17.11 Create `Header`, `Footer`, `UserMenu`, and the root layout
+  - [x] 17.11 Create `Header`, `Footer`, `UserMenu`, and the root layout
     - `components/Header.tsx` (app link, My Tasks link, `UserMenu`, login and register links for anonymous visitors; `NotificationBell` slot added in 17.12), `components/Footer.tsx`, `components/users/UserMenu.tsx` (profile link and logout)
     - `app/layout.tsx` (Server Component): reads both cookies, renders `AuthProvider`, react-hot-toast `Toaster`, one Header and one Footer per page
     - RTL tests: exactly one Header and one Footer, anonymous versus authenticated links, logout action
@@ -530,7 +530,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B1, B3_
     - Depends on: 17.7, 17.10
 
-  - [ ] 17.12 Create `useNotifications`, `NotificationBell`, `NotificationList` with tests
+  - [x] 17.12 Create `useNotifications`, `NotificationBell`, `NotificationList` with tests
     - `hooks/useNotifications.ts`: poll `GET /api/notifications?page=1&per_page=20` on mount and every 30 s while authenticated, keep the previous state silently on a poll error, clear the timer on unmount and logout; `markRead(id)` sets the item read and decreases the count to at least 0, on error the item stays unread and `handleError` fires
     - `NotificationBell` shows `formatBadge(unreadCount)`; `NotificationList` newest first, unread styled differently, empty state; add the bell to `Header`
     - Tests (fake timers): count 1 and 99 shown, hidden at 0, `"99+"`, polling interval, stop on unmount, mark read success and failure
@@ -540,7 +540,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B8_
     - Depends on: 17.9, 17.11
 
-  - [ ] 17.13 Create `hooks/useDebouncedValue.ts` with a test
+  - [x] 17.13 Create `hooks/useDebouncedValue.ts` with a test
     - Returns the value after a delay (300 ms default)
     - fast-check test with fake timers: **Property 33: Search debounce** (keystroke gaps under 300 ms produce at most one request carrying the final text; clearing sends no request)
     - **Validates: Requirements 21.9, 21.10**
@@ -548,7 +548,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B6_
     - Depends on: 17.1
 
-  - [ ] 17.14 Create `hooks/useDragAndDrop.ts` (mouse and touch) with tests
+  - [x] 17.14 Create `hooks/useDragAndDrop.ts` (mouse and touch) with tests
     - API `{ onDragStart, onDragOver, onDrop, onTouchStart, pendingIds, touchDrag }` with one shared `commitDrop(cardId, columnId, index)`; mouse uses HTML5 drag events; touch uses `touchGestureStep`, a 300 ms long-press, `touchmove` default-prevented only while dragging (non-passive document listeners), `document.elementFromPoint`, throttled by `requestAnimationFrame`, cancels native `dragstart` on touch, cleans listeners and timers on every exit path
     - Drop rules: outside a column or same position sends nothing, invalid order does nothing and calls `handleError`, pending card ignored, otherwise optimistic update then `PATCH /api/cards/<id>/position`, revert and one toast on failure
     - Cards use no `touch-action` that blocks panning (`select-none`, `-webkit-touch-callout: none`)
@@ -558,8 +558,8 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B6_
     - Depends on: 17.4, 17.9
 
-- [ ] 18. Phase 7: Frontend pages
-  - [ ] 18.1 Build `/register` with `RegisterForm`
+- [x] 18. Phase 7: Frontend pages
+  - [x] 18.1 Build `/register` with `RegisterForm`
     - `app/(auth)/register/page.tsx` (Server) and `components/auth/RegisterForm.tsx` (Client, controlled inputs name, email, password)
     - Field errors for empty name after trim, name over 100, bad email, password under 8; no request on invalid input; submit button disabled while pending; 201 redirects to `/login` with a success toast; 409 shows an email-in-use error on the email field; 400, 500, and network errors use `useErrorHandler`; entered values kept
     - RTL tests: empty name, malformed email, 7-character password each show an error and send no request; valid form with 8 characters submits; 409 handling
@@ -567,21 +567,21 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B2_
     - Depends on: 17.11, 17.3
 
-  - [ ] 18.2 Build `/login` with `LoginForm`
+  - [x] 18.2 Build `/login` with `LoginForm`
     - `app/(auth)/login/page.tsx` and `components/auth/LoginForm.tsx`; field errors for invalid email and empty password; on 200 call `AuthProvider.login(...)` and push `/`; 401 shows one generic invalid-credentials message and clears the password; other failures use `useErrorHandler` and keep the email
     - RTL tests: empty email, empty password blocked; valid form submits; 401 message and cleared password
     - _Requirements: 19.6, 19.7, 19.8, 19.9, 19.10, 17.2, 32.4_
     - _Design: B2_
     - Depends on: 17.11, 17.3
 
-  - [ ] 18.3 Build the `/` Dashboard
+  - [x] 18.3 Build the `/` Dashboard
     - `app/(boards)/page.tsx` (Server Component, fetches `GET /api/boards` with the access cookie token; a 401 calls `redirect("/login?expired=1")`), `components/boards/BoardList.tsx` (name, role `BaseBadge`, link to `/boards/<id>`), `CreateBoardModal.tsx` (BaseModal, one input, 1 to 100 validation, POST `/api/boards`, close on 201, show the new Board with the admin badge, success toast, keep modal and text on error), empty state with a create button, `ErrorPanel` with retry (`router.refresh()`) for non-401 failures
     - RTL tests: list rendering with badges, validation error with retained text, empty state, error panel
     - _Requirements: 20.1, 20.2, 20.3, 20.4, 20.5, 20.6, 20.7, 20.8, 17.10_
     - _Design: B2_
     - Depends on: 17.11, 17.3
 
-  - [ ] 18.4 Build the Board Detail page shell and Kanban rendering
+  - [x] 18.4 Build the Board Detail page shell and Kanban rendering
     - `app/(boards)/boards/[id]/page.tsx` (Server fetch of `GET /api/boards/<id>`), `components/boards/BoardAccessMessage.tsx` (403 access-denied or 404 not-found message with a link to `/`, no columns or cards), `BoardView.tsx` (Client, owns columns state), `KanbanColumn.tsx`, `ColumnHeader.tsx`, `components/cards/CardItem.tsx`
     - Columns and cards sorted by ascending order; Kanban container `flex gap-4 overflow-x-auto`; column `w-72 min-w-[240px] shrink-0`; cards carry `data-column-id` and drag handles wired in 18.5
     - RTL tests: ordering, 403 and 404 messages render no cards
@@ -589,7 +589,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B2, B6, B9_
     - Depends on: 18.3
 
-  - [ ] 18.5 Add column and card mutations and drag and drop to the board
+  - [x] 18.5 Add column and card mutations and drag and drop to the board
     - `AddColumnForm.tsx`, rename and delete controls in `ColumnHeader` (confirm through `ConfirmDialog`), `components/cards/AddCardForm.tsx`; state updates only after success; validation (name 1 to 100, title 1 to 200) with field errors and no request; errors leave state unchanged and call `handleError`
     - Wire `useDragAndDrop` into `BoardView`, `KanbanColumn`, and `CardItem` (mouse and touch); reload shows the new position
     - RTL tests: add, rename, delete column; add card; validation errors; error keeps state
@@ -597,28 +597,28 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B6_
     - Depends on: 18.4, 17.14
 
-  - [ ] 18.6 Add card search to the board
+  - [x] 18.6 Add card search to the board
     - `components/boards/CardSearchInput.tsx` using `useDebouncedValue(…, 300)`; send `GET /api/cards?q=<text>&board_id=<id>` after the debounce, cancel the previous request with `AbortController`, ignore stale responses, show only matches, show a no-results message, and restore the full board when cleared without a request
     - RTL tests with fake timers: one request after 300 ms, clear restores, empty result message
     - _Requirements: 21.9, 21.10, 21.11_
     - _Design: B6_
     - Depends on: 18.5, 17.13
 
-  - [ ] 18.7 Add the member management panel
+  - [x] 18.7 Add the member management panel
     - `components/boards/MemberPanel.tsx` shown only when `my_role === "admin"`: list members, add by email (validation, 404, 409, 400 messages), remove with confirmation; members controls and analytics link hidden for non-admin members
     - RTL tests: panel visible for admin only, add and remove flows, error handling
     - _Requirements: 21.12, 21.13, 9.1, 9.5, 9.6_
     - _Design: B6_
     - Depends on: 18.5
 
-  - [ ] 18.8 Add the analytics view
+  - [x] 18.8 Add the analytics view
     - `components/boards/AnalyticsView.tsx` opened from the admin-only link; fetches `GET /api/boards/<id>/analytics` and shows cards per column, completed this week, and per-member assigned cards and comments; an error shows an inline message and calls `useErrorHandler`
     - RTL tests: rendering and error state
     - _Requirements: 21.14, 21.16_
     - _Design: B6_
     - Depends on: 18.5
 
-  - [ ] 18.9 Build `CardDetailModal` and the comments UI
+  - [x] 18.9 Build `CardDetailModal` and the comments UI
     - `components/cards/CardDetailModal.tsx` (BaseModal, shows title, description, due date, labels, assignee within 300 ms; edit form sends only changed fields with `diffCardFields`; title 1 to 200 validation; keeps modal and values on error; delete with `ConfirmDialog`; assignee select from the members list)
     - `components/comments/CommentList.tsx`, `CommentItem.tsx`, `CommentForm.tsx`: load, loading, empty and error states; add appends and clears the input; whitespace-only blocked; edit and delete only for owned comments (also hidden for the Board_Admin when not the author); state changes only after success
     - RTL tests: owned versus not owned controls, add, edit, delete, errors, empty state
@@ -628,43 +628,43 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B7_
     - Depends on: 18.5
 
-  - [ ] 18.10 Build `/my-tasks`
+  - [x] 18.10 Build `/my-tasks`
     - `app/(cards)/my-tasks/page.tsx` (Server fetch of `GET /api/cards?assignee=me`), `components/cards/MyTasksList.tsx` grouped by `board_name`; each task shows title, local due date or a "no due date" indicator, column name, and a link to `/boards/<id>`; loading indicator, empty state, and error message with toast
     - RTL tests and **Property 34** (grouping part)
     - _Requirements: 25.1, 25.2, 25.3, 25.4, 25.5, 25.6_
     - _Design: B2_
     - Depends on: 17.11, 17.2
 
-  - [ ] 18.11 Build `/profile`
+  - [x] 18.11 Build `/profile`
     - `app/(users)/profile/page.tsx` and `components/users/ProfileForm.tsx`: pre-filled name and email from AuthContext, no password field, validation (name 1 to 100, email at most 254), PATCH `/api/users/me`, button disabled while pending, `updateUser` on success with a toast, 409 shows an email-in-use error and leaves the user unchanged, other errors use `useErrorHandler` and keep the values
     - RTL tests for each branch
     - _Requirements: 26.1, 26.2, 26.3, 26.4, 26.5, 26.6, 26.7_
     - _Design: B2_
     - Depends on: 17.11, 17.3
 
-  - [ ] 18.12 Responsive pass at 375 px
+  - [x] 18.12 Responsive pass at 375 px
     - Review every page and component against design B9: no horizontal overflow except in the Kanban container, `flex-wrap` and `min-w-0`, stacked form controls below `md`, 44 px tap targets, modal limits, content reachable below 375 px
     - Add RTL class-based assertions where practical (full viewport checks are done by Playwright in 21.4)
     - _Requirements: 27.1, 27.2, 27.3, 27.4, 27.5, 27.6, 27.7, 27.8_
     - _Design: B9_
     - Depends on: 18.6, 18.7, 18.8, 18.9, 18.10, 18.11
 
-- [ ] 19. Phase 8a: Frontend gates
-  - [ ] 19.1 Add frontend repository rule tests
+- [x] 19. Phase 8a: Frontend gates
+  - [x] 19.1 Add frontend repository rule tests
     - `web/__tests__/repo-rules.test.ts`: no `dangerouslySetInnerHTML` under `web/`, no native `<button` outside `BaseButton`, one component per file in `components/`, call `scripts/check_file_size.py` for `web/` (300 lines)
     - Split any failing file
     - _Requirements: 28.9, 18.6, 30.6, 30.7_
     - _Design: B1, File size rule_
     - Depends on: 18.12, 15.1
 
-- [ ] 20. Frontend checkpoint
+- [x] 20. Frontend checkpoint
   - Run `npm test` from `web/` (single run, exit code 0, no network and no running API) and `npm run build` (exit code 0 with `.env.local` from `.env.example`, zero TypeScript errors)
   - Ensure all tests pass, ask the user if questions arise
   - Playwright and later phases depend on this checkpoint
   - _Requirements: 15.6, 32.9, 32.10, 32.11_
 
-- [ ] 21. Phase 9: Playwright end-to-end suite
-  - [ ] 21.1 Create `web/playwright.config.ts`
+- [x] 21. Phase 9: Playwright end-to-end suite
+  - [x] 21.1 Create `web/playwright.config.ts`
     - Read `E2E_BASE_URL`; throw before any test starts with a message naming the variable when it is missing or not an absolute http or https URL
     - `use.baseURL`, `expect.timeout = 10_000`, `timeout = 60_000`, `retries` at most 2, HTML reporter to `playwright-report` with `open: "never"`; a second project with a 375 px viewport
     - Add npm scripts for `npx playwright test` and the report
@@ -672,40 +672,40 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Testing Strategy (Playwright)_
     - Depends on: 20
 
-  - [ ] 21.2 Write the auth E2E scenarios (4 tests)
+  - [x] 21.2 Write the auth E2E scenarios (4 tests)
     - Valid login redirects to `/`; invalid credentials show the error and stay on `/login`; an unauthenticated visit to `/` redirects to `/login`; logout redirects to `/login` and a following visit to `/` redirects again
     - Use unique users created per run; only auto-waiting locators and web-first assertions
     - _Requirements: 33.3, 33.6_
     - Depends on: 21.1
 
-  - [ ] 21.3 Write the Kanban journey E2E (8 steps, mouse drag)
+  - [x] 21.3 Write the Kanban journey E2E (8 steps, mouse drag)
     - One serial test with 8 `test.step` blocks: register a unique user (`e2e+<timestamp>@example.com`), log in, create a Board, add 2 Columns, create a Card in the first, drag it to the second with `dragTo`, reload and confirm the Card is in the second Column, add a Comment then edit it and confirm the new text
     - `test.describe.configure({ mode: "serial" })` so remaining steps skip after a failure
     - _Requirements: 33.4, 33.5, 33.6, 22.11_
     - _Design: Testing Strategy (Playwright)_
     - Depends on: 21.1
 
-  - [ ] 21.4 Write the mobile viewport E2E checks (375 px)
+  - [x] 21.4 Write the mobile viewport E2E checks (375 px)
     - Assert no horizontal overflow outside the Kanban container on Dashboard, Board Detail, My Tasks, Profile, Register, Login; no overlapping interactive elements; tap targets at least 44 by 44 px; modal height within the viewport
     - Do not repeat the drag step on mobile (touch drag is checked manually in 22.8)
     - _Requirements: 27.1, 27.2, 27.3, 27.4, 27.5, 27.6_
     - _Design: B9_
     - Depends on: 21.1
 
-  - [ ] 21.5 Add a check that forbids `waitForTimeout`
+  - [x] 21.5 Add a check that forbids `waitForTimeout`
     - Unit test or script `web/__tests__/no-wait-for-timeout.test.ts` that fails when any file in `web/e2e/` contains `waitForTimeout`
     - _Requirements: 33.6_
     - Depends on: 21.2, 21.3, 21.4
 
 - [ ] 22. Phase 10: Deployment
-  - [ ] 22.1 Add deployment configuration files
+  - [x] 22.1 Add deployment configuration files
     - Root `vercel.json` routing `/(.*)` to `app/wsgi.py` with `@vercel/python`; confirm `NullPool` is used when `VERCEL` is set; add a `.python-version` or runtime pin if the Python 3.14 and `psycopg2-binary` check shows Vercel does not support it
     - Ensure `app/.env.example` and `web/.env.example` list every variable read
     - _Requirements: 34.1, 34.7, 35.2, 1.14, 15.5_
     - _Design: D1, D10_
     - Depends on: 20
 
-  - [ ] 22.2 Write the deployment guide `docs/deployment.md`
+  - [x] 22.2 Write the deployment guide `docs/deployment.md`
     - Two Vercel projects (backend project root is the repository root with `vercel.json`; frontend root directory `web/`), environment variable table of design D1, manual migration steps, verification order, serverless risks (pooling, cold start for the 500 ms health check, Python 3.14 wheels), and the optional Railway section (Gunicorn start command `gunicorn "app.wsgi:app" --bind 0.0.0.0:$PORT --workers 2`, env variable names, generated public URL)
     - Note that Vercel deployment protection must be off so both URLs work without a Vercel login
     - _Requirements: 34.1, 34.2, 34.3, 34.7_
