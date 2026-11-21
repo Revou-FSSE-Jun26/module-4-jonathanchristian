@@ -7,7 +7,7 @@ from app.blueprints.comments.schema import Comment
 from app.blueprints.notifications import service as notifications
 from app.extensions import db
 from app.ordering import next_last_order
-from app.permissions import assert_assignee_is_member, get_card_for_member, get_column_for_member
+from app.permissions import assert_assignee_is_writer, get_card_for_writer, get_column_for_writer
 from app.soft_delete import active, soft_delete_where, utcnow
 
 card_schema = CardSchema()
@@ -33,11 +33,11 @@ def _notify_assignment(card, assignee_id, current_user):
 
 
 def create_card(user, column_id, load_data):
-    column, board, _membership = get_column_for_member(column_id, user.user_id)
+    column, board, _membership = get_column_for_writer(column_id, user.user_id)
     data = load_data()
     assignee_id = data.get("assignee_id")
     if assignee_id is not None:
-        assert_assignee_is_member(board.board_id, assignee_id)
+        assert_assignee_is_writer(board.board_id, assignee_id)
     current_max = db.session.execute(
         select(func.max(Card.order)).where(Card.column_id == column_id, active(Card))
     ).scalar_one()
@@ -56,12 +56,12 @@ def create_card(user, column_id, load_data):
 
 def update_card(user, card_id, load_data):
     """Change only the supplied fields; notify a new assignee in the same transaction."""
-    card, board, _membership = get_card_for_member(card_id, user.user_id)
+    card, board, _membership = get_card_for_writer(card_id, user.user_id)
     data = load_data()
     new_assignee = data.get("assignee_id")
     assignee_changed = "assignee_id" in data and new_assignee != card.assignee_id
     if assignee_changed and new_assignee is not None:
-        assert_assignee_is_member(board.board_id, new_assignee)
+        assert_assignee_is_writer(board.board_id, new_assignee)
     for key in UPDATABLE_FIELDS:
         if key in data:
             setattr(card, key, data[key])
@@ -73,7 +73,7 @@ def update_card(user, card_id, load_data):
 
 def delete_card(user, card_id):
     """Soft delete the Card and its Comments with one `deleted_at`."""
-    get_card_for_member(card_id, user.user_id)
+    get_card_for_writer(card_id, user.user_id)
     ts = utcnow()
     soft_delete_where(db.session, Comment, Comment.card_id == card_id, deleted_at=ts)
     soft_delete_where(db.session, Card, Card.card_id == card_id, deleted_at=ts)

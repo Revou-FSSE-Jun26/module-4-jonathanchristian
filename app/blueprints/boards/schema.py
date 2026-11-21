@@ -19,8 +19,16 @@ class Board(SoftDeleteMixin, db.Model):
     created_by = db.Column(
         db.Uuid, db.ForeignKey("users.user_id", name="fk_boards_users"), nullable=False
     )
+    # V6 Invite_Tokens: nullable (Boards that predate V6 get theirs lazily); a unique constraint
+    # allows many NULLs, so no partial index is needed (design A14).
+    member_invite_token = db.Column(db.String(128), nullable=True)
+    guest_invite_token = db.Column(db.String(128), nullable=True)
 
-    __table_args__ = (db.Index("ix_boards_created_by", "created_by"),)
+    __table_args__ = (
+        db.UniqueConstraint("member_invite_token", name="uq_boards_member_invite_token"),
+        db.UniqueConstraint("guest_invite_token", name="uq_boards_guest_invite_token"),
+        db.Index("ix_boards_created_by", "created_by"),
+    )
 
 
 class BoardMembership(SoftDeleteMixin, db.Model):
@@ -42,7 +50,9 @@ class BoardMembership(SoftDeleteMixin, db.Model):
     user = db.relationship("User", lazy="raise")
 
     __table_args__ = (
-        db.CheckConstraint("role IN ('admin', 'member')", name="ck_board_memberships_role"),
+        db.CheckConstraint(
+            "role IN ('admin', 'member', 'guest')", name="ck_board_memberships_role"
+        ),
         db.Index(
             "uq_board_memberships_board_user_active",
             "board_id",

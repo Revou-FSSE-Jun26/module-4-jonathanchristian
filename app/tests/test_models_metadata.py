@@ -137,15 +137,62 @@ def test_required_filter_and_order_indexes_exist(tables):
             assert [c.name for c in _index(tables[table_name], index_name).columns] == columns
 
 
-def test_check_constraints_exist(tables):
-    def check_names(table_name):
-        return {c.name for c in tables[table_name].constraints if isinstance(c, sa.CheckConstraint)}
+def _checks(tables, table_name):
+    return {
+        c.name: c.sqltext.text
+        for c in tables[table_name].constraints
+        if isinstance(c, sa.CheckConstraint)
+    }
 
-    assert "ck_users_email_lowercase" in check_names("users")
-    assert "ck_board_memberships_role" in check_names("board_memberships")
-    assert "ck_cards_description_len" in check_names("cards")
-    assert "ck_comments_content_len" in check_names("comments")
-    assert "ck_notifications_type" in check_names("notifications")
+
+def test_check_constraints_exist(tables):
+    assert "ck_users_email_lowercase" in _checks(tables, "users")
+    assert "ck_board_memberships_role" in _checks(tables, "board_memberships")
+    assert "ck_cards_description_len" in _checks(tables, "cards")
+    assert "ck_cards_status" in _checks(tables, "cards")
+    assert "ck_comments_content_len" in _checks(tables, "comments")
+    assert "ck_notifications_type" in _checks(tables, "notifications")
+
+
+# --- V6 columns and constraints (tasks 25.1, 25.2) -------------------------------------------------
+
+
+def test_cards_status_and_completed_at_columns(tables):
+    status = tables["cards"].c["status"]
+    assert isinstance(status.type, sa.String) and status.type.length == 20
+    assert status.nullable is False
+    assert status.default.arg == "NOT_STARTED"
+    assert str(status.server_default.arg) == "NOT_STARTED"
+    completed_at = tables["cards"].c["completed_at"]
+    assert completed_at.nullable is True
+    assert completed_at.type.timezone is True
+
+
+def test_card_status_check_allows_exactly_the_three_statuses(tables):
+    text = _checks(tables, "cards")["ck_cards_status"]
+    for value in ("NOT_STARTED", "IN_PROGRESS", "DONE"):
+        assert f"'{value}'" in text
+    assert text.count("'") == 6
+
+
+@pytest.mark.parametrize("column", ["member_invite_token", "guest_invite_token"])
+def test_board_invite_token_columns_are_nullable_and_unique(tables, column):
+    boards = tables["boards"]
+    assert isinstance(boards.c[column].type, sa.String) and boards.c[column].type.length == 128
+    assert boards.c[column].nullable is True
+    unique = [
+        c
+        for c in boards.constraints
+        if isinstance(c, sa.UniqueConstraint) and [col.name for col in c.columns] == [column]
+    ]
+    assert [c.name for c in unique] == [f"uq_boards_{column}"]
+
+
+def test_membership_role_check_allows_admin_member_and_guest(tables):
+    text = _checks(tables, "board_memberships")["ck_board_memberships_role"]
+    for value in ("admin", "member", "guest"):
+        assert f"'{value}'" in text
+    assert text.count("'") == 6
 
 
 def test_relationships_use_lazy_raise_and_mappers_configure(app):

@@ -7,7 +7,7 @@ from app.blueprints.comments.schema import Comment
 from app.errors import BadRequest
 from app.extensions import db
 from app.ordering import next_last_order
-from app.permissions import get_column_for_member, require_board_member
+from app.permissions import get_column_for_writer, require_board_writer
 from app.soft_delete import active, soft_delete_where, utcnow
 
 column_schema = ColumnSchema()
@@ -15,7 +15,7 @@ column_schema = ColumnSchema()
 
 def create_column(user, board_id, load_data):
     """Create a Column after the last active one (order 1.0 for the first)."""
-    require_board_member(board_id, user.user_id)
+    require_board_writer(board_id, user.user_id)
     data = load_data()
     current_max = db.session.execute(
         select(func.max(Column.order)).where(Column.board_id == board_id, active(Column))
@@ -27,7 +27,7 @@ def create_column(user, board_id, load_data):
 
 
 def rename_column(user, column_id, load_data):
-    column, _board, _membership = get_column_for_member(column_id, user.user_id)
+    column, _board, _membership = get_column_for_writer(column_id, user.user_id)
     data = load_data()
     column.name = data["name"]
     db.session.commit()
@@ -36,7 +36,7 @@ def rename_column(user, column_id, load_data):
 
 def delete_column(user, column_id):
     """Soft delete the Column, its Cards, and their Comments with one `deleted_at`."""
-    column, _board, _membership = get_column_for_member(column_id, user.user_id)
+    column, _board, _membership = get_column_for_writer(column_id, user.user_id)
     ts = utcnow()
     column_cards = select(Card.card_id).where(Card.column_id == column_id)
     soft_delete_where(db.session, Comment, Comment.card_id.in_(column_cards), deleted_at=ts)
@@ -48,7 +48,7 @@ def delete_column(user, column_id):
 
 def reorder_column(user, board_id, load_data):
     """Store the client-supplied order; the Column must belong to this Board (else 400)."""
-    require_board_member(board_id, user.user_id)
+    require_board_writer(board_id, user.user_id)
     data = load_data()
     column = db.session.execute(
         select(Column).where(

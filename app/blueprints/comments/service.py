@@ -7,7 +7,7 @@ from app.blueprints.comments.schema import Comment, CommentSchema
 from app.blueprints.notifications import service as notifications
 from app.errors import Forbidden
 from app.extensions import db
-from app.permissions import ADMIN, get_card_for_member, get_comment_for_member
+from app.permissions import ADMIN, get_card_for_reader, get_card_for_writer, get_comment_for_writer
 from app.soft_delete import active, soft_delete_where, utcnow
 
 comment_schema = CommentSchema()
@@ -39,7 +39,7 @@ def _board_admin_id(board_id):
 
 def create_comment(user, card_id, load_data):
     """Add the Comment and its notifications in one transaction."""
-    card, board, _membership = get_card_for_member(card_id, user.user_id)
+    card, board, _membership = get_card_for_writer(card_id, user.user_id)
     data = load_data()
     comment = Comment(card_id=card_id, author_id=user.user_id, content=data["content"])
     db.session.add(comment)
@@ -53,7 +53,7 @@ def create_comment(user, card_id, load_data):
 
 
 def list_comments(user, card_id):
-    get_card_for_member(card_id, user.user_id)
+    get_card_for_reader(card_id, user.user_id)
     comments = db.session.execute(
         select(Comment)
         .options(joinedload(Comment.author))
@@ -64,8 +64,8 @@ def list_comments(user, card_id):
 
 
 def _owned_comment(user, comment_id):
-    """404 and 403 for non-members come first; then only the author may continue (even admins)."""
-    comment, _card, _membership = get_comment_for_member(comment_id, user.user_id)
+    """404, then 403 for non-participants and guests; then only the author may continue (even admins)."""
+    comment, _card, _membership = get_comment_for_writer(comment_id, user.user_id)
     if comment.author_id != user.user_id:
         raise Forbidden()
     return comment

@@ -6,7 +6,7 @@ from app.blueprints.cards.schema import Card
 from app.blueprints.users.schema import User
 from app.errors import BadRequest, Conflict, NotFound
 from app.extensions import db
-from app.permissions import MEMBER, require_board_admin, require_board_member
+from app.permissions import MEMBER, require_board_admin, require_board_reader
 from app.soft_delete import active, soft_delete_where, utcnow
 
 member_schema = MemberSchema()
@@ -40,7 +40,7 @@ def add_member(user, board_id, load_data):
 
 
 def list_members(user, board_id):
-    require_board_member(board_id, user.user_id)
+    require_board_reader(board_id, user.user_id)
     rows = db.session.execute(
         select(User, BoardMembership.role)
         .join(BoardMembership, BoardMembership.user_id == User.user_id)

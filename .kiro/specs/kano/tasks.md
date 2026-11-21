@@ -820,8 +820,8 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
   - Depends on: 32, 23.8
   - Ensure all tests pass, ask the user if questions arise
 
-- [ ] 25. Phase 12 (V6): Backend models, schema, and permissions (code only)
-  - [ ] 25.1 Add the V6 Card columns and the pure status rule
+- [x] 25. Phase 12 (V6): Backend models, schema, and permissions (code only)
+  - [x] 25.1 Add the V6 Card columns and the pure status rule
     - `cards/schema.py`: add `status` (String(20), not null, default and server default `NOT_STARTED`), nullable `completed_at` (timestamptz), and the check constraint `ck_cards_status` (`status IN ('NOT_STARTED','IN_PROGRESS','DONE')`)
     - Create `cards/service/status.py` with `CARD_STATUSES` and the pure function `apply_status_change(old_status, old_completed_at, new_status, now)` (no database import); if the cards service is still one `service.py`, convert it to the `cards/service/` package of the split rule and keep `from app.blueprints.cards import service` importable
     - Supersedes the V5 Card model of task 3.2; 3.2 stays as history
@@ -830,7 +830,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A13, D14, Data Models (Card model)_
     - Depends on: 3.2, 11.1
 
-  - [ ] 25.2 Add the V6 Board token columns and the three-role membership check
+  - [x] 25.2 Add the V6 Board token columns and the three-role membership check
     - `boards/schema`: add `member_invite_token` and `guest_invite_token` (varchar(128), nullable) with the named unique constraints `uq_boards_member_invite_token` and `uq_boards_guest_invite_token`; change the `ck_board_memberships_role` definition to allow `admin`, `member`, and `guest`; keep the partial unique index `uq_board_memberships_board_user_active` unchanged
     - Add no table; split `boards/schema` into the planned package (`models.py`, `board_schemas.py`, `member_schemas.py`, `invite_schemas.py`) when it nears 300 lines
     - Supersedes the V5 Board and Board_Membership models of task 3.1; 3.1 stays as history
@@ -838,7 +838,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: D13, A14 (storage), Data Models (V6 schema changes)_
     - Depends on: 3.1, 8.1
 
-  - [ ] 25.3 Add role levels and role-aware helpers to `permissions.py`
+  - [x] 25.3 Add role levels and role-aware helpers to `permissions.py`
     - Add `ROLE_RANK`, `LEVEL_RANK`, and the pure `role_allows(role, level)`; add `require_board_reader`, `require_board_writer`, `get_column_for_writer`, `get_card_for_reader`, `get_card_for_writer`, `get_comment_for_reader`, `get_comment_for_writer`, and `assert_assignee_is_writer`; keep `require_board_admin`
     - One joined query per helper; check order 404, then 403 without membership, then 403 for role; generic 403 message with no resource data; the old helper names stay until task 25.4 migrates every call site
     - Supersedes the V5 helpers of task 3.3; 3.3 stays as history
@@ -846,7 +846,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A4-V6, D12_
     - Depends on: 3.3, 25.2
 
-  - [ ] 25.4 Migrate every service call site to the V6 helpers
+  - [x] 25.4 Migrate every service call site to the V6 helpers
     - boards: detail and members list use the reader helper; board update and delete, member add and remove use the admin helper; columns, cards (create, update, delete, position), and comments (create) use the writer helpers; comment update and delete run the writer check and then the owner check; comment and card reads use the reader helpers; card search joins a membership of any role; assignee checks use `assert_assignee_is_writer`
     - Remove `require_board_member`, `get_column_for_member`, `get_card_for_member`, `get_comment_for_member`, and `assert_assignee_is_member` after the last call site is migrated
     - V5 tests that assert the old behaviour are updated by the V6 test tasks 27.2, 27.4, 27.10, and 27.11
@@ -855,50 +855,50 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A4-V6 (helper and matrix tables), A10, D12_
     - Depends on: 25.3, 25.1
 
-  - [ ] 25.5 Add the pure invitation helpers and the invite-token log redaction
+  - [x] 25.5 Add the pure invitation helpers and the invite-token log redaction
     - `boards/service/accept.py`: pure `resolve_accept(existing_role, token_role)` returning `(resulting_role, action)`; `boards/service/invite_service.py`: `new_invite_token()` (`secrets.token_urlsafe(32)`) and the token format regex `^[A-Za-z0-9_-]{43,128}$`
     - `redact_invite_tokens(text)` replaces `/api/invites/<token>` and `/invite/<token>` (20 or more URL-safe characters) with the same prefix plus `<redacted>`; extend the logging filter of task 2.6 so it applies this function to the formatted message of every record on the root and `werkzeug` loggers
     - _Requirements: 28.12, 28.13, 37.2, 37.11, 37.12_
     - _Design: A12-V6, A14 (accept decision), A1 step 6_
     - Depends on: 2.6, 25.2
 
-  - [ ] 25.6 Update the model metadata tests for the V6 columns and role check (no database)
+  - [x] 25.6 Update the model metadata tests for the V6 columns and role check (no database)
     - Update `app/tests/` metadata tests: still exactly 7 tables; `cards.status` (not null, default `NOT_STARTED`) and `cards.completed_at` (nullable); `boards` token columns nullable with the two unique constraints; the `ck_cards_status` and the three-role `ck_board_memberships_role` constraints are defined on the models; no new table
     - Supersedes the V5 assertions of task 3.5 about the role check and the column list; 3.5 stays as history
     - _Requirements: 1.9, 2.15, 2.16, 2.17, 31.1_
     - _Design: Data Models, ER diagram_
     - Depends on: 25.1, 25.2
 
-  - [ ] 25.7 Write property test for the status transition rule (pure)
+  - [x] 25.7 Write property test for the status transition rule (pure)
     - **Property 44: Status and completed_at transition rule**
     - Hypothesis, at least 100 examples, over statuses, optional new status, and increasing timestamps; assert `completed_at` set on entering `DONE`, cleared on leaving `DONE`, unchanged for `DONE` to `DONE` and for omitted status, and `completed_at is not None` iff status is `DONE`
     - **Validates: Requirements 11.18, 11.19, 11.24**
     - _Requirements: 11.18, 11.19, 11.24, 31.17_
     - Depends on: 25.1
 
-  - [ ] 25.8 Write property test for the accept decision (pure)
+  - [x] 25.8 Write property test for the accept decision (pure)
     - **Property 50: Accept decision never lowers a role**
     - Hypothesis over all pairs of existing role (none, guest, member, admin) and token role (member, guest); assert the table of design A14, no downgrade, admin stays admin
     - **Validates: Requirements 37.11, 37.12**
     - _Requirements: 37.11, 37.12, 31.17_
     - Depends on: 25.5
 
-  - [ ] 25.9 Write tests for `role_allows` and the helper level table (pure part)
+  - [x] 25.9 Write tests for `role_allows` and the helper level table (pure part)
     - **Property 47: Guest never writes (role by endpoint matrix)**, pure part: `role_allows(role, level)` is true iff the rank of the role is at least the rank of the level, over roles guest, member, admin, and none and levels reader, writer, and admin
     - The database-backed endpoint matrix is task 27.11
     - **Validates: Requirements 8.11, 8.12, 28.14**
     - _Requirements: 8.11, 8.12, 28.14, 31.15, 31.17_
     - Depends on: 25.3
 
-  - [ ] 25.10 Write property test for invite-token log redaction (pure)
+  - [x] 25.10 Write property test for invite-token log redaction (pure)
     - **Property 57: Invite tokens never reach the logs**
     - Hypothesis over messages containing `/api/invites/<token>` or `/invite/<token>` with tokens of 20 or more URL-safe characters: the token is absent from the output and the rest of the message is kept; strings without such a path are unchanged
     - **Validates: Requirements 28.13**
     - _Requirements: 28.13, 31.16_
     - Depends on: 25.5
 
-- [ ] 26. Phase 13 (V6): Manual database migration (user-owned)
-  - [ ] 26.1 [MANUAL] Run the V6 `flask db migrate` and `flask db upgrade` on the development and test databases
+- [x] 26. Phase 13 (V6): Manual database migration (user-owned)
+  - [x] 26.1 [MANUAL] Run the V6 `flask db migrate` and `flask db upgrade` on the development and test databases
     - NOT executed by the agent, and no agent-generated migration script. From `app/` with the venv active, run `flask db migrate -m "v6 status invites guest"` against the development database
     - Review the generated script and add by hand what Alembic autogenerate does not detect: the check constraint `ck_cards_status` (`op.create_check_constraint("ck_cards_status", "cards", "status IN ('NOT_STARTED','IN_PROGRESS','DONE')")`) and the replacement of `ck_board_memberships_role` with the three-role version (`op.drop_constraint("ck_board_memberships_role", "board_memberships")` then `op.create_check_constraint(...)` allowing `admin`, `member`, `guest`), with the reverse steps in `downgrade()`; confirm the new `boards` token columns with their unique constraints and the `cards.status` server default `NOT_STARTED`
     - Run `flask db upgrade` on the development database, then run `flask db upgrade` with `DATABASE_URL` pointed at the `*_test` database; check that exactly the 7 tables exist and commit `app/migrations/` yourself
@@ -907,7 +907,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Requirements: 3.8, 3.9, 2.15, 2.16, 2.17_
     - _Design: Manual migration dependency (V6), Data Models (V6 schema changes and migration)_
 
-  - [ ] 26.2 [MANUAL] Optional: backfill `status` and `completed_at` for cards in a Column named `Done`
+  - [x] 26.2 [MANUAL] Optional: backfill `status` and `completed_at` for cards in a Column named `Done`
     - NOT executed by the agent and not required. Run the SQL of design "V6 schema changes and migration" only if cards that sit in a Column named `Done` (case-insensitive) should count as completed in the analytics; skip it on an empty database
     - Without it, existing cards keep `NOT_STARTED` and null `completed_at`
     - Depends on: 26.1

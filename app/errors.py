@@ -201,22 +201,39 @@ def _handle_unexpected_error(error):
 # --- logging hygiene (G-BE-12) ------------------------------------------------------------------
 
 
+INVITE_PATH_RE = re.compile(r"(/api/invites/|/invite/)[A-Za-z0-9_-]{20,}")
+
+
+def redact_invite_tokens(text):
+    """Replace the token in `/api/invites/<token>` and `/invite/<token>` with `<redacted>`."""
+    return INVITE_PATH_RE.sub(r"\1<redacted>", text)
+
+
 class SensitiveLogFilter(logging.Filter):
-    """Drops records whose message mentions a password or a Bearer token."""
+    """Drops records that mention a password or a Bearer token, and redacts Invite_Tokens."""
 
     BLOCKED = ("password", "bearer")
 
     def filter(self, record):
         try:
-            text = record.getMessage().lower()
+            message = record.getMessage()
         except Exception:  # a malformed record is dropped rather than risk a leak
             return False
-        return not any(word in text for word in self.BLOCKED)
+        lowered = message.lower()
+        if any(word in lowered for word in self.BLOCKED):
+            return False
+        redacted = redact_invite_tokens(message)
+        if redacted != message:
+            # Freeze the redacted text; empty args stop `%` formatting from running again.
+            record.msg = redacted
+            record.args = ()
+        return True
 
 
 def install_log_filter(app):
     """Attach the filter to the loggers and handlers that carry application records."""
     targets = [
+        logging.getLogger(),
         app.logger,
         logging.getLogger("app"),
         logging.getLogger("app.errors"),

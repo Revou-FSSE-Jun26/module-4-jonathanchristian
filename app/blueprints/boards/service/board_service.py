@@ -14,7 +14,7 @@ from app.blueprints.boards.service import cascade
 from app.blueprints.cards.schema import Card
 from app.blueprints.columns.schema import Column
 from app.extensions import db
-from app.permissions import ADMIN, require_board_admin, require_board_member
+from app.permissions import ADMIN, require_board_admin, require_board_reader
 from app.soft_delete import active
 
 board_schema = BoardSchema()
@@ -56,7 +56,7 @@ def get_board_detail(user, board_id):
     Query 1 (user lookup) runs in the JWT callback. Here: 2 board plus membership,
     3 columns, 4 cards with the assignee joined.
     """
-    board, membership = require_board_member(board_id, user.user_id)
+    board, membership = require_board_reader(board_id, user.user_id)
     columns = db.session.execute(
         select(Column)
         .where(Column.board_id == board_id, active(Column))
