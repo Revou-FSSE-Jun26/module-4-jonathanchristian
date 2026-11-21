@@ -1,6 +1,6 @@
 # Requirements Document
 
-**Version:** V5
+**Version:** V6
 
 ## Introduction
 
@@ -12,9 +12,10 @@ Kano is a Trello-like task management application. Users create boards, organize
 
 **User roles (per board).**
 - Board_Admin: the user who created the board. Manages members, oversees all cards, and sees analytics and notifications for the board.
-- Board_Member: a user added to a board by email. Manages cards and comments on that board.
+- Board_Member: a user added to a board by email or through the member invitation link. Manages cards and comments on that board.
+- Board_Guest: a user who joined a board through the guest invitation link. Has read-only access to the board, its cards, its comments, and its members list.
 
-**Core features.** JWT authentication with short-lived access tokens and long-lived refresh tokens; board, column, and card management; board members with roles; drag-and-drop with FLOAT ordering; comments; notifications on assignment and comment; card search; My Tasks view; user profile; board analytics.
+**Core features.** JWT authentication with short-lived access tokens and long-lived refresh tokens; board, column, and card management; card status (Not started, In progress, Done); board members with roles (admin, member, guest); board invitation links for members and guests; drag-and-drop with FLOAT ordering; comments; notifications on assignment and comment; card search; My Tasks view; user profile (name and password; the email is fixed); board analytics; welcome page for first-time visitors.
 
 **Tech stack.**
 - Backend: Python 3.14, Flask, SQLAlchemy, Flask-Migrate, Flask-JWT-Extended, Marshmallow, flask-cors, PostgreSQL (psycopg2-binary), python-dotenv, Gunicorn, pytest.
@@ -41,7 +42,7 @@ kano-app/
 |   |-- tests/
 |   |-- migrations/            (generated manually by the user)
 |   `-- venv/                  (already exists)
-`-- web/                     (Next.js frontend; app/, components/shared/, hooks/, lib/; no src/)
+`-- web/                     (Next.js frontend; app/, components/shared/, hooks/, lib/, e2e/, .env.test.example; no src/)
 ```
 
 ## Glossary
@@ -51,10 +52,13 @@ kano-app/
 - **User**: A registered account holder.
 - **Board**: A container of columns and cards owned by one creator.
 - **Board_Admin**: The User who created a Board; holds the admin role on that Board.
-- **Board_Member**: A User added to a Board by email; holds the member role on that Board.
-- **Board_Membership**: The record linking a User to a Board with a role (`admin` or `member`).
+- **Board_Member**: A User added to a Board by email or through a member Invite_Link; holds the member role on that Board. In access rules, the term Board_Member covers the roles `admin` and `member` (a Board_Admin is also a Board_Member) and excludes the `guest` role.
+- **Board_Guest**: A User who joined a Board through a guest Invite_Link; holds the guest role on that Board. A Board_Guest is read-only and is not a Board_Member.
+- **Board_Participant**: A User with a non-deleted Board_Membership on a Board, of any role (`admin`, `member`, or `guest`).
+- **Board_Membership**: The record linking a User to a Board with a role (`admin`, `member`, or `guest`).
 - **Column**: An ordered stage within a Board, ordered by a FLOAT value.
-- **Card**: A task within a Column with title, description, due date, labels, assignee, and a FLOAT order value.
+- **Card**: A task within a Column with title, description, due date, labels, assignee, Card_Status, an optional `completed_at` timestamp, and a FLOAT order value.
+- **Card_Status**: The progress state of a Card, stored as one of the exact strings `NOT_STARTED` (default), `IN_PROGRESS`, or `DONE`, and shown to users as "Not started", "In progress", and "Done".
 - **Comment**: A text note attached to a Card by a User.
 - **Notification**: A record for a User created when a Card is assigned to the User, or when a Comment is added to a Card the User is assigned to or when the User is the Board_Admin of the Card's Board (never for the Comment author).
 - **Order_Value**: A FLOAT used to position Columns and Cards; a new position is computed so existing rows need not be renumbered.
@@ -70,6 +74,10 @@ kano-app/
 - **Blueprint_Package**: A directory `app/blueprints/<feature>/` containing `routes.py`, `service.py`, and `schema.py` (Marshmallow schemas and SQLAlchemy models).
 - **Guidelines**: The documents `guidelines/frontend.md`, `guidelines/backend.md`, and `guidelines/database.md`.
 - **E2E_Suite**: The Playwright test suite run against the live Vercel frontend URL.
+- **Invite_Token**: A random, URL-safe, unique string stored on a Board in one of two columns, `member_invite_token` or `guest_invite_token`, that identifies the role granted to a User who accepts it. A Board has exactly one member Invite_Token and one guest Invite_Token at a time.
+- **Invite_Link**: The URL `<Kano_Web origin>/invite/<Invite_Token>` built from an Invite_Token.
+- **Welcome_Page**: The public page `/welcome` that introduces Kano to a visitor who has not logged in.
+- **Welcome_Cookie**: The non-httpOnly cookie `kano_welcome_seen` (value `1`, `SameSite=Lax`, path `/`, lifetime 31536000 seconds) that records that the visitor has already seen the Welcome_Page.
 
 ## Requirements
 
@@ -114,9 +122,12 @@ kano-app/
 9. WHEN a Board is soft deleted, THE Kano_API SHALL soft delete the Columns, Cards, Comments, and Board_Memberships belonging to that Board in the same database transaction, using the same `deleted_at` value as the Board.
 10. WHEN a Column is soft deleted, THE Kano_API SHALL soft delete the Cards belonging to that Column, and the Comments belonging to those Cards, in the same database transaction, using the same `deleted_at` value as the Column.
 11. WHEN a Card is soft deleted, THE Kano_API SHALL soft delete the Comments belonging to that Card in the same database transaction, using the same `deleted_at` value as the Card.
-12. THE Kano_API SHALL store every User email lowercased (normalized on registration, on PATCH `/api/users/me`, and when matching the email of an add-member request) and SHALL enforce a unique lowercased email per non-deleted User and a unique (board, user) pair per non-deleted Board_Membership, so that a soft deleted row does not block creating a new row with the same email or the same (board, user) pair.
+12. THE Kano_API SHALL store every User email lowercased (normalized on registration and when matching the email of an add-member request; the email cannot change after registration, see Requirement 7) and SHALL enforce a unique lowercased email per non-deleted User and a unique (board, user) pair per non-deleted Board_Membership, so that a soft deleted row does not block creating a new row with the same email or the same (board, user) pair.
 13. IF a cascading soft delete fails part-way, THEN THE Kano_API SHALL roll back the whole transaction, leave every affected row unchanged, and return status 500 in the Response_Envelope.
 14. IF a write violates a unique constraint, a named foreign key constraint, or a NOT NULL constraint, THEN THE Kano_API SHALL reject the write, leave the stored data unchanged, and return an error in the Response_Envelope without exposing database details.
+15. THE Kano_API SHALL restrict the Board_Membership `role` column to the values `admin`, `member`, and `guest` with a database check constraint, and SHALL keep the partial unique index of criterion 12 unchanged for all three roles.
+16. THE Kano_API SHALL store on each Card a `status` column restricted to the values `NOT_STARTED`, `IN_PROGRESS`, and `DONE` with a database check constraint, NOT NULL with the default `NOT_STARTED`, and a nullable `completed_at` UTC timestamp column.
+17. THE Kano_API SHALL store the Invite_Tokens as the two columns `member_invite_token` and `guest_invite_token` on the `boards` table, each nullable (so that existing rows stay valid) and each protected by a unique constraint that ignores NULL values, and SHALL add no new table.
 
 ### Requirement 3: Manual Database Migrations
 
@@ -131,6 +142,9 @@ kano-app/
 5. WHEN the user marks the manual Migration_Step task complete, THE tasks.md document SHALL allow the blocked tasks to start, and the tables for User, Board, Board_Membership, Column, Card, Comment, and Notification SHALL exist in the local PostgreSQL database.
 6. IF the database schema has not been applied, THEN THE Kano_API SHALL return status 500 through the 500 error handler with a generic `{ "error": "<message>" }` Response_Envelope that contains no SQL text, table names, or connection details, and SHALL log the underlying exception.
 7. IF the database is unreachable when a request needs it, THEN THE Kano_API SHALL return status 500 through the same 500 error handler with the same generic Response_Envelope, and SHALL keep running to serve later requests.
+8. WHEN the V6 models are implemented (Requirement 2 criteria 15 to 17), THE tasks.md document SHALL contain one additional manual Migration_Step task in which the user runs `flask db migrate` and `flask db upgrade` from `app/` against the local development database and the test database, and SHALL mark every V6 task that needs the new columns (status, `completed_at`, Invite_Tokens, role `guest`) and every pytest task that uses them as blocked by that task. The production database is not deployed yet, so no production migration applies to V6.
+9. THE V6 Migration_Step SHALL add new columns to the existing tables `boards` and `cards` and a check constraint on `board_memberships.role`, and SHALL add no table, so the 7-table rule of Requirement 1 criterion 9 and Requirement 3 criterion 5 still holds.
+10. WHERE the user wants cards that are currently in a Column named `Done` (case-insensitive) to count as completed, THE user MAY run an optional manual SQL backfill that sets `status` to `DONE` and `completed_at` to the Card's `updated_at` for those non-deleted Cards, and this backfill SHALL NOT be an automated task. Existing Cards without the backfill keep `status` `NOT_STARTED` and `completed_at` NULL.
 
 ### Requirement 4: Response Envelope, Validation, and Error Handling
 
@@ -140,7 +154,7 @@ kano-app/
 
 1. WHEN a request succeeds, THE Kano_API SHALL return the exact success status code defined in criterion 3 with a JSON body whose only top-level key is `data`, in the form `{ "data": ... }`.
 2. THE Kano_API SHALL set the status code on the HTTP status line of every response and SHALL NOT repeat the status code as a field in the JSON body, and the JSON body SHALL contain no top-level key other than `data` or `error`.
-3. WHEN a POST request creates a resource (POST `/api/auth/register`, `/api/boards`, `/api/boards/<id>/members`, `/api/boards/<id>/columns`, `/api/columns/<id>/cards`, and `/api/cards/<id>/comments`), THE Kano_API SHALL return status 201, and WHEN any other request succeeds (POST `/api/auth/login`, POST `/api/auth/refresh`, every GET including `/api/health`, every PATCH including `/api/cards/<id>/position`, `/api/boards/<id>/columns/reorder`, and `/api/notifications/<id>/read`, and every DELETE), THE Kano_API SHALL return status 200.
+3. WHEN a POST request creates a resource (POST `/api/auth/register`, `/api/boards`, `/api/boards/<id>/members`, `/api/boards/<id>/columns`, `/api/columns/<id>/cards`, and `/api/cards/<id>/comments`), THE Kano_API SHALL return status 201, and WHEN any other request succeeds (POST `/api/auth/login`, POST `/api/auth/refresh`, POST `/api/invites/<token>/accept`, POST `/api/boards/<id>/invite-links/<role>/regenerate`, every GET including `/api/health`, every PATCH including `/api/cards/<id>/position`, `/api/boards/<id>/columns/reorder`, and `/api/notifications/<id>/read`, and every DELETE), THE Kano_API SHALL return status 200.
 4. WHEN a DELETE request succeeds, THE Kano_API SHALL return status 200 with a body of the form `{ "data": ... }` containing a JSON object (for example the id of the deleted resource), and SHALL NOT return status 204 or an empty body.
 5. IF a request fails, THEN THE Kano_API SHALL return the exact HTTP status code defined in criterion 6 for the failure type, with a JSON body whose only top-level key is `error`, in the form `{ "error": "<message>" }`, where `<message>` is a non-empty string of at most 500 characters.
 6. THE Kano_API SHALL map failures to status codes as follows: request validation failure 400; missing, malformed, invalid, expired, or wrong-type JWT (a Refresh_Token on a protected endpoint or an Access_Token on POST `/api/auth/refresh`) 401; permission or Board_Membership failure 403; missing or soft-deleted resource, or a path id that is not a valid UUID, 404; unsupported method 405; unique-constraint conflict (duplicate) 409; unhandled exception or database failure 500.
@@ -197,12 +211,13 @@ kano-app/
 #### Acceptance Criteria
 
 1. WHEN an authenticated client sends GET `/api/users/me`, THE Kano_API SHALL return status 200 with the current User's `user_id`, name, and email, and SHALL exclude the password and password hash.
-2. WHEN an authenticated client sends PATCH `/api/users/me` with a name of 1 to 100 characters and/or a valid email of up to 254 characters, THE Kano_API SHALL update only the supplied fields (storing a supplied email lowercased), return status 200 with the updated profile excluding the password, and set `updated_at` to the current UTC timestamp.
-3. IF a PATCH `/api/users/me` request contains a password field, THEN THE Kano_API SHALL return status 400 and leave the User unchanged.
-4. IF the new email in a PATCH `/api/users/me` request belongs to another non-deleted User (compared case-insensitively), THEN THE Kano_API SHALL return status 409 and leave the User unchanged.
-5. IF a PATCH `/api/users/me` request has an empty name, a name longer than 100 characters, an email that is malformed or longer than 254 characters, or a body with neither name nor email, THEN THE Kano_API SHALL return status 400 with an error message identifying the invalid field and leave the User unchanged.
+2. WHEN an authenticated client sends PATCH `/api/users/me` with a `name` of 1 to 100 characters and/or a `password` of 8 to 128 characters together with a `current_password` that matches the stored password, THE Kano_API SHALL update only the supplied fields, store a supplied password as a salted hash, return status 200 with the updated profile (user id, name, email, created_at) excluding the password and password hash, and set `updated_at` to the current UTC timestamp.
+3. IF a PATCH `/api/users/me` request contains an `email` field with any value, THEN THE Kano_API SHALL return status 400 with an error message naming the field `email` and leave the User unchanged, because the email cannot be changed after registration.
+4. IF a PATCH `/api/users/me` request contains a `password` and the `current_password` is missing or does not match the stored password, THEN THE Kano_API SHALL return status 400 (and not status 403) with an error message naming the field `current_password`, and leave the User unchanged, including the name when the same request also contains a name.
+5. IF a PATCH `/api/users/me` request has an empty name, a name longer than 100 characters, a password shorter than 8 or longer than 128 characters, a `current_password` without a `password`, or a body with neither `name` nor `password`, THEN THE Kano_API SHALL return status 400 with an error message identifying each invalid field and leave the User unchanged.
 6. IF a request to GET or PATCH `/api/users/me` has a missing, malformed, invalid-signature, expired, or wrong-type JWT (a Refresh_Token), or a JWT whose subject belongs to a soft-deleted or nonexistent User, THEN THE Kano_API SHALL return status 401 and leave the User unchanged.
 7. THE Kano_API SHALL NOT provide any endpoint to delete or deactivate a User, and soft-deleted Users SHALL exist only as seed data created directly in the database by tests (Requirements 6.6, 6.9, 6.13, and 31.11 are tested with such seed data).
+8. THE Kano_API SHALL exclude `password`, `current_password`, and the password hash from every response and from all log output of PATCH `/api/users/me`, including requests that fail with status 400.
 
 ### Requirement 8: Boards
 
@@ -219,7 +234,9 @@ kano-app/
 7. IF a Board_Member who is not the Board_Admin sends PATCH or DELETE `/api/boards/<id>`, THEN THE Kano_API SHALL return status 403 and leave the Board unchanged.
 8. IF a Board name is missing, empty, consists only of whitespace, or is longer than 100 characters in a POST or PATCH request, THEN THE Kano_API SHALL return status 400 and leave existing data unchanged.
 9. IF the Board identified by `<id>` does not exist, is soft deleted, or `<id>` is not a valid UUID, THEN THE Kano_API SHALL return status 404 for GET, PATCH, and DELETE `/api/boards/<id>`.
-10. IF a Board creation request fails after the Board row is created but before the admin Board_Membership is stored, THEN THE Kano_API SHALL roll back both records and return status 500 with the Response_Envelope.
+10. IF a Board creation request fails after the Board row is created but before the admin Board_Membership and the two Invite_Tokens (Requirement 37 criterion 3) are stored, THEN THE Kano_API SHALL roll back all of these records and return status 500 with the Response_Envelope.
+11. WHEN a Board_Guest sends GET `/api/boards/<id>`, THE Kano_API SHALL return the same Board detail as for a Board_Member (Columns and Cards ordered as in criterion 3), with `my_role` equal to `guest`.
+12. IF a Board_Guest sends PATCH or DELETE `/api/boards/<id>`, THEN THE Kano_API SHALL return status 403 and leave the Board unchanged.
 
 ### Requirement 9: Board Members and Roles
 
@@ -239,6 +256,9 @@ kano-app/
 10. IF a User without a non-deleted Board_Membership on the Board sends GET, POST, or DELETE to a members endpoint, THEN THE Kano_API SHALL return status 403.
 11. WHEN a Board_Membership is soft deleted, THE Kano_API SHALL set the assignee to empty on every non-deleted Card of that Board assigned to the removed User, within the same transaction as the removal.
 12. WHEN a User whose Board_Membership was soft deleted sends any request to that Board's endpoints, THE Kano_API SHALL return status 403.
+13. WHEN a Board_Guest sends GET `/api/boards/<id>/members`, THE Kano_API SHALL return the member list as described in criterion 5, with the role `guest` included for guest rows.
+14. IF a Board_Guest sends POST or DELETE to a members endpoint, THEN THE Kano_API SHALL return status 403 and make no change.
+15. WHEN a Board_Admin sends DELETE `/api/boards/<id>/members/<user_id>` for a Board_Guest, THE Kano_API SHALL soft delete that Board_Membership and return status 200, as in criterion 6.
 
 ### Requirement 10: Columns
 
@@ -255,6 +275,7 @@ kano-app/
 7. IF the current User is not a Board_Member of the Column's Board, THEN THE Kano_API SHALL return status 403 and leave the Column data unchanged.
 8. IF a reorder request has a Column identifier that is not a valid UUID, or an Order_Value that is not a number greater than 0, THEN THE Kano_API SHALL return status 400 and leave every Column Order_Value unchanged.
 9. IF the Column or Board targeted by a request does not exist or is soft deleted, THEN THE Kano_API SHALL return status 404 and leave the data unchanged.
+10. IF a Board_Guest sends POST `/api/boards/<id>/columns`, PATCH `/api/columns/<id>`, DELETE `/api/columns/<id>`, or PATCH `/api/boards/<id>/columns/reorder`, THEN THE Kano_API SHALL return status 403 and leave the Column data unchanged.
 
 ### Requirement 11: Cards
 
@@ -263,21 +284,29 @@ kano-app/
 #### Acceptance Criteria
 
 1. WHEN a Board_Member sends POST `/api/columns/<id>/cards` with a title, THE Kano_API SHALL create a Card with an Order_Value greater than the highest existing non-deleted Order_Value in that Column (or 1.0 if the Column has no Cards) and return status 201 with the created Card.
-2. THE Kano_API SHALL store on each Card a title (required, 1 to 200 characters), description (optional, up to 5,000 characters), due date (optional, ISO 8601 date), labels (optional list of up to 10 strings, each 1 to 30 characters), assignee (optional, a Board_Member), Order_Value, and Column.
+2. THE Kano_API SHALL store on each Card a title (required, 1 to 200 characters), description (optional, up to 5,000 characters), due date (optional, ISO 8601 date), labels (optional list of up to 10 strings, each 1 to 30 characters), assignee (optional, a Board_Member with the role `admin` or `member`), status (Card_Status, default `NOT_STARTED`), completed_at (optional UTC timestamp), Order_Value, and Column.
 3. WHEN a Board_Member sends PATCH `/api/cards/<id>` with card fields, THE Kano_API SHALL update only the supplied fields, leave all other fields unchanged, and return the updated Card.
-4. IF a create or update request has a missing or empty title, a title longer than 200 characters, a description longer than 5,000 characters, a due date that is not a valid ISO 8601 date, or a labels list that exceeds 10 items or contains an item outside 1 to 30 characters, THEN THE Kano_API SHALL return status 400 and leave the Card unchanged.
+4. IF a create or update request has a missing or empty title, a title longer than 200 characters, a description longer than 5,000 characters, a due date that is not a valid ISO 8601 date, a labels list that exceeds 10 items or contains an item outside 1 to 30 characters, or a `status` that is not exactly `NOT_STARTED`, `IN_PROGRESS`, or `DONE` (case-sensitive, so an empty string, null, or lowercase value is invalid), THEN THE Kano_API SHALL return status 400 and leave the Card unchanged.
 5. IF the assignee in a create or update request is not a Board_Member of the Card's Board, THEN THE Kano_API SHALL return status 400 and leave the Card unchanged.
 6. WHEN a Board_Member sends DELETE `/api/cards/<id>`, THE Kano_API SHALL soft delete the Card and its Comments and return status 200.
 7. WHEN a Board_Member sends PATCH `/api/cards/<id>/position` with a `column_id` (UUID) and an `order` (float greater than 0), THE Kano_API SHALL validate the body with CardPositionSchema, move the Card to that Column with that Order_Value, and return the updated Card.
 8. IF a position request names a Column in a different Board than the Card, or a Column that does not exist or is soft deleted, THEN THE Kano_API SHALL return status 400 and leave the Card's Column and Order_Value unchanged.
 9. IF a position request has a `column_id` that is not a valid UUID or an `order` that is not a float greater than 0, THEN THE Kano_API SHALL return status 400 and leave the Card's Column and Order_Value unchanged.
 10. WHEN an authenticated client sends GET `/api/cards?assignee=me`, THE Kano_API SHALL return the non-deleted Cards assigned to the current User on non-deleted Boards, each with its Board id, Board name, and Column name, and SHALL return an empty list when no Cards match.
-11. WHEN an authenticated client sends GET `/api/cards?q=<text>` where the text is 1 to 100 characters, THE Kano_API SHALL return the non-deleted Cards, across Boards where the current User is a Board_Member, whose title or description contains the text, case-insensitively, and SHALL return an empty list when no Cards match.
+11. WHEN an authenticated client sends GET `/api/cards?q=<text>` where the text is 1 to 100 characters, THE Kano_API SHALL return the non-deleted Cards, across Boards where the current User is a Board_Participant (admin, member, or guest), whose title or description contains the text, case-insensitively, and SHALL return an empty list when no Cards match.
 12. WHERE the query parameter `board_id` is supplied together with `q`, THE Kano_API SHALL restrict the search results to that Board.
-13. IF `board_id` is supplied together with `q` and the current User is not a Board_Member of that Board, THEN THE Kano_API SHALL return status 403.
+13. IF `board_id` is supplied together with `q` and the current User is not a Board_Participant of that Board, THEN THE Kano_API SHALL return status 403.
 14. IF a GET `/api/cards` request has neither `assignee=me` nor `q`, has an empty `q`, has a `q` longer than 100 characters, or has a `board_id` that is not a valid UUID, THEN THE Kano_API SHALL return status 400.
 15. IF the current User is not a Board_Member of the Card's Board, THEN THE Kano_API SHALL return status 403 for every Card endpoint that targets a single Card and for card creation in a Column of that Board.
 16. WHEN a Board_Admin requests GET `/api/boards/<id>`, THE Kano_API SHALL return all non-deleted Cards of the Board regardless of assignee.
+17. WHEN a Board_Member sends POST `/api/columns/<id>/cards`, THE Kano_API SHALL create the Card with `status` `NOT_STARTED` and `completed_at` NULL, and IF the request body contains a `status` field, THEN THE Kano_API SHALL return status 400 with an error message naming the field `status` and create no Card.
+18. WHEN a Board_Member sends PATCH `/api/cards/<id>` with a valid `status`, THE Kano_API SHALL update the status together with any other supplied fields, leave unsupplied fields unchanged, and return the updated Card.
+19. WHEN the `status` of a Card changes to `DONE` from another value, THE Kano_API SHALL set `completed_at` to the current UTC time, WHEN the `status` changes from `DONE` to another value, THE Kano_API SHALL set `completed_at` to NULL, and IF the `status` is unchanged (including `DONE` to `DONE`) or not supplied, THEN THE Kano_API SHALL leave `completed_at` unchanged.
+20. THE Kano_API SHALL include `status` and `completed_at` in every Card representation it returns (board detail, search, My Tasks, create, update, and position responses).
+21. WHEN a Board_Member sends PATCH `/api/cards/<id>/position`, THE Kano_API SHALL leave the `status` and `completed_at` of the Card unchanged, including when the target Column is named `Done` (case-insensitive), and SHALL NOT require a Card with `status` `DONE` to be in any particular Column.
+22. IF the assignee in a create or update request is a Board_Guest, THEN THE Kano_API SHALL return status 400 and leave the Card unchanged.
+23. IF a Board_Guest sends POST `/api/columns/<id>/cards`, PATCH `/api/cards/<id>`, DELETE `/api/cards/<id>`, or PATCH `/api/cards/<id>/position`, THEN THE Kano_API SHALL return status 403, leave the Card unchanged, and, for PATCH, SHALL NOT change the status or the assignee.
+24. THE Kano_API SHALL treat every Card that existed before the V6 migration as having `status` `NOT_STARTED` and `completed_at` NULL, unless the optional manual backfill of Requirement 3 criterion 10 was run.
 
 ### Requirement 12: Comments
 
@@ -292,8 +321,10 @@ kano-app/
 5. IF a comment create or update request has missing content, content that is empty or whitespace only, or content longer than 2,000 characters, THEN THE Kano_API SHALL return status 400 and leave the stored Comments unchanged.
 6. IF a comment request has a missing, invalid, or expired JWT, THEN THE Kano_API SHALL return status 401.
 7. IF a User other than the Comment owner sends PATCH or DELETE `/api/comments/<id>`, THEN THE Kano_API SHALL return status 403 and leave the Comment unchanged, including when that User is a Board_Admin.
-8. IF the current User is not a Board_Member of the Card's Board, THEN THE Kano_API SHALL return status 403 for comment creation and listing and SHALL NOT create or return any Comment.
+8. IF the current User is not a Board_Participant of the Card's Board, THEN THE Kano_API SHALL return status 403 for comment creation and listing and SHALL NOT create or return any Comment.
 9. IF the Card or Comment identified in a comment request does not exist or is soft deleted, THEN THE Kano_API SHALL return status 404.
+10. WHEN a Board_Guest sends GET `/api/cards/<id>/comments`, THE Kano_API SHALL return the non-deleted Comments of the Card as described in criterion 2.
+11. IF a Board_Guest sends POST `/api/cards/<id>/comments`, PATCH `/api/comments/<id>`, or DELETE `/api/comments/<id>`, THEN THE Kano_API SHALL return status 403 and leave the Comments unchanged.
 
 ### Requirement 13: Notifications
 
@@ -312,6 +343,7 @@ kano-app/
 9. WHEN the recipient sends PATCH `/api/notifications/<id>/read`, THE Kano_API SHALL set `is_read` to true and return the Notification, and repeating the request SHALL return status 200 with `is_read` still true.
 10. IF a User other than the recipient sends PATCH `/api/notifications/<id>/read`, THEN THE Kano_API SHALL return status 403 and leave `is_read` unchanged.
 11. IF the Notification in a PATCH `/api/notifications/<id>/read` request does not exist or is soft deleted, THEN THE Kano_API SHALL return status 404.
+12. THE Kano_API SHALL create no Notification for a Board_Guest, because a Board_Guest cannot be an assignee, and SHALL create no Notification when a User accepts an Invite_Link.
 
 ### Requirement 14: Analytics
 
@@ -320,14 +352,15 @@ kano-app/
 #### Acceptance Criteria
 
 1. WHEN a Board_Admin sends GET `/api/boards/<id>/analytics`, THE Kano_API SHALL return status 200 with the Card count for every non-deleted Column of the Board (0 for a Column without Cards), the number of Cards completed this week, and the member activity for every Board_Member.
-2. THE Kano_API SHALL treat a Card as completed when it is in the Column of the Board whose name is `Done` (case-insensitive), and count it in the current week when its `updated_at` falls from Monday 00:00:00 UTC of the current week up to and including the request time.
-3. IF the Board has no Column named `Done` (case-insensitive), THEN THE Kano_API SHALL return 0 as the number of Cards completed this week.
+2. THE Kano_API SHALL treat a non-deleted Card of the Board as completed when its `status` is `DONE`, regardless of the Column it is in, and count it in the current week when its `completed_at` falls from Monday 00:00:00 UTC of the current week up to and including the request time.
+3. IF no non-deleted Card of the Board has `status` `DONE` with a `completed_at` in the current week, THEN THE Kano_API SHALL return 0 as the number of Cards completed this week.
 4. THE Kano_API SHALL compute member activity as, for each Board_Member, the number of non-deleted Cards of the Board assigned to that Board_Member and the number of non-deleted Comments written by that Board_Member on Cards of the Board, returning 0 for each count when none exist.
 5. THE Kano_API SHALL compute all analytics values through SQLAlchemy joins and aggregations in the analytics service layer.
 6. THE Kano_API SHALL exclude soft-deleted Columns, Cards, Comments, and Board_Memberships from every analytics count.
 7. IF a Board_Member who is not the Board_Admin requests the analytics of a Board, THEN THE Kano_API SHALL return status 403 and no analytics data.
 8. IF the Board does not exist or is soft deleted, THEN THE Kano_API SHALL return status 404.
 9. IF a request to the analytics endpoint has a missing, invalid, or expired JWT, THEN THE Kano_API SHALL return status 401.
+10. IF a Board_Guest requests the analytics of a Board, THEN THE Kano_API SHALL return status 403 and no analytics data, and the member activity of criterion 4 SHALL list only Board_Members (roles `admin` and `member`).
 
 ## Part B: Frontend
 
@@ -383,10 +416,12 @@ kano-app/
 5. IF the GET `/api/users/me` call during session restoration fails with a network error or a status of 500 or above, THEN THE AuthContext SHALL keep both cookies, leave the User unset, and trigger the useErrorHandler toast.
 6. WHEN a User logs out, THE AuthContext SHALL clear both cookies, clear the User, Access_Token, and Refresh_Token state, and redirect to `/login`, without sending any request to the Kano_API.
 7. WHEN a visitor requests a protected route and the access cookie is missing or expired while a valid refresh cookie exists, THE Kano_Web middleware SHALL send POST `/api/auth/refresh` with the Refresh_Token, set the new access cookie on the response (lifetime in seconds equal to the `expires_in` value of the refresh response, path `/`, `SameSite=Lax`), and let the request continue, before any protected page content renders.
-8. WHEN an unauthenticated visitor requests a protected route, THE Kano_Web SHALL redirect the visitor to `/login` before rendering any protected page content. An unauthenticated visitor is one with no usable access cookie and no valid refresh cookie, or one whose refresh request returned status 401 (in which case the middleware also deletes both cookies).
-9. WHEN an authenticated User requests `/login` or `/register`, THE Kano_Web SHALL redirect the User to `/`.
+8. WHEN an unauthenticated visitor requests a protected route, THE Kano_Web SHALL redirect the visitor to `/login` before rendering any protected page content, with two exceptions: a request for `/` without the Welcome_Cookie redirects to `/welcome` (Requirement 38), and a request for `/invite/<token>` redirects to `/login?next=<encoded path>` (Requirement 37). A protected route is every route except `/welcome`, `/login`, and `/register`. An unauthenticated visitor is one with no usable access cookie and no valid refresh cookie, or one whose refresh request returned status 401 (in which case the middleware also deletes both cookies).
+9. WHEN an authenticated User requests `/login`, `/register`, or `/welcome`, THE Kano_Web SHALL redirect the User to `/`.
 10. WHEN a Server Component fetches data, THE Kano_Web SHALL read the Access_Token from the access cookie and pass it to the apiClient.
 11. WHEN `updateUser` is called with a User object, THE AuthContext SHALL replace the current User state with that object without changing the tokens or the cookies.
+12. THE Kano_Web middleware SHALL take its routing decision from one side-effect-free function `decideRoute` whose inputs are the request pathname, the authentication state (authenticated, refreshable, or unauthenticated), and whether the Welcome_Cookie is present, and whose output is exactly one outcome (continue, redirect to a target path, refresh then continue), covering every case of criteria 7 to 9 and Requirement 38.
+13. THE Kano_Web middleware SHALL treat `/invite/<token>` as a protected route, including the refresh step of criterion 7, so that an authenticated visitor with an expired access cookie and a valid refresh cookie reaches the invite page.
 
 ### Requirement 18: Shared Components
 
@@ -416,14 +451,16 @@ kano-app/
 
 1. THE Kano_Web SHALL provide a `/register` page with controlled inputs for name, email, and password.
 2. IF a registration form field is invalid (empty name after trimming whitespace, name longer than 100 characters, email not in the form `local@domain.tld`, or password shorter than 8 characters), THEN THE Kano_Web SHALL show a field-level error next to each invalid field, SHALL NOT send any request, and SHALL keep the entered values in the form.
-3. WHEN a valid registration form is submitted, THE Kano_Web SHALL send POST `/api/auth/register`, disable the submit button until the response arrives, and, on a 201 response, redirect to `/login` and show a success toast.
+3. WHEN a valid registration form is submitted, THE Kano_Web SHALL send POST `/api/auth/register`, disable the submit button until the response arrives, and, on a 201 response, redirect to `/login` (keeping a valid `next` query parameter, see criterion 11) and show a success toast.
 4. IF the registration request returns status 409, THEN THE Kano_Web SHALL show an email-already-in-use error on the email field, SHALL stay on `/register`, and SHALL keep the entered values in the form.
 5. IF the registration request fails with status 400, 500, or no response (network error), THEN THE Kano_Web SHALL show an error toast through useErrorHandler, SHALL stay on `/register`, and SHALL keep the entered values in the form.
 6. THE Kano_Web SHALL provide a `/login` page with controlled inputs for email and password.
 7. IF a login form field is invalid (email not in the form `local@domain.tld` or empty password), THEN THE Kano_Web SHALL show a field-level error next to each invalid field and SHALL NOT send any request.
-8. WHEN a valid login form is submitted, THE Kano_Web SHALL send POST `/api/auth/login`, disable the submit button until the response arrives, store the JWT through the AuthContext on a 200 response, and redirect to `/`.
+8. WHEN a valid login form is submitted, THE Kano_Web SHALL send POST `/api/auth/login`, disable the submit button until the response arrives, store the JWT through the AuthContext on a 200 response, and redirect to the `next` path when it is valid (criterion 11) or to `/` when `next` is missing or invalid.
 9. IF the login request returns status 401, THEN THE Kano_Web SHALL show a single invalid-credentials error message on the page that does not indicate whether the email or the password was wrong, SHALL stay on `/login`, and SHALL clear the password input.
 10. IF the login request fails with status 400, 500, or no response (network error), THEN THE Kano_Web SHALL show an error toast through useErrorHandler, SHALL stay on `/login`, and SHALL keep the entered email.
+11. THE Kano_Web SHALL accept a `next` query parameter on `/login` and `/register` only when its decoded value starts with `/invite/` followed by 1 to 128 characters from `A-Z`, `a-z`, `0-9`, `_`, and `-`, and contains no other character (no further slash, backslash, query, fragment, scheme, or host), and SHALL ignore any other value so that no redirect leaves the Kano_Web origin.
+12. WHERE a valid `next` parameter is present on `/login` or `/register`, THE Kano_Web SHALL keep it in the links between the login page and the register page.
 
 ### Requirement 20: Dashboard Page
 
@@ -431,7 +468,7 @@ kano-app/
 
 #### Acceptance Criteria
 
-1. WHEN an authenticated User requests `/`, THE Kano_Web SHALL render the page as a Server Component that fetches GET `/api/boards` and lists every returned Board with its name and a role badge showing `admin` or `member` for the User.
+1. WHEN an authenticated User requests `/`, THE Kano_Web SHALL render the page as a Server Component that fetches GET `/api/boards` and lists every returned Board with its name and a role badge showing `admin`, `member`, or `guest` for the User.
 2. WHEN the User opens the create-board form, THE Kano_Web SHALL show a BaseModal containing a single board name input and a submit BaseButton.
 3. IF the board name in the create-board form is empty or longer than 100 characters, THEN THE Kano_Web SHALL show a field-level error, SHALL NOT send the request, and SHALL keep the BaseModal open with the entered text retained.
 4. WHEN the User submits a valid board name, THE Kano_Web SHALL send POST `/api/boards`, close the BaseModal on status 201, show the new Board in the list with the `admin` role badge, and show a success toast.
@@ -462,6 +499,13 @@ kano-app/
 14. WHEN a Board_Admin opens the analytics view, THE Kano_Web SHALL fetch GET `/api/boards/<id>/analytics` and show the Card count per Column, the number of Cards completed this week, and, for each Board_Member, the number of assigned Cards and the number of Comments written.
 15. IF the board request returns status 403 or 404, THEN THE Kano_Web SHALL show an access-denied message for 403 or a not-found message for 404, together with a link to `/`, and SHALL NOT render any Column or Card.
 16. IF the analytics request returns an error, THEN THE Kano_Web SHALL show an error message in the analytics view and trigger the useErrorHandler toast.
+17. WHEN the POST `/api/columns/<id>/cards` request of criterion 6 returns status 201, THE Kano_Web SHALL show the new Card in its Column and open the CardDetailModal for that Card, so that the User can fill in description, due date, labels, assignee, and status. The quick-add card form SHALL still ask only for the title (criterion 7 applies).
+18. WHEN the User closes the CardDetailModal opened by criterion 17 without saving, THE Kano_Web SHALL keep the Card on the board with its title only, status `NOT_STARTED`, and no other details.
+19. IF the card creation request fails, THEN THE Kano_Web SHALL NOT open the CardDetailModal, SHALL show no new Card, and SHALL trigger the useErrorHandler toast (criterion 8).
+20. WHERE the current User is a Board_Guest, THE Kano_Web SHALL show a read-only indicator badge with the text "Guest" on the board page and SHALL hide or disable every edit control: add column, add card, column rename and delete, card drag and drop, comment form, status control, assignee control, card delete, member management panel, and analytics link.
+21. WHERE the current User is the Board_Admin, THE Kano_Web SHALL show in the member management panel the two Invite_Links, member and guest, as specified in Requirement 37 criteria 15 to 17.
+22. THE Kano_Web SHALL show the Card_Status of each Card on the board as a BaseBadge with the labels "Not started", "In progress", and "Done", and SHALL update the badge without a page reload when the status changes in the CardDetailModal.
+23. WHEN a Board_Member moves a Card between Columns, THE Kano_Web SHALL leave the displayed Card_Status of that Card unchanged.
 
 ### Requirement 22: Drag and Drop
 
@@ -486,6 +530,8 @@ kano-app/
 15. WHILE a touch drag is active, THE useDragAndDrop hook SHALL determine the target Column and the drop position from the current touch point with `document.elementFromPoint`, and WHEN the touch ends over a Column, SHALL compute the Order_Value with the rules of criteria 2 to 5 and apply the same optimistic update, position request, and revert on failure as criteria 6 and 7.
 16. IF a touch drag ends outside any Column, ends on the Card's own current position, or is cancelled by the browser, THEN THE useDragAndDrop hook SHALL leave the Card state unchanged and SHALL NOT send a position request.
 17. WHILE a touch drag is not active, THE Kano_Web SHALL allow the page and the Kanban board container to scroll by touch, and the Cards SHALL NOT use any CSS `touch-action` value that blocks panning.
+18. WHERE the current User is a Board_Guest, THE useDragAndDrop hook SHALL NOT start a mouse drag or a touch drag, SHALL leave the Card state unchanged, and SHALL NOT send a position request.
+19. WHEN a Card is dropped at a valid position, THE useDragAndDrop hook SHALL send only `column_id` and `order` in the position request and SHALL NOT change the Card_Status in local state.
 
 ### Requirement 23: Card Detail Modal and Comments
 
@@ -509,6 +555,12 @@ kano-app/
 14. WHERE a Comment is not owned by the current User, THE CommentList SHALL hide the edit and delete controls for that Comment, including when the current User is the Board_Admin.
 15. WHEN a Board_Member confirms deletion of a Card in the CardDetailModal, THE Kano_Web SHALL send DELETE `/api/cards/<id>`, close the modal, and remove the Card from the board.
 16. IF the DELETE `/api/cards/<id>` request returns an error, THEN THE CardDetailModal SHALL keep the modal open and the Card on the board, and trigger the useErrorHandler toast.
+17. THE CardDetailModal SHALL show a status control with exactly the three options "Not started", "In progress", and "Done", preselected with the current Card_Status of the Card.
+18. WHEN a Board_Member changes the status in the CardDetailModal and saves, THE CardDetailModal SHALL send PATCH `/api/cards/<id>` with only the changed fields (criterion 2), update the Card on the board with the returned `status` and `completed_at`, and show a success toast.
+19. IF the PATCH request that carries a status change returns an error, THEN THE CardDetailModal SHALL keep the modal open, keep the previously saved status on the board, keep the entered values in the form, and trigger the useErrorHandler toast.
+20. THE CardDetailModal SHALL offer only Board_Members with the role `admin` or `member` as assignee options and SHALL NOT offer a Board_Guest.
+21. WHERE the current User is a Board_Guest, THE CardDetailModal SHALL show the Card title, description, due date, labels, assignee, status, and Comments as read-only, with disabled inputs, and SHALL hide the save button, the delete button, the comment form, and the edit and delete controls of Comments.
+22. WHEN the CardDetailModal is opened by Requirement 21 criterion 17 for a newly created Card, THE CardDetailModal SHALL show the title already entered and let the User save the details with the same PATCH request as criterion 18, using a single save button.
 
 ### Requirement 24: Notifications UI
 
@@ -533,11 +585,12 @@ kano-app/
 #### Acceptance Criteria
 
 1. WHEN an authenticated User opens `/my-tasks`, THE Kano_Web SHALL fetch GET `/api/cards?assignee=me` and group the returned Cards under their Board names, with one group per Board.
-2. THE Kano_Web SHALL show for each task the Card title, the due date in the User's local date format (or a "no due date" indicator when the Card has no due date), the Column name, and a link to `/boards/<id>` for the Card's Board.
+2. THE Kano_Web SHALL show for each task the Card title, the due date in the User's local date format (or a "no due date" indicator when the Card has no due date), the Column name, the Card_Status as a BaseBadge ("Not started", "In progress", or "Done"), and a link to `/boards/<id>` for the Card's Board.
 3. WHILE the GET `/api/cards?assignee=me` request is pending, THE Kano_Web SHALL show a loading indicator in place of the task list.
 4. IF the request returns an empty list, THEN THE Kano_Web SHALL show an empty-state message and no Board groups.
 5. IF the GET `/api/cards?assignee=me` request returns an ApiError, THEN THE Kano_Web SHALL show an error message on the page, trigger the useErrorHandler toast, and show no task list.
 6. WHEN a Card is soft deleted or its assignee is cleared, THE Kano_Web SHALL omit that Card the next time `/my-tasks` is loaded.
+7. THE Kano_Web SHALL keep Cards with the status `DONE` in the My Tasks list, marked with the "Done" badge, and SHALL NOT filter Cards by status.
 
 ### Requirement 26: Profile Page
 
@@ -545,13 +598,14 @@ kano-app/
 
 #### Acceptance Criteria
 
-1. THE Kano_Web SHALL provide a `/profile` page with a form whose controlled inputs for name and email are pre-populated from the current User held in the AuthContext.
-2. WHEN a profile form is submitted with a name of 1 to 100 characters and a well-formed email address of up to 254 characters, THE Kano_Web SHALL send PATCH `/api/users/me` with the name and email, disable the submit button until the request completes, update the AuthContext with the returned User, and show a success toast.
-3. IF a profile form field is invalid (empty name, name longer than 100 characters, malformed email, or email longer than 254 characters), THEN THE Kano_Web SHALL show a field-level error next to the invalid field and SHALL NOT send the request.
-4. IF the PATCH `/api/users/me` request returns status 409, THEN THE Kano_Web SHALL show an email-already-in-use error on the email field and SHALL leave the AuthContext User unchanged.
-5. IF the PATCH `/api/users/me` request fails with any status other than 409, THEN THE Kano_Web SHALL show an error toast through the useErrorHandler hook, SHALL leave the AuthContext User unchanged, and SHALL keep the entered form values.
-6. THE Kano_Web SHALL NOT include a password field in the profile form.
+1. THE Kano_Web SHALL provide a `/profile` page with a form whose controlled name input is pre-populated from the current User held in the AuthContext, and that shows the email of the current User as read-only text without an editable email input.
+2. WHEN a profile form is submitted with a name of 1 to 100 characters, THE Kano_Web SHALL send PATCH `/api/users/me` with the name (and with `password` and `current_password` only when criterion 6 applies), disable the submit button until the request completes, update the AuthContext with the returned User, and show a success toast.
+3. IF a profile form field is invalid (empty name, name longer than 100 characters, a new password shorter than 8 or longer than 128 characters, or a password section where only one of the two inputs is filled), THEN THE Kano_Web SHALL show a field-level error next to each invalid field and SHALL NOT send the request.
+4. IF the PATCH `/api/users/me` request returns status 400 with an error that names `current_password`, THEN THE Kano_Web SHALL show a wrong-current-password error on the current password input, SHALL leave the AuthContext User unchanged, and SHALL keep the entered name.
+5. IF the PATCH `/api/users/me` request fails with any other error status or no response, THEN THE Kano_Web SHALL show an error toast through the useErrorHandler hook, SHALL leave the AuthContext User unchanged, and SHALL keep the entered form values.
+6. THE Kano_Web SHALL provide in the profile form an optional change-password section with a current password input and a new password input, and WHEN both inputs are filled and valid, THE Kano_Web SHALL include `password` and `current_password` in the PATCH request.
 7. IF an unauthenticated visitor requests `/profile`, THEN THE Kano_Web SHALL redirect the visitor to `/login`.
+8. WHEN a profile update that included a password succeeds, THE Kano_Web SHALL clear the current password and new password inputs, and the password inputs SHALL be rendered as masked inputs and never be pre-populated.
 
 ### Requirement 27: Responsive Layout
 
@@ -567,6 +621,7 @@ kano-app/
 6. WHILE the viewport width is below 768 px, THE Kano_Web SHALL render every interactive element with a tap target of at least 44 px by 44 px.
 7. IF the viewport width is below 375 px, THEN THE Kano_Web SHALL allow horizontal page scrolling and SHALL keep all page content reachable without truncation.
 8. WHILE the viewport width is below 768 px, THE Kano_Web SHALL let a Board_Member drag a Card between Columns by touch, as specified in Requirement 22 criteria 12 to 17.
+9. THE Kano_Web SHALL apply criteria 1, 2, and 6 to the Welcome_Page and to the invite page `/invite/<token>` as well, and WHILE the viewport width is below 768 px, the Join, Log in, and Create account buttons SHALL have a tap target of at least 44 px by 44 px.
 
 ## Part C: Non-Functional Requirements
 
@@ -587,6 +642,10 @@ kano-app/
 9. THE Kano_Web SHALL NOT use `dangerouslySetInnerHTML` in any file under `web/`.
 10. WHEN an endpoint that requires Board_Membership or a specific role receives a request, THE Kano_API SHALL verify the Board_Membership and role on the server before performing the action, regardless of any frontend control state.
 11. IF an authenticated User sends a request to an endpoint for which the User lacks the required Board_Membership or role, THEN THE Kano_API SHALL return status 403, leave all data unchanged, and not disclose data of the target resource in the response.
+12. THE Kano_API SHALL generate every Invite_Token with a cryptographically secure random generator with at least 32 bytes of entropy, and SHALL return the Invite_Tokens only to a Board_Admin of the Board (GET invite-links and regenerate) and, for the single token in the path, to an authenticated User who sends GET `/api/invites/<token>`.
+13. THE Kano_API SHALL exclude Invite_Tokens from all application log output, including log output produced for requests that fail with status 400, 401, 403, 404, or 500.
+14. THE Kano_API SHALL verify the role of the caller on the server for every write endpoint, so that a Board_Guest receives status 403 regardless of any frontend control state.
+15. THE Kano_Web SHALL redirect after login or registration only to a relative path that passes the `next` validation of Requirement 19 criterion 11, so that no open redirect is possible.
 
 ### Requirement 29: Performance
 
@@ -633,6 +692,12 @@ kano-app/
 9. WHILE the manual Migration_Step is incomplete, THE tests that require database tables SHALL be treated as blocked.
 10. IF the test database is unreachable or the schema has not been applied, THEN THE Kano_API test run SHALL stop with an error message that names the unavailable test database and SHALL NOT run tests against the development database.
 11. THE Kano_API auth tests SHALL cover: login returning an Access_Token with `type` = `access` and expiry 3600 seconds and a Refresh_Token with `type` = `refresh` and expiry 604800 seconds, both with `sub` equal to the `user_id`, together with `expires_in` equal to 3600 and `refresh_expires_in` equal to 604800 in the response data; POST `/api/auth/refresh` returning 200 with a new Access_Token that is accepted by GET `/api/users/me`; status 401 for a refresh request with an expired Refresh_Token, a missing token, an Access_Token, or a Refresh_Token of a soft-deleted User; status 401 when a Refresh_Token is sent to GET `/api/users/me` or any other protected endpoint; and status 401 on GET and PATCH `/api/users/me` and on one other protected endpoint for an Access_Token whose subject belongs to a soft-deleted User. The soft-deleted User SHALL be seed data created directly in the test database, because Requirement 7 criterion 7 provides no endpoint to delete a User.
+12. THE Kano_API users tests SHALL cover PATCH `/api/users/me`: name update (boundaries 0, 1, 100, and 101 characters); password change with a correct `current_password` (boundaries 7, 8, 128, and 129 characters) followed by a login with the new password; status 400 naming `current_password` for a wrong or missing `current_password` with the name left unchanged; status 400 for a body that contains `email` (with any value, including the current email) with the User unchanged; and that no response contains the password or the password hash.
+13. THE Kano_API cards tests SHALL cover Card_Status: default `NOT_STARTED` on create; status 400 for a `status` in the create body and for each of `done`, an empty string, null, and an unknown value on PATCH; the `completed_at` rules of Requirement 11 criterion 19 (set on entering `DONE`, cleared on leaving `DONE`, unchanged on `DONE` to `DONE` and on updates without status); `status` and `completed_at` present in board detail, search, and My Tasks; and that a position change leaves both unchanged, including a move into a Column named `Done`.
+14. THE Kano_API analytics tests SHALL cover the V6 completed-this-week rule: a Card with `DONE` and `completed_at` at Monday 00:00:00 UTC is counted, one second earlier is not counted, a `DONE` Card in a Column that is not named `Done` is counted, a Card in a Column named `Done` with another status is not counted, and a soft-deleted `DONE` Card is not counted.
+15. THE Kano_API tests SHALL cover the Board_Guest role: status 403 for every write endpoint listed in Requirement 37 criterion 14, status 200 for the guest read endpoints, status 400 when a Board_Guest is set as assignee, and status 403 on analytics and invite-links.
+16. THE Kano_API invitation tests SHALL cover: tokens created with the Board and lazily created for a Board with NULL tokens; the token properties of Requirement 37 criterion 2; GET invite-links and regenerate for the admin and status 403 for a member, a guest, and a non-participant; regenerate invalidating the old token (status 404 on the old token) while the other role's token stays valid; accept creating a `member` and a `guest` membership; the upgrade of a guest through a member token; no downgrade of a member or admin through a guest token; repeated accept being idempotent; accept after a soft-deleted membership creating a new active membership; status 404 for an unknown token and for a soft-deleted Board; status 401 without a token; and that no new table exists (the 7 tables of Requirement 1 criterion 9).
+17. THE Kano_API tests for Requirement 31 criteria 12 to 16 SHALL be property-based where the behavior varies with input (the `completed_at` state machine over sequences of status changes, and the accept-role decision function over all role and token-role pairs).
 
 ### Requirement 32: Frontend Unit Tests
 
@@ -654,6 +719,11 @@ kano-app/
 12. THE Kano_Web SHALL provide apiClient tests, with the network mocked, that assert: a 401 from a protected request triggers exactly one POST `/api/auth/refresh` and one retry of the original request with the new Access_Token; two concurrent 401 responses share a single refresh request; a refresh response of 401 clears both cookies and the AuthContext state and redirects to `/login`; and a 401 from POST `/api/auth/login` does not trigger a refresh.
 13. THE Kano_Web SHALL provide useDragAndDrop tests for the touch path, with touch events simulated through React Testing Library (`touchstart`, `touchmove`, `touchend`, `touchcancel`), fake timers, and `document.elementFromPoint` mocked, that assert: a touch held 300 ms without moving starts a drag; a touch that moves more than 10 px or ends before 300 ms starts no drag and sends no request; a touch ended over a Column moves the Card in local state before the mocked position request resolves; a failing mocked request restores the Card to its original Column and Order_Value and triggers the useErrorHandler toast once; and a touch ended outside any Column or cancelled sends no request and leaves the state unchanged.
 14. THE Kano_Web SHALL provide tests, with the network mocked, that assert: the apiClient running in a Server Component never sends POST `/api/auth/refresh`, never writes a cookie, and throws an ApiError with `statusCode` 401 on a 401 response; and a login response sets the access cookie lifetime from `expires_in` and the refresh cookie lifetime from `refresh_expires_in`, using values other than 3600 and 604800 to show that no constant is used.
+15. THE Kano_Web SHALL provide React Testing Library tests for the profile form that assert: the email is shown as read-only text and no email input exists; a name of 0 and 101 characters shows a field-level error without a request; a password section with only one filled input shows a field-level error without a request; a new password of 7 characters shows an error and one of 8 characters is submitted together with `current_password`; a `current_password` error response (status 400) shows the error on the current password input; and the request body never contains `email`.
+16. THE Kano_Web SHALL provide React Testing Library tests for the CardDetailModal that assert: the status control shows the three options with the current status preselected; changing only the status sends PATCH with only `status`; the board Card and the My Tasks row show the matching status badge after the update; a failing PATCH keeps the modal open and the previous status; and the guest view renders read-only controls without save, delete, and comment form.
+17. THE Kano_Web SHALL provide tests for the new-card flow that assert: the CardDetailModal opens for the new Card after a 201 response; no modal opens after a failing creation request; and closing the modal keeps the Card with its title only.
+18. THE Kano_Web SHALL provide tests for the invitation UI that assert: the MemberPanel shows the member and guest links with copy buttons for the Board_Admin and not for others; regenerate asks for confirmation and replaces the link only after a 200 response; the invite page shows the board name and role and joins through POST accept; an unknown token (status 404) shows the not-found message without a Join button; and a guest view hides every edit control listed in Requirement 21 criterion 20 and starts no drag.
+19. THE Kano_Web SHALL provide property-based tests for the `decideRoute` function of Requirement 17 criterion 12 over all combinations of pathname class (`/`, `/welcome`, `/login`, `/register`, `/invite/<token>`, other protected route), authentication state, and Welcome_Cookie presence, asserting the outcomes of Requirement 38 criteria 5 to 11, and for the `next` validation of Requirement 19 criterion 11 over generated strings (valid invite paths accepted; absolute URLs, protocol-relative URLs, backslashes, extra slashes, and paths outside `/invite/` rejected).
 
 ### Requirement 33: End-to-End Tests
 
@@ -663,13 +733,18 @@ kano-app/
 
 1. WHERE the environment variable holding the live Vercel frontend URL is set, THE E2E_Suite SHALL run Playwright against that URL.
 2. IF the environment variable holding the live Vercel frontend URL is missing or is not a valid absolute http or https URL, THEN THE E2E_Suite SHALL exit before running any test with a non-zero exit code and an error message naming the variable.
-3. WHEN the E2E_Suite runs the auth scenarios, THE E2E_Suite SHALL verify four cases: a login with valid credentials redirects to `/`, a login with invalid credentials shows the invalid-credentials error on `/login` and stays on `/login`, an unauthenticated visit to a protected route redirects to `/login`, and a logout redirects to `/login` and a following visit to `/` redirects to `/login` again.
-4. WHEN the E2E_Suite runs the Kanban journey, THE E2E_Suite SHALL execute these 8 steps in order: (1) register a new User with a unique email per run, (2) log in as that User, (3) create a Board, (4) add at least 2 Columns, (5) create a Card in the first Column, (6) drag the Card to the second Column, (7) reload the page and confirm the Card is shown in the second Column, (8) add a Comment to the Card and then edit that Comment and confirm the edited text is shown.
+3. WHEN the E2E_Suite runs the auth scenarios, THE E2E_Suite SHALL verify four cases: a login with the credentials `E2E_USER_EMAIL` and `E2E_USER_PASSWORD` redirects to `/`, a login with the same email and a wrong password built at run time from `E2E_USER_PASSWORD` shows the invalid-credentials error on `/login` and stays on `/login`, an unauthenticated visit to a protected route (with the Welcome_Cookie set first) redirects to `/login`, and a logout redirects to `/login` and a following visit to `/` redirects to `/login` again. Every scenario that visits `/` while unauthenticated SHALL first set the `kano_welcome_seen` cookie.
+4. WHEN the E2E_Suite runs the Kanban journey, THE E2E_Suite SHALL execute these 8 steps in order: (1) register a new User with a unique generated email per run and the password from `E2E_USER_PASSWORD`, (2) log in as that User, (3) create a Board, (4) add at least 2 Columns, (5) create a Card in the first Column, (6) drag the Card to the second Column, (7) reload the page and confirm the Card is shown in the second Column, (8) add a Comment to the Card and then edit that Comment and confirm the edited text is shown.
 5. IF a step of the Kanban journey fails, THEN THE E2E_Suite SHALL mark the journey test as failed, skip the remaining steps of that journey, and keep the failure details in the HTML report.
 6. THE E2E_Suite SHALL use Playwright auto-waiting and web-first assertions and SHALL NOT call `waitForTimeout` anywhere in the test code.
 7. THE E2E_Suite SHALL use an assertion timeout of 10 seconds and a per-test timeout of 60 seconds, with no test retried more than 2 times.
 8. WHEN `npx playwright test` is run, THE E2E_Suite SHALL finish with all tests passed, exit code 0, and generate an HTML report.
 9. THE repository SHALL contain the full Playwright HTML report from a run in which all tests passed, including the result of every test, which is viewable with `npx playwright show-report`.
+10. THE E2E_Suite in `web/e2e/` SHALL read the live URL and the test credentials only from the variables `E2E_BASE_URL`, `E2E_USER_EMAIL`, and `E2E_USER_PASSWORD`, loaded by `playwright.config.ts` with dotenv from the git-ignored file `web/.env.test`, where a value already present in the process environment takes precedence over the file, and SHALL keep the validation of criterion 2 for `E2E_BASE_URL`.
+11. IF `E2E_USER_EMAIL` or `E2E_USER_PASSWORD` is missing or empty when a test needs it, THEN THE E2E_Suite SHALL fail that test immediately with a message naming the missing variable and SHALL NOT print any variable value.
+12. THE repository SHALL contain a check that fails when any file in `web/e2e/` contains a literal password or a literal e-mail credential (an e-mail address string literal or a password string literal used for login or registration), in the same style as the check for `waitForTimeout` in criterion 6.
+13. WHEN the E2E_Suite runs the welcome scenario, THE E2E_Suite SHALL verify with a fresh browser context (no cookies) that a visit to `/` redirects to `/welcome`, that the page shows the "Log in" and "Create account" buttons, that the "Log in" button leads to `/login` and sets the `kano_welcome_seen` cookie, that the "Create account" button leads to `/register`, and that a second visit to `/` then redirects to `/login`.
+14. THE login-based E2E tests SHALL require an account for `E2E_USER_EMAIL` that already exists on the target database, which the user creates manually before the run, while the registration scenarios SHALL register a unique generated email per run with the password from `E2E_USER_PASSWORD`.
 
 ## Part E: Deployment and Documentation
 
@@ -696,8 +771,8 @@ kano-app/
 
 #### Acceptance Criteria
 
-1. THE repository SHALL contain a `.gitignore` at the repository root that excludes `.env`, `.env.local`, and every other `.env*` file except `.env.example`, and that excludes `__pycache__/`, `.next/`, `node_modules/`, and `app/venv/`.
-2. THE repository SHALL commit `app/.env.example` and `web/.env.example`, each listing every environment variable name that the corresponding project reads, with a placeholder value that is not a real credential.
+1. THE repository SHALL contain a `.gitignore` at the repository root that excludes `.env`, `.env.local`, `.env.test`, and every other `.env*` file except `.env.example` and `.env.test.example`, and that excludes `__pycache__/`, `.next/`, `node_modules/`, and `app/venv/`.
+2. THE repository SHALL commit `app/.env.example`, `web/.env.example`, and `web/.env.test.example` (listing `E2E_BASE_URL`, `E2E_USER_EMAIL`, and `E2E_USER_PASSWORD`), each listing every environment variable name that the corresponding project reads, with a placeholder value that is not a real credential.
 3. THE repository SHALL contain no real secrets (JWT secret, database password, or API key) in any tracked file or in any commit of the Git history.
 4. THE repository SHALL have a commit history in which each of the six phases (specification writing, guideline authoring, backend implementation, frontend implementation, testing, and deployment) is represented by at least 1 commit whose message names the phase.
 5. THE repository SHALL keep the specification documents `requirements.md`, `design.md`, `tasks.md`, and `CHANGELOG.md` in `.kiro/specs/kano/`.
@@ -722,3 +797,57 @@ kano-app/
 10. THE README.md Screenshots section SHALL include image files, each with a caption naming its subject, for: a Postman run covering all eight Blueprint_Package endpoint groups against the public URL, the Dashboard, Board Detail, Card Detail Modal, My Tasks, Profile, Register, and Login pages, a Card being dragged between Columns, the notification bell showing an unread count greater than zero, and the Playwright HTML report showing all tests passed.
 11. THE README.md SHALL document the XSS exposure of the non-httpOnly access cookie and refresh cookie (both tokens) and its mitigations, and SHALL document that Refresh_Tokens are stateless and cannot be revoked on logout, as required by Requirement 28 criterion 8 and Requirement 6 criterion 15.
 12. IF a link or image path in README.md does not resolve to an existing file or URL, THEN THE repository SHALL be treated as failing this requirement until the link or image path is corrected.
+13. THE README.md SHALL, in addition to criteria 1 to 12, list in Features the card status, the board invitation links with the guest role, and the welcome page; SHALL document in Test Steps the file `web/.env.test` (created from `web/.env.test.example`) with the variables `E2E_BASE_URL`, `E2E_USER_EMAIL`, and `E2E_USER_PASSWORD` and the need for a pre-existing account; and SHALL state in Local Run Steps that the V6 schema changes need `flask db migrate` and `flask db upgrade` as a manual Migration_Step.
+
+## Part F: V6 Improvements
+
+### Requirement 37: Board Invitation Links and Guest Role
+
+**User Story:** As a Board_Admin, I want to share a member link and a guest link for my board, so that people can join with the right access without me typing their email.
+
+#### Acceptance Criteria
+
+1. THE Kano_API SHALL store the Invite_Tokens of a Board as the two columns `member_invite_token` and `guest_invite_token` of the `boards` table and SHALL add no table, so that the 7 tables of Requirement 1 criterion 9 remain.
+2. THE Kano_API SHALL generate each Invite_Token with a cryptographically secure random generator with at least 32 bytes of entropy, as a URL-safe string of 43 to 128 characters from `A-Z`, `a-z`, `0-9`, `_`, and `-`, unique across all Boards and across both roles.
+3. WHEN a Board is created, THE Kano_API SHALL create both Invite_Tokens in the same transaction as the Board and the admin Board_Membership, and WHEN a Board_Admin sends GET `/api/boards/<id>/invite-links` for a Board whose Invite_Tokens are NULL (a Board that existed before V6), THE Kano_API SHALL create the missing tokens, store them, and return them.
+4. WHEN a Board_Admin sends GET `/api/boards/<id>/invite-links`, THE Kano_API SHALL return status 200 with `{ "data": { "member": { "role": "member", "token": "<token>" }, "guest": { "role": "guest", "token": "<token>" } } }`.
+5. IF a Board_Member who is not the Board_Admin, a Board_Guest, or a User without a non-deleted Board_Membership sends GET `/api/boards/<id>/invite-links` or POST `/api/boards/<id>/invite-links/<role>/regenerate`, THEN THE Kano_API SHALL return status 403, leave the tokens unchanged, and not disclose any token.
+6. WHEN a Board_Admin sends POST `/api/boards/<id>/invite-links/<role>/regenerate` with `<role>` equal to `member` or `guest`, THE Kano_API SHALL replace the Invite_Token of that role with a new token, make the old token invalid immediately, leave the token of the other role unchanged, and return status 200 with `{ "data": { "role": "<role>", "token": "<new token>" } }`.
+7. IF `<role>` in a regenerate request is neither `member` nor `guest`, THEN THE Kano_API SHALL return status 400 and leave both tokens unchanged.
+8. IF the Board in a GET invite-links or regenerate request does not exist, is soft deleted, or `<id>` is not a valid UUID, THEN THE Kano_API SHALL return status 404.
+9. WHEN an authenticated client sends GET `/api/invites/<token>` with a valid Invite_Token of a non-deleted Board, THE Kano_API SHALL return status 200 with `{ "data": { "board_id", "board_name", "role", "current_role" } }`, where `role` is the role of the token and `current_role` is the role of the current User on that Board or null when the User has no non-deleted Board_Membership.
+10. IF the token in a GET `/api/invites/<token>` or POST `/api/invites/<token>/accept` request is unknown, has been replaced by a regenerate request, does not match the format of criterion 2, or belongs to a soft-deleted Board, THEN THE Kano_API SHALL return status 404, create no Board_Membership, and disclose no Board data.
+11. WHEN an authenticated client sends POST `/api/invites/<token>/accept` with a valid Invite_Token and the User has no non-deleted Board_Membership on the Board, THE Kano_API SHALL create a Board_Membership with the role of the token (`member` or `guest`) and return status 200 with `{ "data": { "board_id", "role" } }`.
+12. IF the User already has a non-deleted Board_Membership on the Board when accepting an Invite_Token, THEN THE Kano_API SHALL change nothing and return status 200 with the existing role, except that a `guest` who accepts the member token SHALL be upgraded to `member` and the response SHALL carry the role `member`; a `member` or `admin` who accepts the guest token SHALL keep the role, and an `admin` who accepts any token SHALL keep the role `admin`.
+13. IF the User has only a soft-deleted Board_Membership on the Board when accepting an Invite_Token, THEN THE Kano_API SHALL create a new non-deleted Board_Membership with the role of the token, leave the soft-deleted row unchanged, and return status 200, so that the partial unique index of Requirement 2 criterion 12 is respected.
+14. IF a Board_Guest sends any of the following requests, THEN THE Kano_API SHALL return status 403 and leave the data unchanged: PATCH or DELETE `/api/boards/<id>`; POST or DELETE on `/api/boards/<id>/members`; POST `/api/boards/<id>/columns`; PATCH `/api/boards/<id>/columns/reorder`; PATCH or DELETE `/api/columns/<id>`; POST `/api/columns/<id>/cards`; PATCH or DELETE `/api/cards/<id>`; PATCH `/api/cards/<id>/position`; POST `/api/cards/<id>/comments`; PATCH or DELETE `/api/comments/<id>`; GET `/api/boards/<id>/analytics`; GET `/api/boards/<id>/invite-links`; POST `/api/boards/<id>/invite-links/<role>/regenerate`. A Board_Guest MAY send GET `/api/boards/<id>`, GET `/api/boards/<id>/members`, GET `/api/cards/<id>/comments`, GET `/api/cards` (search), and the invite and notification endpoints for the guest's own account.
+15. WHERE the current User is the Board_Admin, THE Kano_Web SHALL show in the member management panel the member Invite_Link (labelled as able to edit) and the guest Invite_Link (labelled as view only), each as the full URL `<origin>/invite/<token>` with a copy BaseButton that copies the URL to the clipboard and shows a success toast, and IF the clipboard is not available, THEN THE Kano_Web SHALL show an error toast and keep the URL visible as selectable text.
+16. WHEN the Board_Admin selects the regenerate BaseButton of a link, THE Kano_Web SHALL open a BaseModal that states that the old link stops working, and WHEN the Board_Admin confirms, THE Kano_Web SHALL send POST `/api/boards/<id>/invite-links/<role>/regenerate`, show the new link and a success toast on status 200, and IF the request fails, THEN THE Kano_Web SHALL keep the old link displayed and trigger the useErrorHandler toast.
+17. THE Kano_Web SHALL show the role of every Board_Membership in the member management panel as a BaseBadge (`admin`, `member`, or `guest`) and SHALL let the Board_Admin remove a Board_Guest with the same control as a Board_Member.
+18. WHEN an authenticated User requests `/invite/<token>`, THE Kano_Web SHALL fetch GET `/api/invites/<token>` and show the board name, the role the User would get ("Member: can edit" or "Guest: view only"), and a Join BaseButton; WHEN the User selects Join, THE Kano_Web SHALL send POST `/api/invites/<token>/accept`, disable the button until the response arrives, and on status 200 redirect to `/boards/<board_id>` and show a success toast.
+19. IF the GET `/api/invites/<token>` or the accept request returns status 404, THEN THE Kano_Web SHALL show a not-found message for the invitation with a link to `/` and SHALL NOT show the Join BaseButton, and IF the User already holds a role that the token would not change (criterion 12), THEN THE Kano_Web SHALL show the current role and an open-board link instead of the Join BaseButton.
+20. WHEN an unauthenticated visitor requests `/invite/<token>`, THE Kano_Web middleware SHALL redirect the visitor to `/login?next=<URL-encoded /invite/<token>>` (a visitor may switch to `/register`, which keeps the `next` parameter by Requirement 19 criterion 12), and after a successful login THE Kano_Web SHALL return the visitor to `/invite/<token>` under the validation of Requirement 19 criterion 11.
+21. THE Kano_API SHALL keep an Invite_Token valid with no expiry time and no limit on the number of uses until a regenerate request replaces it or the Board is soft deleted, and accepting a token SHALL NOT consume it.
+22. THE Kano_API SHALL keep adding a member by email (Requirement 9 criterion 1) unchanged, creating the role `member`, and SHALL provide no endpoint that changes a role other than the upgrade of criterion 12.
+23. IF a request to GET `/api/invites/<token>` or POST `/api/invites/<token>/accept` has a missing, malformed, invalid-signature, expired, or wrong-type JWT, THEN THE Kano_API SHALL return status 401 and make no change.
+
+### Requirement 38: Welcome Page
+
+**User Story:** As a first-time visitor, I want an introduction to Kano before I log in, so that I understand what the app offers.
+
+#### Acceptance Criteria
+
+1. THE Kano_Web SHALL provide a public page `/welcome` rendered as a Server Component that sends no request to the Kano_API and shows what Kano is (1 to 5 sentences) and what a User can do with it, listing at least these items: boards, columns, drag and drop of cards, comments, notifications, My Tasks, invitation of members and guests by link or email, and board analytics.
+2. THE Welcome_Page SHALL render exactly one Header and one Footer (Requirement 18 criterion 13) and SHALL provide a "Log in" BaseButton that navigates to `/login` and a "Create account" BaseButton that navigates to `/register`.
+3. WHILE the viewport width is between 375 px and 1920 px inclusive, THE Welcome_Page SHALL satisfy Requirement 27 criteria 1, 2, and 9.
+4. THE Welcome_Cookie SHALL be named `kano_welcome_seen`, SHALL have the value `1`, SHALL NOT be httpOnly, and SHALL have `SameSite=Lax`, the path `/`, and a lifetime of 31536000 seconds.
+5. WHEN an unauthenticated visitor without the Welcome_Cookie requests `/`, THE Kano_Web middleware SHALL redirect the visitor to `/welcome` before rendering any page content.
+6. WHEN an unauthenticated visitor with the Welcome_Cookie requests `/`, THE Kano_Web middleware SHALL redirect the visitor to `/login`.
+7. WHEN an unauthenticated visitor requests a protected route other than `/` and `/invite/<token>`, THE Kano_Web middleware SHALL redirect the visitor to `/login`, with or without the Welcome_Cookie.
+8. WHEN an authenticated User requests `/welcome`, THE Kano_Web middleware SHALL redirect the User to `/`.
+9. THE Kano_Web SHALL serve `/welcome`, `/login`, and `/register` to an unauthenticated visitor without a redirect, with or without the Welcome_Cookie.
+10. WHEN an unauthenticated visitor requests `/login` or `/register` and the Welcome_Cookie is absent, or selects the "Log in" or "Create account" BaseButton on the Welcome_Page, THE Kano_Web SHALL set the Welcome_Cookie, so that the first-visit redirect of criterion 5 happens at most until the visitor has opened the login or register page.
+11. WHEN an unauthenticated visitor requests `/invite/<token>`, THE Kano_Web middleware SHALL redirect the visitor to `/login?next=<URL-encoded path>` (Requirement 37 criterion 20) with or without the Welcome_Cookie, and SHALL NOT redirect to `/welcome`.
+12. WHEN an authenticated User requests `/`, THE Kano_Web middleware SHALL continue to the Dashboard and SHALL NOT redirect to `/welcome`, with or without the Welcome_Cookie.
+13. WHEN a User logs out, THE Kano_Web SHALL keep the Welcome_Cookie, so that a following request for `/` redirects to `/login` (criterion 6).
+14. THE E2E_Suite SHALL cover criteria 5 to 11 as specified in Requirement 33 criteria 3 and 13.

@@ -1,6 +1,8 @@
 # Design Document
 
-**Version:** V5 (revised against requirements V5; initial design was V3)
+**Version:** V6 (revised against requirements V6; initial design was V3)
+
+> **V6 change summary.** V6 adds card status, the guest role, board invitation links, a fixed email with password change, a welcome page, and E2E credentials from `web/.env.test`. Amended or new design sections are marked with a "V6 change" note. No V5 decision was deleted. Where V6 supersedes a V5 decision, the V5 text stays and the note says what replaced it. Index of V6 sections: D12 to D15 (decisions), V6 migration note, A3 (users PATCH), A4 and A4-V6 (roles and permission matrix), A7 and A8 (notifications, analytics), A10, A11 (endpoints), A12-V6 (security), A13 (card status), A14 (invitations), B1 to B11 (frontend), Data Models (V6 columns, ER, migration), Correctness Properties 44 to 58, Error Handling, Testing Strategy (V6), D1 and D3 notes, Traceability (V6 table, rows 37 and 38), Open issues 21 to 32.
 
 ## Overview
 
@@ -21,6 +23,10 @@ Key design decisions:
 | D9 | Two JWT types, both sent as `Authorization: Bearer`: an access token (`type=access`, 3600 s) for every protected endpoint and a refresh token (`type=refresh`, 604800 s) accepted only by `POST /api/auth/refresh`. Each is mirrored into its own non-httpOnly cookie so Server Components and the middleware can read them. Refresh tokens are stateless: no rotation, no server-side revocation (assumption, see Open issues). | Requirements 6, 16, 17, 28.7. XSS trade-off for both tokens is documented in Requirement 28.8. |
 | D10 | Two Vercel projects. The backend project root is the repository root with a root `vercel.json` that routes to `app/wsgi.py`. The frontend project root is `web/`. | The package is named `app` and must be importable. See the deployment risk notes. |
 | D11 | Denormalized `board_id` on `cards` and `notifications`. | Keeps search, permission checks, and notification navigation to one join, and keeps `notifications` independent of `cards` code. A card cannot change Board (Requirement 11.8), so the value is immutable. |
+| D12 | **V6.** Three roles per Board: `admin`, `member`, `guest`. Permission helpers are split by level: reader (any role), writer (`admin` or `member`), admin. The old single `require_board_member` is replaced by `require_board_reader` and `require_board_writer` so that no call site can silently let a guest write. | Requirements 8.11, 8.12, 9.13 to 9.15, 28.14, 37.14. The glossary term Board_Member excludes the guest, so the helper names say what they allow. |
+| D13 | **V6.** Invitation logic lives inside the `boards` Blueprint_Package (`boards/service/invite_service.py`, `boards/service/accept.py`, `boards/routes/invite_routes.py`). The two tokens are columns of `boards`. No ninth package and no new table. | Requirement 1.2 allows exactly 8 packages and Requirement 37.1 allows no new table. |
+| D14 | **V6.** Card status is stored on `cards` (`status`, `completed_at`) and changes only through PATCH `/api/cards/<id>`. The transition rule is the pure function `apply_status_change`. Moving a card never changes its status. Analytics uses `status = DONE` and `completed_at`, not the Column named `Done`. | Requirements 11.17 to 11.21, 14.2. Supersedes the V5 rule "completed = in Column named Done with `updated_at` in this week" (see A8 and Open issue 3). |
+| D15 | **V6.** Route decisions come from one pure function `decideRoute` (replaces `guardDecision`). The first-visit redirect to `/welcome` uses the cookie `kano_welcome_seen`. `/invite/<token>` is a protected route that sends anonymous visitors to `/login?next=...`. The `next` value is validated by one pure function `safeNext`. | Requirements 17.7 to 17.13, 19.11, 38. One function makes the whole routing table property-testable and prevents open redirects. |
 
 Pure logic (ordering, validation boundaries, recipient computation, pagination, week boundaries, optimistic-move reducers, route-guard decisions, badge formatting) is isolated in side-effect-free functions so it can be tested with property-based tests. See Correctness Properties.
 
@@ -29,6 +35,8 @@ Pure logic (ordering, validation boundaries, recipient computation, pagination, 
 > **MANUAL STEP (user-owned, Requirement 3):** `flask db init`, `flask db migrate`, `flask db upgrade`, in that order, from `app/` against the local PostgreSQL database. Production and the test database get `flask db upgrade` as separate manual runs. No automated task generates or commits migration scripts.
 
 Parts of this design that depend on that step: every endpoint that reads or writes the database (all except `GET /api/health`), all service and end-to-end pytest tests, the performance checks (Requirement 29), the production verification (Requirement 34), and the Playwright suite. Pure-function unit tests, schema tests, and all frontend unit tests do not depend on it.
+
+> **V6 change, manual migration (Requirement 3.8 to 3.10).** V6 adds columns to existing tables, so the user runs a second manual Migration_Step, `flask db migrate` and `flask db upgrade` from `app/`, against the development database and the test database. Production is not deployed yet, so its first `flask db upgrade` applies the complete history including V6. Alembic autogenerate does not detect changes to check constraints on existing tables, so the user must review the generated script and add the check constraints by hand (details under Data Models, "V6 schema changes and migration"). This design commits no migration script. Everything that reads `status`, `completed_at`, the invite tokens, or the role `guest` in the database is blocked until that step is done. Pure functions (`apply_status_change`, `resolve_accept`, `start_of_week_utc`, `role_allows`, `decideRoute`, `safeNext`) and all frontend unit tests are not blocked.
 
 ## Architecture
 
@@ -61,7 +69,7 @@ app/
 |-- blueprints/
 |   |-- auth/            routes.py, service.py, schema.py   (no model)
 |   |-- users/           routes.py, service.py, schema.py   (User)
-|   |-- boards/          routes.py, service.py, schema.py   (Board, BoardMembership)
+|   |-- boards/          routes.py, service.py, schema.py   (Board, BoardMembership; V6: also invitation links and accept, see A14)
 |   |-- columns/         routes.py, service.py, schema.py   (Column)
 |   |-- cards/           routes.py, service.py, schema.py   (Card)
 |   |-- comments/        routes.py, service.py, schema.py   (Comment)
@@ -81,7 +89,7 @@ Because `app/` itself is the Python package `app` (it contains `__init__.py`), a
 | Blueprint_Package | Owns model(s) | Table(s) |
 |---|---|---|
 | users | User | `users` |
-| boards | Board, BoardMembership | `boards`, `board_memberships` |
+| boards | Board, BoardMembership (V6: Board also holds the two Invite_Token columns; the invitation endpoints belong to this package) | `boards`, `board_memberships` |
 | columns | Column | `columns` |
 | cards | Card | `cards` |
 | comments | Comment | `comments` |
@@ -127,6 +135,8 @@ Rules that keep the graph acyclic:
 3. Service-to-service calls exist only in three places: `auth` to `users`, `cards` to `notifications`, `comments` to `notifications`.
 4. `routes.py` imports only its own `service.py` and `schema.py` plus `errors.py`.
 5. `create_app` imports every model-defining `schema.py` (users, boards, columns, cards, comments, notifications) before `Migrate.init_app`, so `flask db migrate` detects all 7 tables (Requirement 1.9).
+6. **V6.** `boards/service` keeps owning Board_Memberships, including the invitation accept (a membership write). `cards/service` imports nothing from `boards` except through `permissions.py` and `notifications/service`, and never imports a `routes.py`. The invitation routes are registered by the `boards` blueprint under `/api/invites/...` and `/api/boards/<id>/invite-links...`, so no other package is involved.
+7. **V6.** `apply_status_change` (cards), `resolve_accept` (boards), `role_allows` (permissions), and `start_of_week_utc` (analytics) are pure functions with no import of `db`, so they are unit and property testable without a database.
 
 ### File size and split rule (Requirement 30.6, 30.7)
 
@@ -138,6 +148,12 @@ Every Python and TSX file stays at or below 300 lines. Splits are decided now wh
 | `blueprints/cards/service.py` | `cards/service/`: `card_service.py`, `position_service.py`, `search_service.py` |
 | `blueprints/boards/schema.py` | `boards/schema/`: `models.py`, `board_schemas.py`, `member_schemas.py` |
 | `blueprints/cards/routes.py` | `cards/routes/`: `card_routes.py`, `search_routes.py` |
+| **V6** `blueprints/boards/service/` (with invitations) | `board_service.py`, `member_service.py`, `cascade.py`, `invite_service.py` (tokens, lazy creation, regenerate, lookup), `accept.py` (pure `resolve_accept` and the accept transaction) |
+| **V6** `blueprints/boards/routes.py` | `boards/routes/`: `board_routes.py`, `member_routes.py`, `invite_routes.py` |
+| **V6** `blueprints/boards/schema.py` | `boards/schema/`: `models.py`, `board_schemas.py`, `member_schemas.py`, `invite_schemas.py` |
+| **V6** `blueprints/cards/service.py` | `cards/service/`: add `status.py` (pure `apply_status_change`, `CARD_STATUSES`) next to `card_service.py`, `position_service.py`, `search_service.py` |
+| **V6** `web/components/boards/MemberPanel.tsx` | `MemberPanel.tsx` (shell), `MemberList.tsx`, `AddMemberForm.tsx`, `InviteLinksPanel.tsx`, `InviteLinkRow.tsx`, one component per file |
+| **V6** `web/components/cards/CardDetailModal.tsx` | `CardDetailModal.tsx` (shell and save logic), `CardDetailForm.tsx`, `StatusSelect.tsx`, with `CommentList.tsx` unchanged |
 
 The package `__init__.py` keeps `routes`, `service`, and `schema` importable under those names.
 
@@ -188,7 +204,7 @@ sequenceDiagram
 3. Engine options: when the environment variable `VERCEL` is set, use `poolclass=NullPool` (no pooled connections in a serverless function). Otherwise `pool_size=5`, `pool_pre_ping=True`.
 4. `CORS(app, resources={r"/api/*": {"origins": cfg.cors_origins, "allow_headers": ["Authorization", "Content-Type"]}})` with `supports_credentials=False`. flask-cors omits the allow-origin header for an origin not in the list (Requirement 4.17).
 5. Register error handlers and JWT callbacks from `errors.py`, register the health blueprint and the 8 feature blueprints under `/api`.
-6. Never log request bodies or `Authorization` headers. A logging filter drops records that contain `password` or `Bearer` text (Requirement 28.2).
+6. Never log request bodies or `Authorization` headers. A logging filter drops records that contain `password` or `Bearer` text (Requirement 28.2). **V6 change:** the same filter, attached to the root logger and to the `werkzeug` logger, also rewrites every record with `redact_invite_tokens(text)` (see A12-V6) so an Invite_Token in a request path never reaches the log (Requirement 28.13). `current_password` is dropped by the existing `password` rule.
 
 ### A2. Error handling and Response_Envelope (`errors.py`, Requirement 4)
 
@@ -233,7 +249,7 @@ Serialization: `UuidField` outputs `str(uuid)` (lowercase, 36 characters). `UtcD
 - Type enforcement: `@jwt_required()` (default) rejects a refresh token and `@jwt_required(refresh=True)` rejects an access token. Flask-JWT-Extended raises its wrong-token error in both cases (it would answer 422 by default). The `invalid_token_loader` registered in `errors.py` maps it to 401 in the envelope (Requirement 4.6). A test asserts the 401 for each direction, so a library default change is caught.
 - `jwt.user_lookup_loader` loads the non-deleted User by id once per request and caches it on `flask.g`. A missing or soft-deleted user returns `None`, which the lookup-error callback turns into 401 (Requirement 6.9). This is query 1 of every protected request.
 - `POST /api/auth/refresh` (`auth/service.refresh(identity)`): `@jwt_required(refresh=True)`, then loads the non-deleted User by `get_jwt_identity()` and raises `Unauthorized` if missing (Requirement 6.13), then returns `create_access_token(...)`. It does not issue a new refresh token (no rotation), and it keeps no server state (Requirement 6.15).
-- `GET/PATCH /api/users/me` use the cached user. PATCH updates only supplied fields and stores a supplied email lowercased, and checks uniqueness on the lowercased value. A token whose subject is a soft-deleted or nonexistent user never reaches the route: the lookup loader answers 401 on every protected endpoint, including these two (Requirements 6.9 and 7.6). There is no 404 for a missing current user.
+- `GET/PATCH /api/users/me` use the cached user. **V6 change (supersedes the V5 PATCH, which accepted `email` and rejected `password`):** PATCH accepts only `name` and/or `password` with `current_password`, and the email can never change (Requirements 7.2 to 7.5, 7.8). `UserUpdateSchema` declares `name` (1 to 100, stripped), `password` (8 to 128), `current_password` (load only, non-empty string), and an explicit `email = fields.Raw(load_only=True)` whose validator always raises `ValidationError("email cannot be changed")`, so a body that contains `email` with any value (including the current one, null, or an empty string) returns 400 naming `email` (the `unknown = RAISE` rule alone would also reject it, but the explicit field gives the clear message). A `@validates_schema` hook rejects a body with neither `name` nor `password`, a `current_password` without `password`, and a `password` without `current_password` (400 naming `current_password`). `users/service.update_me` runs in this order: (1) if `password` is present, `check_password_hash(user.password_hash, current_password)`; a mismatch raises `BadRequest("current_password: does not match")` before any field is touched, so the name of the same request is not saved (never 403); (2) set `name`; (3) set `password_hash = generate_password_hash(password)` (same salted adaptive hash as registration, reused through `users/service.hash_password`); (4) one commit. There is no token invalidation: access and refresh tokens stay valid after a password change (Requirement 6.15, stateless, see Open issue 13). `UserSchema` output never contains a password field, and the log filter drops any record that contains `password` or `current_password`, including those of failed requests (Requirement 7.8). A token whose subject is a soft-deleted or nonexistent user never reaches the route: the lookup loader answers 401 on every protected endpoint, including these two (Requirements 6.9 and 7.6). There is no 404 for a missing current user.
 - No endpoint deletes or deactivates a user (Requirement 7.7). Soft-deleted users exist only as seed data: tests insert a `User` row with `is_deleted = true` directly through the test session (a `make_deleted_user` fixture). Requirements 6.6, 6.9, 6.13, and 31.11 are tested with those rows.
 - Email normalization: `normalize_email(value) = value.strip().lower()` in `users/schema.py`, applied by a Marshmallow `pre_load` hook on every schema that carries an email (`RegisterSchema`, `LoginSchema`, `UserUpdateSchema`, `MemberAddSchema`), so register, login lookup, PATCH, and add-member lookup all work on the lowercased value, and the stored column is always lowercase (Requirements 2.12, 6.1, 7.2, 9.1).
 - The login response is `{ "data": { "access_token": "<jwt>", "refresh_token": "<jwt>", "token_type": "Bearer", "expires_in": 3600, "refresh_expires_in": 604800, "user": { ... } } }`. `expires_in` is `JWT_ACCESS_TOKEN_EXPIRES` and `refresh_expires_in` is `JWT_REFRESH_TOKEN_EXPIRES`, both in seconds. The refresh response is `{ "data": { "access_token": "<jwt>", "token_type": "Bearer", "expires_in": 3600 } }`. Register returns the user profile only and no tokens.
@@ -252,6 +268,48 @@ def assert_assignee_is_member(board_id, assignee_id) -> None                   #
 ```
 
 Each helper does one joined query that selects the resource with its Board and the caller's active membership (`board_memberships.is_deleted = false`). Order of checks: resource missing or soft deleted gives 404, then missing membership gives 403, then role gives 403. A 403 response body contains only a generic message, never resource data (Requirement 28.11). Every `service.py` that enforces membership or role calls these helpers (Requirement 1.6).
+
+**V6 change: this helper list is superseded by A4-V6 below.** The signatures above are kept for history. In V6 `require_board_member` and the `*_for_member` helpers no longer exist, because "member" was ambiguous once the guest role was added.
+
+#### A4-V6. Role levels, helpers, and the endpoint by role matrix (Requirements 8.11, 8.12, 9.13 to 9.15, 10.10, 11.22, 11.23, 12.10, 12.11, 14.10, 28.14, 37.14)
+
+Role levels (pure, in `permissions.py`, no database access):
+
+```python
+ROLE_RANK = {"guest": 0, "member": 1, "admin": 2}
+LEVEL_RANK = {"reader": 0, "writer": 1, "admin": 2}      # reader = any role, writer = admin or member
+def role_allows(role: str | None, level: str) -> bool:    # None (no active membership) -> False
+    return role is not None and ROLE_RANK[role] >= LEVEL_RANK[level]
+```
+
+| V6 helper | Replaces (V5) | Behavior |
+|---|---|---|
+| `require_board_reader(board_id, user_id)` | `require_board_member` for read endpoints | 404, 403 without active membership, any role passes |
+| `require_board_writer(board_id, user_id)` | `require_board_member` for write endpoints | 404, 403 without membership, 403 for `guest` |
+| `require_board_admin(board_id, user_id)` | unchanged | 404, 403 for `member`, `guest`, and non-participants |
+| `get_column_for_writer(column_id, user_id)` | `get_column_for_member` | column rename, delete, create card; guest gets 403 |
+| `get_card_for_reader(card_id, user_id)` and `get_card_for_writer(card_id, user_id)` | `get_card_for_member` | reader for GET comments; writer for PATCH, DELETE, position, create comment |
+| `get_comment_for_reader(comment_id, user_id)` and `get_comment_for_writer(comment_id, user_id)` | `get_comment_for_member` | the comment PATCH and DELETE use the writer variant and then the owner check, so a guest who is the author of an old Comment (possible after being removed and re-joining as guest) still gets 403 (Requirement 12.11) |
+| `assert_assignee_is_writer(board_id, assignee_id)` | `assert_assignee_is_member` | 400 unless the assignee has an active membership with role `admin` or `member`; a guest, a removed member, and a non-participant all give 400 (Requirements 11.5, 11.22) |
+
+Every helper still does one joined query and returns the membership, so the number of queries per request does not change (Property 25). Check order stays 404, then 403 for no membership, then 403 for role. A guest on a write endpoint gets 403 with the generic message, never resource data.
+
+Matrix (server-verified; `ok` = allowed; `403` = forbidden; "any user" = authenticated, no Board role needed):
+
+| Endpoint group | admin | member | guest | non-participant |
+|---|---|---|---|---|
+| GET board detail, GET members, GET card comments | ok | ok | ok | 403 |
+| GET `/api/cards?q=...` (with or without `board_id`) | ok | ok | ok | 403 with `board_id`, boards not included without it |
+| PATCH or DELETE board; POST or DELETE members; GET analytics | ok | 403 | 403 | 403 |
+| GET invite-links; POST regenerate | ok | 403 | 403 | 403 |
+| POST column; PATCH, DELETE column; PATCH reorder | ok | ok | 403 | 403 |
+| POST card; PATCH, DELETE card; PATCH position | ok | ok | 403 | 403 |
+| POST comment | ok | ok | 403 | 403 |
+| PATCH or DELETE comment | author only | author only | 403 | 403 |
+| GET `/api/invites/<token>`; POST accept | any user (token-gated) | any user | any user | any user |
+| POST and GET `/api/boards`, `/api/cards?assignee=me`, notifications, users/me, refresh | any user | any user | any user | any user |
+
+`role_allows` is the single decision point, so Property 47 can test the whole matrix as a table over role and level.
 
 ### A5. Soft delete and cascade (`soft_delete.py`, Requirement 2)
 
@@ -294,6 +352,8 @@ Create uses `SELECT max(order)` over active rows of the parent (Board for column
 
 The message is `Assigned to you: "<title>"` or `<author name> commented on "<title>"`. The title is shortened with `...` so the message never exceeds 255 characters. The notification row is inserted in the same transaction as the triggering write. Listing: `page` and `per_page` are validated by `NotificationQuerySchema` (integers from 1 to 2147483647, `per_page` at most 100, defaults 1 and 20). The query is `ORDER BY created_at DESC, notification_id DESC LIMIT per_page OFFSET (page-1)*per_page`. `total` and `unread_count` come from two `count()` queries on active rows of the recipient. A page past the last returns an empty list with the unchanged `total` and `unread_count`. Marking read is idempotent.
 
+**V6 change (Requirement 13.12).** Guests are never notification recipients: a guest cannot be an assignee (`assert_assignee_is_writer`) and is never the Board_Admin, so `comment_recipients` needs no change. Accepting an invitation, changing a status, and moving a card create no notification. A status change that is part of a PATCH which also changes the assignee still creates the `assignment` notification by the existing rule.
+
 ### A8. Analytics queries (`analytics/service.py`, Requirement 14)
 
 All use SQLAlchemy joins and aggregation, with every joined table filtered on `is_deleted = false`.
@@ -305,16 +365,21 @@ select(Column.column_id, Column.name, func.count(Card.card_id))
   .where(Column.board_id == board_id, Column.is_deleted.is_(False))
   .group_by(Column.column_id, Column.name).order_by(Column.order)
 
-# completed this week
-week_start = start_of_week_utc(now)   # Monday 00:00:00 UTC, pure function
-select(func.count(Card.card_id)).join(Column, Column.column_id == Card.column_id)
-  .where(Card.board_id == board_id, Card.is_deleted.is_(False), Column.is_deleted.is_(False),
-         func.lower(Column.name) == "done", Card.updated_at >= week_start, Card.updated_at <= now)
+# completed this week  (V6 change: status and completed_at; V5 used the Column named "Done" and updated_at)
+week_start = start_of_week_utc(now)   # Monday 00:00:00 UTC, pure function, unchanged
+select(func.count(Card.card_id))
+  .where(Card.board_id == board_id, Card.is_deleted.is_(False), Card.status == "DONE",
+         Card.completed_at >= week_start, Card.completed_at <= now)
+# no join with columns: a DONE card counts whatever Column it is in (Requirement 14.2);
+# cards of a soft-deleted Column are already soft deleted by the cascade (A5), so no extra filter is needed.
 
-# member activity: assigned cards and written comments per active member (two aggregates left-joined to memberships)
+# member activity (V6 change: guests excluded): only memberships with role in ("admin", "member")
+# assigned cards and written comments per active member (two aggregates left-joined to memberships)
+select(BoardMembership.user_id, ...).where(BoardMembership.board_id == board_id,
+         BoardMembership.is_deleted.is_(False), BoardMembership.role.in_(("admin", "member")))
 ```
 
-If no Column is named `Done`, the completed count is 0 (Requirement 14.3). Only the Board_Admin may call it (403 otherwise, 404 if the Board is missing).
+**V6 change.** If no non-deleted Card has `status = DONE` with `completed_at` in the current week, the completed count is 0 (Requirement 14.3). Cards counted before V6 through the Column named `Done` are not counted after V6 unless the optional backfill (Data Models, V6 migration) was run, which is a breaking change for the numbers (CHANGELOG V6). Cards per Column count every non-deleted Card whatever its status. Only the Board_Admin may call the endpoint (403 for `member`, `guest`, and non-participants, 404 if the Board is missing). `start_of_week_utc` is unchanged and is also used by the tests with the boundary `Monday 00:00:00 UTC` (inclusive) and one second earlier (excluded).
 
 ### A9. Board detail query plan (Requirements 8.3, 11.16, 29.1, 29.2)
 
@@ -322,11 +387,11 @@ If no Column is named `Done`, the completed count is 0 (Requirement 14.3). Only 
 
 ### A10. Card search and My Tasks (`GET /api/cards`, Requirement 11.10 to 11.14)
 
-`CardQuerySchema` accepts `assignee` (only `me`), `q` (1 to 100 characters), `board_id` (UUID). Valid combinations: `assignee=me`, or `q` with optional `board_id`. Anything else is 400. `q` is escaped for LIKE (`\`, `%`, `_`) and used as `Card.title.ilike(pattern, escape="\\") | Card.description.ilike(pattern, escape="\\")`, so SQL and LIKE metacharacters are literal (Requirement 28.4). Rows join `Column`, `Board`, and the caller's active `BoardMembership`, and return `board_id`, `board_name`, `column_name`. With `board_id`, the membership is checked first (403 for a non-member).
+`CardQuerySchema` accepts `assignee` (only `me`), `q` (1 to 100 characters), `board_id` (UUID). Valid combinations: `assignee=me`, or `q` with optional `board_id`. Anything else is 400. `q` is escaped for LIKE (`\`, `%`, `_`) and used as `Card.title.ilike(pattern, escape="\\") | Card.description.ilike(pattern, escape="\\")`, so SQL and LIKE metacharacters are literal (Requirement 28.4). Rows join `Column`, `Board`, and the caller's active `BoardMembership`, and return `board_id`, `board_name`, `column_name`. With `board_id`, the membership is checked first (403 for a non-member). **V6 change:** the membership join accepts every role, so a Board_Guest can search the Cards of Boards where the guest holds a membership (Requirement 11.11, 11.13). Every returned Card (search and My Tasks) includes `status` and `completed_at` (Requirement 11.20). `CardQuerySchema` is unchanged. `assignee=me` is unaffected by roles: a guest cannot be an assignee, and removal of a membership already clears the assignee.
 
 ### A11. Endpoint table
 
-Legend: Auth `-` = none, `JWT` = any authenticated user holding a valid access token (a refresh token gets 401), `Refresh` = a valid refresh token only (an access token gets 401), `Member` / `Admin` / `Owner` / `Recipient` = per-resource role (server-verified). Success 201 for the six creating POSTs, 200 for everything else; DELETE returns 200 with a data object. Errors list the statuses beyond the always-possible 500 (and 401 for JWT endpoints).
+Legend: Auth `-` = none, `JWT` = any authenticated user holding a valid access token (a refresh token gets 401), `Refresh` = a valid refresh token only (an access token gets 401), `Member` / `Admin` / `Owner` / `Recipient` = per-resource role (server-verified). **V6 change:** `Member` in this table now means the writer level (role `admin` or `member`, a guest gets 403), `Participant` means any role including `guest` (reader level), and `Token` means any authenticated user holding a valid Invite_Token. See the matrix in A4-V6. Success 201 for the six creating POSTs, 200 for everything else; DELETE returns 200 with a data object. Errors list the statuses beyond the always-possible 500 (and 401 for JWT endpoints).
 
 | # | Method | Path | Auth / role | Request schema | Success | Error statuses | Requirement |
 |---|---|---|---|---|---|---|---|
@@ -335,14 +400,14 @@ Legend: Auth `-` = none, `JWT` = any authenticated user holding a valid access t
 | 3 | POST | `/api/auth/login` | - | `LoginSchema` (email, password) | 200 `{access_token, refresh_token, token_type, expires_in, refresh_expires_in, user}` | 400, 401 | 6.4-6.9 |
 | 3a | POST | `/api/auth/refresh` | Refresh | none (token in `Authorization` header) | 200 `{access_token, token_type, expires_in}` | 401 | 6.10-6.15 |
 | 4 | GET | `/api/users/me` | JWT | none | 200 profile | 401 | 7.1, 7.6 |
-| 5 | PATCH | `/api/users/me` | JWT | `UserUpdateSchema` (name, email; `password` rejected) | 200 profile | 400, 401, 409 | 7.2-7.6 |
+| 5 | PATCH | `/api/users/me` | JWT | **V6:** `UserUpdateSchema` (`name`, `password` with `current_password`; `email` always 400; V5 accepted email and rejected password) | 200 profile | 400 (incl. wrong or missing `current_password`), 401 | 7.2-7.8 |
 | 6 | POST | `/api/boards` | JWT | `BoardCreateSchema` (name 1-100, not blank) | 201 board with `my_role` | 400 | 8.1, 8.8, 8.10 |
 | 7 | GET | `/api/boards` | JWT | none | 200 list, `created_at` desc | none | 8.2 |
-| 8 | GET | `/api/boards/<uuid:id>` | Member | none | 200 board, columns, cards | 403, 404 | 8.3, 8.6, 8.9, 11.16 |
+| 8 | GET | `/api/boards/<uuid:id>` | Participant | none | 200 board, columns, cards (with `status`, `completed_at`), `my_role` may be `guest` | 403, 404 | 8.3, 8.6, 8.9, 8.11, 11.16 |
 | 9 | PATCH | `/api/boards/<uuid:id>` | Admin | `BoardUpdateSchema` | 200 board | 400, 403, 404 | 8.4, 8.7 |
 | 10 | DELETE | `/api/boards/<uuid:id>` | Admin | none | 200 `{board_id}` | 403, 404 | 8.5, 2.9 |
 | 11 | POST | `/api/boards/<uuid:id>/members` | Admin | `MemberAddSchema` (email) | 201 member | 400, 403, 404, 409 | 9.1-9.4, 9.9, 9.10 |
-| 12 | GET | `/api/boards/<uuid:id>/members` | Member | none | 200 list, creation asc | 403, 404 | 9.5, 9.10 |
+| 12 | GET | `/api/boards/<uuid:id>/members` | Participant | none | 200 list, creation asc, roles incl. `guest` | 403, 404 | 9.5, 9.10, 9.13 |
 | 13 | DELETE | `/api/boards/<uuid:id>/members/<uuid:user_id>` | Admin | none | 200 `{user_id}` | 400 (self), 403, 404 | 9.6-9.8, 9.11, 9.12 |
 | 14 | POST | `/api/boards/<uuid:id>/columns` | Member | `ColumnCreateSchema` | 201 column | 400, 403, 404 | 10.1, 10.6, 10.7 |
 | 15 | PATCH | `/api/columns/<uuid:id>` | Member | `ColumnUpdateSchema` | 200 column | 400, 403, 404 | 10.2 |
@@ -352,14 +417,20 @@ Legend: Auth `-` = none, `JWT` = any authenticated user holding a valid access t
 | 19 | PATCH | `/api/cards/<uuid:id>` | Member | `CardUpdateSchema` (partial) | 200 card | 400, 403, 404 | 11.3-11.5 |
 | 20 | DELETE | `/api/cards/<uuid:id>` | Member | none | 200 `{card_id}` | 403, 404 | 11.6, 2.11 |
 | 21 | PATCH | `/api/cards/<uuid:id>/position` | Member | `CardPositionSchema` (`column_id`, `order`) | 200 card | 400, 403, 404 | 11.7-11.9 |
-| 22 | GET | `/api/cards?assignee=me` and `/api/cards?q=&board_id=` | JWT | `CardQuerySchema` | 200 list | 400, 403 | 11.10-11.14 |
+| 22 | GET | `/api/cards?assignee=me` and `/api/cards?q=&board_id=` | JWT (search: Participant of each board searched) | `CardQuerySchema` | 200 list with `status`, `completed_at` | 400, 403 | 11.10-11.14, 11.20 |
 | 23 | POST | `/api/cards/<uuid:id>/comments` | Member | `CommentCreateSchema` (content 1-2000, non-blank) | 201 comment | 400, 403, 404 | 12.1, 12.5, 12.8, 13.2, 13.3 |
-| 24 | GET | `/api/cards/<uuid:id>/comments` | Member | none | 200 list, creation asc | 403, 404 | 12.2, 12.8 |
+| 24 | GET | `/api/cards/<uuid:id>/comments` | Participant | none | 200 list, creation asc | 403, 404 | 12.2, 12.8, 12.10 |
 | 25 | PATCH | `/api/comments/<uuid:id>` | Owner | `CommentUpdateSchema` | 200 comment | 400, 403, 404 | 12.3, 12.7 |
 | 26 | DELETE | `/api/comments/<uuid:id>` | Owner | none | 200 `{comment_id}` | 403, 404 | 12.4, 12.7 |
 | 27 | GET | `/api/notifications` | JWT | `NotificationQuerySchema` (`page`, `per_page`) | 200 `{items,page,per_page,total,unread_count}` | 400 | 13.4-13.8 |
 | 28 | PATCH | `/api/notifications/<uuid:id>/read` | Recipient | none | 200 notification | 403, 404 | 13.9-13.11 |
 | 29 | GET | `/api/boards/<uuid:id>/analytics` | Admin | none | 200 analytics | 403, 404 | 14 |
+| 30 | GET | `/api/boards/<uuid:id>/invite-links` | Admin | none | 200 `{member: {role, token}, guest: {role, token}}`, missing tokens created lazily | 403, 404 | 37.3, 37.4, 37.5, 37.8 |
+| 31 | POST | `/api/boards/<uuid:id>/invite-links/<role>/regenerate` | Admin | path `role` must be `member` or `guest` (`InviteRoleSchema`) | 200 `{role, token}` (not 201, per R4.3) | 400 (bad role), 403, 404 | 37.5 to 37.8 |
+| 32 | GET | `/api/invites/<token>` | Token (JWT) | token format check | 200 `{board_id, board_name, role, current_role}` | 401, 404 | 37.9, 37.10, 37.23 |
+| 33 | POST | `/api/invites/<token>/accept` | Token (JWT) | token format check | 200 `{board_id, role}` (not 201, per R4.3) | 401, 404 | 37.11 to 37.13, 37.21, 37.23 |
+
+**V6 change, rows 6 to 29 that gain behavior without a new row.** Row 6 (POST `/api/boards`) also creates both Invite_Tokens in the same transaction (A14). Rows 14 to 17, 18 to 21, 23, 25, 26 return 403 to a guest (matrix in A4-V6). Row 18 rejects a `status` field with 400 and always creates `NOT_STARTED` (A13). Row 19 accepts `status`. Row 11 (add member by email) is unchanged and creates the role `member` (Requirement 37.22).
 
 Error status mapping follows Requirement 4.6 exactly. Routes with a `<uuid:...>` converter return 404 for a malformed id because the URL rule does not match.
 
@@ -372,7 +443,8 @@ JSON shapes (fields only):
 | board detail | board + `columns: [{column_id, name, order, cards: [card]}]` |
 | member | `user_id`, `name`, `email`, `role` |
 | column | `column_id`, `board_id`, `name`, `order` |
-| card | `card_id`, `board_id`, `column_id`, `title`, `description`, `due_date`, `labels`, `assignee: {user_id, name} or null`, `order`, `created_at`, `updated_at` |
+| card | `card_id`, `board_id`, `column_id`, `title`, `description`, `due_date`, `labels`, `assignee: {user_id, name} or null`, `status` (V6), `completed_at` (V6, UTC string or null), `order`, `created_at`, `updated_at` |
+| invite links (V6) | `{ member: {role: "member", token}, guest: {role: "guest", token} }`; regenerate returns `{role, token}`; invite info returns `{board_id, board_name, role, current_role}`; accept returns `{board_id, role}` |
 | card search result | card + `board_name`, `column_name` |
 | comment | `comment_id`, `card_id`, `content`, `author: {user_id, name}`, `created_at`, `updated_at` |
 | notification | `notification_id`, `type`, `message`, `card_id`, `board_id`, `is_read`, `created_at` |
@@ -382,13 +454,97 @@ JSON shapes (fields only):
 
 Passwords only as salted adaptive hashes; secrets only from environment; all queries parameterized through SQLAlchemy with LIKE escaping; server-side membership and role checks in `permissions.py` on every endpoint; CORS restricted to configured origins; log filter for secrets; frontend never uses `dangerouslySetInnerHTML`. The non-httpOnly cookies are a deliberate trade-off (D9): any XSS can read both the access token and the 7-day refresh token, which raises the impact compared with a single short token. Mitigations: short access token expiry (3600 s), refresh token expiry (604800 s), React output escaping, no `dangerouslySetInnerHTML` (documented in the README).
 
+#### A12-V6. Security additions (Requirements 28.12 to 28.15, 37)
+
+- **Token entropy and exposure.** Invite_Tokens come from `secrets.token_urlsafe(32)`: 32 random bytes, 43 characters from `A-Z a-z 0-9 _ -`. Tokens are returned only to a Board_Admin (GET invite-links, regenerate) and echoed nowhere else. GET `/api/invites/<token>` returns the board id, name, and the role of the token to any authenticated user who already knows the token, and never returns the other role's token.
+- **No token in logs.** `redact_invite_tokens(text)` replaces every match of `/api/invites/[A-Za-z0-9_-]{20,}` and `/invite/[A-Za-z0-9_-]{20,}` with the same prefix plus `<redacted>`. The logging filter applies it to the formatted message of every record (root and `werkzeug` loggers, which print the request line), so a 400, 401, 403, 404, or 500 caused by an invite request leaves no token behind. Services never put a token into an exception message. The platform's own request logs on Vercel are outside the application and cannot be filtered (Open issue 22).
+- **Token lookup and timing.** The format check (`^[A-Za-z0-9_-]{43,128}$`) runs before any query, so malformed tokens cost no database access and give the same 404 as unknown tokens. Lookup is an indexed equality on 256-bit random values, so a timing attack is infeasible and no constant-time comparison is added. No rate limit is designed (Open issue 26).
+- **Open redirect.** The server never redirects from user input. The frontend validates `next` with `safeNext` (B4), so only `/invite/<1 to 128 URL-safe characters>` is accepted (Requirements 19.11, 28.15).
+- **Server-side role checks.** Every write endpoint checks the role through `permissions.py` (Requirement 28.14). Frontend hiding of controls is a convenience only.
+- **Passwords.** `current_password` is verified with `check_password_hash` before any write and is never logged or returned.
+- **No new environment variable** and no CORS change. Invite endpoints are ordinary JWT-protected `/api/*` routes.
+
+### A13. Card status (Requirements 2.16, 11.2, 11.4, 11.17 to 11.24, 14.2, 25.7)
+
+Constants and pure rule (`cards/service/status.py`, no database import):
+
+```python
+CARD_STATUSES = ("NOT_STARTED", "IN_PROGRESS", "DONE")      # exact, case-sensitive
+def apply_status_change(old_status: str, old_completed_at, new_status: str | None, now) -> tuple[str, datetime | None]:
+    if new_status is None or new_status == old_status:      # not supplied, or unchanged (incl. DONE -> DONE)
+        return old_status, old_completed_at
+    if new_status == "DONE":                                 # any other value -> DONE
+        return "DONE", now
+    if old_status == "DONE":                                 # DONE -> any other value
+        return new_status, None
+    return new_status, old_completed_at                      # NOT_STARTED <-> IN_PROGRESS (completed_at is None here)
+```
+
+- **Create.** `CardCreateSchema` does not declare `status` or `completed_at`, and uses `unknown = RAISE`, so a body with `status` returns 400 naming `status` and creates no Card (Requirement 11.17). The service always stores `status = "NOT_STARTED"` and `completed_at = None`.
+- **PATCH `/api/cards/<id>`.** `CardUpdateSchema` adds `status = fields.String(validate=validate.OneOf(CARD_STATUSES), allow_none=False)`. `OneOf` is exact, so `done`, `""`, `null`, and unknown values give 400 (Requirement 11.4). `completed_at` is not declared, so a client can never set it. The service calls `apply_status_change(card.status, card.completed_at, supplied_status, utcnow())` once, inside the same transaction and the same single UPDATE as the other supplied fields (Requirement 11.18). The notification rule of A7 is unchanged.
+- **Position.** `CardPositionSchema` and `position_service` never read or write `status` or `completed_at`, including a move into a Column named `Done` (Requirement 11.21). The Column named `Done` stays a plain Column.
+- **Serialization.** `CardSchema`, `CardSearchSchema`, and the board detail Cards all include `status` and `completed_at` (UTC string ending in `Z`, or null), in every response that returns a Card (Requirement 11.20). Cards created before V6 read as `NOT_STARTED` and `null` through the column default (Requirement 11.24).
+- **Invariant used by tests.** After any sequence of PATCH calls, `completed_at is not None` iff `status == "DONE"`, apart from rows changed by the optional manual backfill, which sets both (Property 44).
+
+### A14. Board invitation links and guest accept (Requirements 37, 2.15, 2.17, 8.10, 9.13)
+
+**Storage.** `boards.member_invite_token` and `boards.guest_invite_token`, both `varchar(128)`, nullable, each with a named unique constraint (`uq_boards_member_invite_token`, `uq_boards_guest_invite_token`). PostgreSQL unique constraints allow many NULLs, which gives "unique ignoring NULL" without a partial index. Tokens of soft-deleted Boards stay in the columns and stay unique, but the lookup filters `is_deleted = false`, so they answer 404.
+
+**Generation (`invite_service.py`).**
+
+```python
+def new_invite_token() -> str:            # secrets.token_urlsafe(32), 43 chars
+def generate_unique_token(session) -> str: # retries up to 3 times if either token column already holds the value (practically never)
+```
+
+- **Creation with the Board.** `boards/service.create_board` sets both tokens and inserts the admin membership in one transaction. A failure rolls back all of them (Requirement 8.10).
+- **Lazy creation.** GET invite-links for a Board whose tokens are NULL runs `UPDATE boards SET member_invite_token = COALESCE(member_invite_token, :t1), guest_invite_token = COALESCE(guest_invite_token, :t2) WHERE board_id = :id` and re-reads the row, so two concurrent admin requests end with one stored pair and both receive it.
+- **Regenerate.** After `require_board_admin`, `InviteRoleSchema` validates the path `role` (`member` or `guest`, else 400, the Board is still checked first for 404 and 403). The service stores a new token in that column only. The old token is invalid at once (the next lookup misses it), the other role's token and all memberships are unchanged, and the response is `{role, token}` with status 200.
+
+**Lookup.** `find_board_by_token(token)` returns `(board, token_role)` or raises `NotFound` for a malformed, unknown, replaced, or soft-deleted-Board token: one query on `member_invite_token = :t OR guest_invite_token = :t` with `is_deleted = false`, and the role is whichever column matched.
+
+**Accept decision (pure, `accept.py`).**
+
+```python
+def resolve_accept(existing_role: str | None, token_role: str) -> tuple[str, str]:
+    """-> (resulting_role, action) with action in {"create", "upgrade", "none"}"""
+    if existing_role is None:                               # no active membership (a soft-deleted row counts as none)
+        return token_role, "create"
+    if existing_role == "guest" and token_role == "member":
+        return "member", "upgrade"
+    return existing_role, "none"                            # admin keeps admin; member keeps member (no downgrade); guest + guest stays
+```
+
+**Accept transaction (`POST /api/invites/<token>/accept`).** JWT check first (401), then `find_board_by_token` (404), then:
+
+1. Read the caller's active membership for the Board with `SELECT ... FOR UPDATE`.
+2. `role, action = resolve_accept(existing.role if existing else None, token_role)`.
+3. `create`: insert a new Board_Membership with the token role. A soft-deleted row of the same pair is left untouched and a new row is inserted, which the partial unique index allows (Requirement 37.13). `upgrade`: `UPDATE board_memberships SET role = 'member' WHERE board_membership_id = :id AND role = 'guest'` (conditional, so it cannot lower a role). `none`: no write.
+4. Commit and return `{board_id, role}` with status 200 in every case. No Notification is created and the token is not consumed (Requirement 37.21).
+
+**Race.** Two simultaneous accepts of the same pair both try to insert. The partial unique index `uq_board_memberships_board_user_active` makes one fail with an `IntegrityError` (pgcode 23505). The accept service catches it locally, rolls back, re-reads the membership, runs `resolve_accept` again, and returns 200 with the existing role, so the global 409 mapping is never reached by accept and repeated accepts are idempotent.
+
+**Error mapping for the invite endpoints.**
+
+| Case | Status |
+|---|---|
+| Missing, malformed, expired, or wrong-type JWT | 401 (checked first, Requirement 37.23) |
+| Token malformed, unknown, replaced, or Board soft deleted | 404, no Board data, no membership created |
+| Regenerate or invite-links by `member`, `guest`, or non-participant | 403 |
+| Regenerate with `role` other than `member` or `guest` | 400, tokens unchanged |
+| Board missing, soft deleted, or `<id>` not a UUID | 404 |
+| Accept, any role combination (including no change) | 200 |
+
+**Module boundaries.** Everything above sits in `boards/service/` and `boards/routes/`. `invite_routes.py` registers `/boards/<uuid:id>/invite-links`, `/boards/<uuid:id>/invite-links/<role>/regenerate`, `/invites/<token>` and `/invites/<token>/accept` on the boards blueprint (the application mounts it under `/api`). `permissions.py` provides the membership helpers and `users` is not touched.
+
 ## Part B: Frontend
 
 ### B1. File tree (`web/`, App Router, no `src/`)
 
 ```
 web/
-|-- middleware.ts                  route guard (see B4)
+|-- proxy.ts                       route guard (see B4). V6 change: the repo uses the Next.js file name `proxy.ts`; every "middleware.ts" in this document means this file, logic unchanged
+|-- next.config.ts                 V6: headers() sets Referrer-Policy no-referrer and Cache-Control no-store for /invite/:path*
 |-- app/
 |   |-- layout.tsx                 Server: reads both cookies, renders AuthProvider, Toaster, Header, Footer (one each per page)
 |   |-- globals.css                Tailwind entry (@source lines for components/ and hooks/)
@@ -397,23 +553,31 @@ web/
 |   |-- (cards)/my-tasks/page.tsx  My Tasks (Server Component fetching, client list)
 |   |-- (users)/profile/page.tsx   Profile (Client form inside a thin server page)
 |   |-- (auth)/login/page.tsx
-|   `-- (auth)/register/page.tsx
+|   |-- (auth)/register/page.tsx
+|   |-- welcome/page.tsx           V6: public Server Component, no API call
+|   `-- invite/[token]/page.tsx    V6: Server fetch of GET /api/invites/<token>, renders InviteJoinCard
 |-- components/
 |   |-- Header.tsx  Footer.tsx  NotificationBell.tsx
-|   |-- shared/   BaseButton.tsx  BaseBadge.tsx  BaseModal.tsx  ConfirmDialog.tsx  ErrorPanel.tsx
+|   |-- shared/   BaseButton.tsx  BaseBadge.tsx  BaseModal.tsx  ConfirmDialog.tsx  ErrorPanel.tsx  StatusBadge.tsx (V6)
 |   |-- auth/     LoginForm.tsx  RegisterForm.tsx  AuthProvider.tsx
 |   |-- boards/   BoardList.tsx  CreateBoardModal.tsx  BoardView.tsx  KanbanColumn.tsx  ColumnHeader.tsx
 |   |             AddColumnForm.tsx  CardSearchInput.tsx  MemberPanel.tsx  AnalyticsView.tsx  BoardAccessMessage.tsx
-|   |-- cards/    CardItem.tsx  AddCardForm.tsx  CardDetailModal.tsx  MyTasksList.tsx
+|   |             V6: MemberList.tsx  AddMemberForm.tsx  InviteLinksPanel.tsx  InviteLinkRow.tsx  InviteJoinCard.tsx
+|   |             BoardRoleContext.tsx (provides my_role and canEdit to the board tree)
+|   |-- cards/    CardItem.tsx  AddCardForm.tsx  CardDetailModal.tsx  MyTasksList.tsx  (V6: CardDetailForm.tsx  StatusSelect.tsx)
 |   |-- comments/ CommentList.tsx  CommentItem.tsx  CommentForm.tsx
 |   |-- notifications/ NotificationList.tsx
-|   `-- users/    ProfileForm.tsx  UserMenu.tsx
+|   |-- welcome/  WelcomeContent.tsx (Server)  WelcomeActions.tsx (Client)            V6
+|   `-- users/    ProfileForm.tsx  UserMenu.tsx  (V6: ChangePasswordForm.tsx  ReadOnlyEmail.tsx)
 |-- hooks/   useDragAndDrop.ts  useNotifications.ts  useErrorHandler.ts  useDebouncedValue.ts  useAuth.ts
 |-- lib/     apiClient.ts  refreshSession.ts  errors.ts  toast.ts  authCookie.ts  authContext.ts  serverAuth.ts
 |            order.ts  validation.ts  types.ts  format.ts
+|            V6: status.ts  roles.ts  nextParam.ts  decideRoute.ts  inviteRoles.ts  (all pure; authCookie.ts gains welcome cookie helpers)
 |-- __tests__/ (Jest or Vitest + React Testing Library)
-|-- e2e/       (Playwright specs, playwright.config.ts at web/)
+|-- e2e/       (Playwright specs, playwright.config.ts at web/; V6: e2e/support/credentials.ts, e2e/support/welcome.ts)
+|-- scripts/   V6: scanCredentials.ts (pure scanner used by a unit test over web/e2e/)
 |-- .env.example   NEXT_PUBLIC_API_BASE_URL, API_BASE_URL
+|-- .env.test.example   V6: E2E_BASE_URL, E2E_USER_EMAIL, E2E_USER_PASSWORD (placeholders; the real web/.env.test is git-ignored)
 `-- package.json   tailwind, react-hot-toast, test scripts
 ```
 
@@ -428,7 +592,11 @@ Directories under `components/` follow API resources (auth, boards, cards, comme
 | `/` | Server | GET `/api/boards` with the access cookie token | Renders `BoardList` (role `BaseBadge`), `CreateBoardModal` (Client) opened from `BaseButton`; empty state; load error shows `ErrorPanel` with retry (`router.refresh()`) |
 | `/boards/[id]` | Server fetch, `BoardView` Client | GET `/api/boards/<id>` | 403 or 404 renders `BoardAccessMessage` with link to `/`; otherwise `BoardView` owns columns state, drag and drop, search |
 | `/my-tasks` | Server fetch, `MyTasksList` Client | GET `/api/cards?assignee=me` | Groups by `board_name`; empty and error states; Server error also fires toast through a small client effect |
-| `/profile` | `ProfileForm` Client | PATCH `/api/users/me` | Pre-filled from `AuthContext`; no password field |
+| `/profile` | `ProfileForm` Client | PATCH `/api/users/me` | **V6 change:** name pre-filled from `AuthContext`, email shown as read-only text, optional change-password section (B11). V5 had an email input and no password field |
+| `/welcome` | Server page, `WelcomeContent` Server, `WelcomeActions` Client | none | V6, public. 1 to 5 sentences plus the eight listed capabilities, "Log in" and "Create account" `BaseButton`s that set the Welcome_Cookie and navigate |
+| `/invite/[token]` | Server page, `InviteJoinCard` Client | GET `/api/invites/<token>`, then POST `/api/invites/<token>/accept` | V6, protected by `proxy.ts`. Never renders for an anonymous visitor. 404 shows a not-found message with a link to `/`; 401 calls `redirect("/login?expired=1")` |
+
+**V6 change, other pages.** `/` shows the role badge `admin`, `member`, or `guest` per Board (`ROLE_VARIANT` in `lib/roles.ts`). `/boards/[id]` provides `my_role` through `BoardRoleContext` and gates every edit control (B6). `/my-tasks` shows a `StatusBadge` per task (B7). `/login` and `/register` read `next` through `safeNext` (B4).
 
 Unauthenticated access to protected pages is blocked in `middleware.ts` before rendering. A 401 inside a Server Component (the middleware has already refreshed an expired access token, so this means the API rejected the token) calls `redirect("/login?expired=1")`.
 
@@ -441,6 +609,7 @@ Unauthenticated access to protected pages is blocked in `middleware.ts` before r
 | `BaseModal` | `open`, `onClose`, `title`, `children` | Portal; renders nothing when closed; Escape and backdrop click call `onClose`; content clicks stop propagation; focuses first focusable (else container) on open; traps Tab; restores previous focus on close; `role="dialog"`, `aria-modal`; mobile: `max-h-[100dvh] overflow-y-auto`, width inside viewport |
 | `ConfirmDialog` | `open`, `message`, `onConfirm`, `onCancel`, `busy` | `BaseModal` wrapper used for delete confirmations |
 | `ErrorPanel` | `message`, `onRetry?` | Error text with a `BaseButton` retry |
+| `StatusBadge` (V6) | `status: CardStatus` | Renders `BaseBadge` with `STATUS_LABEL[status]` and `STATUS_VARIANT[status]` from `lib/status.ts`; the only place a status becomes text, so board, modal, and My Tasks always agree |
 
 Every button in pages and feature components uses `BaseButton` (Requirement 18.6). `Header` contains the app link, `NotificationBell`, `UserMenu` (profile link, logout) and links to `/my-tasks`; it shows only login and register links for anonymous visitors.
 
@@ -514,6 +683,85 @@ sequenceDiagram
         MW-->>U: redirect /login + delete kano_access and kano_refresh
     end
 ```
+
+#### B4-V6. Route guard with welcome page, invite links, and safe `next` (Requirements 17.7 to 17.13, 19.3, 19.8, 19.11, 19.12, 37.18 to 37.20, 38)
+
+**V6 change.** `guardDecision` (V5, five rows in the table above) is superseded by `decideRoute` in `lib/decideRoute.ts`. The V5 table stays valid for the paths it covers: the new function adds the `/` first visit, `/welcome`, and `/invite/<token>`. The file that calls it is `web/proxy.ts`.
+
+```ts
+// lib/decideRoute.ts  (pure, no I/O, no Date.now)
+export type AuthState = "authenticated" | "refreshable" | "unauthenticated";
+export type PathClass = "root" | "welcome" | "login" | "register" | "invite" | "protected";
+export type RouteDecision =
+  | { kind: "continue"; setWelcomeCookie?: boolean }
+  | { kind: "refresh-then-continue" }
+  | { kind: "redirect"; to: string; setWelcomeCookie?: boolean };
+export const INVITE_PATH_RE = /^\/invite\/[A-Za-z0-9_-]{1,128}$/;
+export function classifyPath(pathname: string): PathClass;   // "/" root, "/welcome", "/login", "/register", INVITE_PATH_RE -> invite, everything else protected
+export function decideRoute(i: { pathname: string; auth: AuthState; welcomeSeen: boolean }): RouteDecision;
+```
+
+`auth` is computed as in V5: `authenticated` = access cookie present and `exp` in the future, `refreshable` = access missing or expired and refresh cookie valid, `unauthenticated` = neither. `/login?expired=1` forces `unauthenticated` and deletes both auth cookies (V5 loop guard, unchanged). The table is the complete decision (Requirements 17.7 to 17.13, 38.5 to 38.12):
+
+| Path class | authenticated | refreshable | unauthenticated |
+|---|---|---|---|
+| `root` (`/`) | continue (no welcome redirect, 38.12) | refresh-then-continue | redirect `/login` if `welcomeSeen`, else redirect `/welcome` (38.5, 38.6) |
+| `welcome` | redirect `/` (17.9, 38.8) | redirect `/` (the root then refreshes) | continue, no cookie write (38.9) |
+| `login`, `register` | redirect `/` | redirect `/` | continue, with `setWelcomeCookie: true` when `!welcomeSeen` (38.9, 38.10) |
+| `invite` (`/invite/<token>`) | continue | refresh-then-continue (17.13) | redirect `/login?next=<encodeURIComponent(pathname)>`, never `/welcome` (17.8, 37.20, 38.11) |
+| `protected` (all else, including a malformed `/invite/...`) | continue | refresh-then-continue | redirect `/login` (38.7) |
+
+`proxy.ts` performs the decision: on `refresh-then-continue` it runs the V5 refresh (POST `/api/auth/refresh`, set `kano_access` on the request and the response). If the refresh returns 401, it deletes both auth cookies and then evaluates `decideRoute` again with `auth: "unauthenticated"` and returns that redirect, so an invite path keeps its `next` and `/` goes to `/welcome` or `/login` by the cookie (Requirement 17.8). A network error or 5xx still redirects to `/login?expired=1` (V5, Open issue 15, which drops `next`). When `setWelcomeCookie` is true, `proxy.ts` sets `kano_welcome_seen=1; Max-Age=31536000; Path=/; SameSite=Lax; Secure on HTTPS`, not httpOnly. Logout calls `clearAuthCookies()`, which never touches `kano_welcome_seen`, so the next `/` goes to `/login` (Requirement 38.13).
+
+```mermaid
+sequenceDiagram
+    participant V as Anonymous visitor
+    participant P as proxy.ts (decideRoute)
+    participant L as LoginForm
+    participant A as Flask API
+    participant I as /invite/[token] page
+    V->>P: GET /invite/T
+    P->>P: decideRoute: invite + unauthenticated
+    P-->>V: redirect /login?next=%2Finvite%2FT
+    V->>L: submit credentials (safeNext(next) = "/invite/T")
+    L->>A: POST /api/auth/login
+    A-->>L: 200 tokens
+    L->>V: router.push("/invite/T") (cookies set)
+    V->>P: GET /invite/T
+    P->>P: decideRoute: invite + authenticated, continue
+    P->>I: render
+    I->>A: GET /api/invites/T (server token)
+    A-->>I: 200 {board_id, board_name, role, current_role}
+    I-->>V: InviteJoinCard (Join button)
+    V->>A: POST /api/invites/T/accept (from the client)
+    A-->>V: 200 {board_id, role}, then redirect /boards/<board_id>
+```
+
+First visit and welcome cookie:
+
+```mermaid
+sequenceDiagram
+    participant V as New visitor (no cookies)
+    participant P as proxy.ts
+    participant W as /welcome
+    V->>P: GET /
+    P-->>V: redirect /welcome (unauthenticated, welcomeSeen false)
+    V->>W: render (public, no API call)
+    V->>P: click "Log in" (WelcomeActions sets kano_welcome_seen, navigates)
+    P-->>V: GET /login continue (cookie also set by the proxy if it was absent)
+    V->>P: later GET / (unauthenticated, welcomeSeen true)
+    P-->>V: redirect /login
+```
+
+**Safe `next` (`lib/nextParam.ts`, pure).**
+
+```ts
+const NEXT_RE = /^\/invite\/[A-Za-z0-9_-]{1,128}$/;
+export function safeNext(raw: unknown): string | null   // typeof raw === "string" && NEXT_RE.test(raw) ? raw : null
+export function withNext(href: "/login" | "/register", next: string | null): string  // next ? `${href}?next=${encodeURIComponent(next)}` : href
+```
+
+`raw` is the already-decoded value from `searchParams`. It is tested once, as is: a value that still contains `%`, `\`, `/` after the first segment, a scheme, a host, a query, or a fragment fails the regex, so absolute URLs (`https://evil.test`), protocol-relative URLs (`//evil.test`), and other app paths (`/boards/1`) all return `null` and the form redirects to `/`. `LoginForm` redirects with `router.push(safeNext(next) ?? "/")`, `RegisterForm` redirects to `withNext("/login", safeNext(next))` after the 201, and the two forms link to each other with `withNext` (Requirements 19.3, 19.8, 19.12). `proxy.ts` builds `next` only from a pathname that already matched `INVITE_PATH_RE`.
 
 ### B5. API client and errors (Requirement 16)
 
@@ -672,9 +920,62 @@ sequenceDiagram
 
 Analytics view: `AnalyticsView` fetches `GET /api/boards/<id>/analytics` when opened and shows cards per column, completed this week, and per-member assigned cards and comments. Errors show an inline message and a toast.
 
+#### B6-V6. Role gating, guests, and the new-card flow (Requirements 21.12, 21.13, 21.17 to 21.23, 22.18, 22.19, 27.8, 37.15 to 37.17)
+
+**Role derivation (`lib/roles.ts`, pure).** `canEdit(role) = role === "admin" || role === "member"`, `isAdmin(role) = role === "admin"`, `isGuest(role) = role === "guest"`, and `ROLE_VARIANT` maps a role to a `BaseBadge` variant. `BoardView` reads `my_role` from the board response and provides `{ role, canEdit, isAdmin }` through `BoardRoleContext`, so `KanbanColumn`, `ColumnHeader`, `CardItem`, `AddColumnForm`, `AddCardForm`, `CardSearchInput`, and `CardDetailModal` read the role from one source instead of receiving a prop per control. The server stays the authority (Requirement 28.14); the gating only removes controls that would get 403.
+
+| Element | admin | member | guest |
+|---|---|---|---|
+| Header of the board | role badge | role badge | "Guest" `BaseBadge` (read-only indicator, 21.20) |
+| `AddColumnForm`, `AddCardForm`, column rename and delete | shown | shown | not rendered |
+| Card drag (mouse and touch) | enabled | enabled | disabled (`draggable` attribute absent, touch handler absent) |
+| Card search input | shown | shown | shown (guests may search boards where they hold a membership) |
+| `CardDetailModal` | editable | editable | read-only (B7-V6) |
+| `MemberPanel`, `InviteLinksPanel`, analytics link | shown | hidden | hidden |
+
+**`useDragAndDrop({ enabled })`.** The hook takes `enabled = canEdit`. When `enabled` is false it returns the same shape with every handler `undefined` and `touchDrag = null`, and its internal `commitDrop` returns early, so even a stray event from a browser extension or a test starts no drag, leaves the state unchanged, and sends no request (Requirement 22.18). When enabled it behaves exactly as in V5. A successful drop sends only `column_id` and `order` and never changes the card's `status` in local state (Requirement 22.19, 21.23); `moveCardInState` copies every other field of the card unchanged (Property 56).
+
+**New-card flow (Requirement 21.17 to 21.19).** The quick-add form still asks only for the title. `AddCardForm` returns the created Card to `BoardView`, which appends it to its column and opens `CardDetailModal` with `isNew = true`.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> Submitting: submit valid title (1 to 200)
+    Submitting --> Idle: request fails (no card, no modal, useErrorHandler toast)
+    Submitting --> ModalOpenNew: 201 (card appended to the column, modal opens for it)
+    ModalOpenNew --> Saving: Save with at least one changed field
+    ModalOpenNew --> Idle: Save with no change, or Close (title-only card stays, status NOT_STARTED)
+    Saving --> Idle: PATCH 200 (card updated, success toast, modal closes)
+    Saving --> ModalOpenNew: PATCH error (values kept, toast)
+```
+
+**Member panel and invitation links (admin only).** `MemberPanel` composes `MemberList` (each membership with a `BaseBadge` for `admin`, `member`, or `guest`, and the remove control for every non-admin row, guests included), `AddMemberForm` (email, unchanged), and `InviteLinksPanel`. `InviteLinksPanel` calls GET `/api/boards/<id>/invite-links` when it mounts (this also creates missing tokens) and renders two `InviteLinkRow`s: "Member link: can edit" and "Guest link: view only". Each row shows the full URL `window.location.origin + "/invite/" + token` in a read-only, selectable field (`select-all break-all`), a copy `BaseButton`, and a regenerate `BaseButton`. Copy calls `navigator.clipboard.writeText` inside `try/catch`: success shows a success toast, failure shows an error toast and leaves the URL visible (Requirement 37.15). Regenerate opens `ConfirmDialog` ("the old link stops working"); on confirm it sends POST `.../regenerate`, replaces the row's token and shows a success toast only after a 200; on an error the old link stays and `handleError` runs (Requirement 37.16). Regenerating does not remove members who joined with the old link (Open issue 21).
+
+**Invite page (`/invite/[token]`, Requirement 37.18, 37.19).** The Server page rejects a token that fails `INVITE_PATH_RE`'s token part with the not-found message, otherwise fetches GET `/api/invites/<token>` with the server token. `InviteJoinCard` (Client) shows the board name and "Member: can edit" or "Guest: view only". `acceptOutcome(currentRole, tokenRole)` in `lib/inviteRoles.ts` is the TypeScript twin of `resolve_accept`. If the outcome action is `none` and `current_role` is set, the card shows the current role and an open-board link and no Join button (this also covers a guest holding the guest token and every admin or member). Otherwise (no membership, or a guest with the member token) it shows Join: the button is disabled while POST accept runs, and on 200 the page redirects to `/boards/<board_id>` and shows a success toast. A 404 from either call shows the not-found message with a link to `/` and no Join button. The page header adds `Referrer-Policy: no-referrer` and `Cache-Control: no-store` through `next.config.ts` (Open issue 22).
+
 ### B7. Card detail modal and comments
 
 `CardDetailModal` (Client) renders inside `BaseModal`, shows title, description, due date, labels, assignee (a select of board members from `MemberPanel` data or GET members), and composes `CommentList` plus `CommentForm`. It sends PATCH with only changed fields, keeps entered values on error, validates the title (1 to 200) before sending, and uses `ConfirmDialog` for card deletion. `CommentList` loads `GET /api/cards/<id>/comments` on open, shows loading, empty, and error states, and renders `CommentItem`. Edit and delete controls appear only when `comment.author.user_id === user.user_id`, including for the Board_Admin (Requirement 23.14). Comment changes update list state only after a successful response.
+
+#### B7-V6. Status control, guest read-only view, and status badges (Requirements 21.22, 23.17 to 23.22, 25.2, 25.7)
+
+**`lib/status.ts` (pure).**
+
+```ts
+export const CARD_STATUSES = ["NOT_STARTED", "IN_PROGRESS", "DONE"] as const;
+export type CardStatus = (typeof CARD_STATUSES)[number];
+export const STATUS_LABEL: Record<CardStatus, string> = { NOT_STARTED: "Not started", IN_PROGRESS: "In progress", DONE: "Done" };
+export const STATUS_VARIANT: Record<CardStatus, "gray" | "blue" | "green"> = { NOT_STARTED: "gray", IN_PROGRESS: "blue", DONE: "green" };
+export function isCardStatus(x: unknown): x is CardStatus;
+```
+
+`improvements.md` wrote the options in capitals; requirements V6 (21.22, 23.17, 25.2) fix the displayed labels as "Not started", "In progress", and "Done", and the stored values are the exact uppercase strings. The design follows the requirements.
+
+**`CardDetailModal`.** The shell keeps the save logic and composes `CardDetailForm` (title, description, due date, labels, assignee, `StatusSelect`) and `CommentList`. `StatusSelect` is a native select with exactly the three options, preselected with the card's current status. `diffCardFields(original, form)` now includes `status`, so changing only the status sends PATCH `/api/cards/<id>` with only `{ status }` (Requirement 23.18). On 200 the modal calls `onCardUpdated(card)` with the returned card, so the board's `CardItem` badge (`status`, `completed_at`) updates without a reload, and shows a success toast. On error the modal stays open, keeps the entered values, keeps the previously saved status on the board, and calls `handleError` (Requirement 23.19). The assignee options are `members.filter(m => m.role !== "guest")` from GET `/api/boards/<id>/members` (Requirement 23.20). For a newly created card (`isNew`) the modal shows the entered title and a single Save button that sends the same PATCH; Save with an empty diff closes the modal without a request.
+
+**Guest view.** When `canEdit` is false, `CardDetailForm` renders every field `disabled`, `StatusSelect` disabled, and hides the Save button, the Delete button, the comment form, and the edit and delete controls of every Comment (`CommentList` gets `readOnly`). The Comments are still loaded with GET `/api/cards/<id>/comments` (Requirement 12.10). Ownership controls from V5 (author only, Board_Admin excluded) apply to admin and member authors only.
+
+**Badges.** `CardItem` renders `<StatusBadge status={card.status} />` next to the labels. `MyTasksList` renders it after the Column name and keeps Cards with `DONE` in the list, marked "Done", with no status filter (Requirement 25.7). Moving a card by drag never changes the badge (Requirement 21.23).
 
 ### B8. Notifications UI
 
@@ -695,10 +996,13 @@ Mobile-first Tailwind; the minimum design width is 375 px.
 | Below 375 px | Page can scroll horizontally; content is not truncated |
 | Tailwind scan | v4: `@source "../components"; @source "../hooks";` in `globals.css`. v3: `content` array lists `./app`, `./components`, `./hooks` |
 
+**V6 change, responsive notes (Requirement 27.9).** `/welcome` and `/invite/[token]` use a single column `mx-auto w-full max-w-xl px-4`, `min-w-0` on text, and `flex flex-col gap-2 sm:flex-row` for the button row, so there is no horizontal overflow between 375 px and 1920 px and no two controls overlap. The Join, Log in, and Create account buttons are `BaseButton`s with the 44 px minimum. The invite link rows in `InviteLinksPanel` stack the URL field, the copy button, and the regenerate button vertically below `md`, the URL uses `break-all`, and the "Guest" badge wraps with the board title (`flex-wrap`). `ConfirmDialog` for regenerate follows the BaseModal mobile rules. Guests keep the same Kanban container scrolling, with no drag handlers and no `touch-action` rule (Requirement 22.17).
+
 ### B10. Typed API models (`lib/types.ts`)
 
 ```ts
-export type Role = "admin" | "member";
+export type Role = "admin" | "member" | "guest";            // V6: guest added
+export type CardStatus = "NOT_STARTED" | "IN_PROGRESS" | "DONE";   // V6 (values and labels in lib/status.ts)
 export interface User { user_id: string; name: string; email: string; created_at: string }
 export interface LoginResult { access_token: string; refresh_token: string; token_type: "Bearer"; expires_in: number; refresh_expires_in: number; user: User }
 export interface RefreshResult { access_token: string; token_type: "Bearer"; expires_in: number }
@@ -708,7 +1012,8 @@ export interface AuthContextValue extends AuthState {
   login(r: LoginResult): void; logout(): void; updateUser(u: User): void; setAccessToken(t: string): void }
 export interface Card { card_id: string; board_id: string; column_id: string; title: string;
   description: string | null; due_date: string | null; labels: string[];
-  assignee: { user_id: string; name: string } | null; order: number; created_at: string; updated_at: string }
+  assignee: { user_id: string; name: string } | null; status: CardStatus; completed_at: string | null;
+  order: number; created_at: string; updated_at: string }
 export interface Column { column_id: string; board_id: string; name: string; order: number; cards: Card[] }
 export interface BoardSummary { board_id: string; name: string; my_role: Role; created_at: string }
 export interface BoardDetail extends BoardSummary { columns: Column[] }
@@ -722,6 +1027,29 @@ export interface NotificationPage { items: AppNotification[]; page: number; per_
 export interface Analytics { cards_per_column: { column_id: string; name: string; count: number }[];
   completed_this_week: number; member_activity: { user_id: string; name: string; assigned_cards: number; comments: number }[] }
 ```
+
+**V6 additions to `lib/types.ts`.**
+
+```ts
+export interface InviteLink { role: "member" | "guest"; token: string }
+export interface InviteLinks { member: InviteLink; guest: InviteLink }
+export interface InviteInfo { board_id: string; board_name: string; role: "member" | "guest"; current_role: Role | null }
+export interface AcceptResult { board_id: string; role: Role }
+export interface ProfileUpdate { name?: string; password?: string; current_password?: string }   // never `email`
+```
+
+### B11. Profile page (Requirements 7, 26)
+
+`ProfileForm` (Client) keeps a controlled `name` input pre-filled from `AuthContext`, renders `ReadOnlyEmail` (the email as text in a `<dd>`, no input element, so no editable email control exists), and composes `ChangePasswordForm` with two masked inputs (current password with `autoComplete="current-password"`, new password with `autoComplete="new-password"`), never pre-populated. Validation lives in `lib/validation.ts` and mirrors the server (Property 29):
+
+```ts
+validateName(s)                 // trimmed length 1 to 100
+validateNewPassword(s)          // length 8 to 128
+validateCurrentPassword(s)      // non-empty
+validatePasswordSection(cur, next) // both empty: ok (section unused); exactly one filled: error on the empty one; both filled: validate each
+```
+
+Submit builds the body `{ name }` plus `{ password, current_password }` only when both password inputs are filled and valid, and never contains `email`. The button is disabled until the request finishes. On 200 the form calls `updateUser(returned user)` (tokens and cookies untouched), shows a success toast, and, when a password was sent, clears both password inputs. On status 400 with a message that names `current_password` (`errorNamesField(err, "current_password")`), the form shows the field error on the current-password input, keeps the entered name, and leaves the AuthContext user unchanged (no toast). Any other error goes to `useErrorHandler` and the entered values stay (Requirements 26.2 to 26.8). A password change does not log the user out and does not invalidate tokens.
 
 ## Data Models
 
@@ -756,9 +1084,13 @@ class Card(SoftDeleteMixin, db.Model):
     labels      = db.Column(postgresql.ARRAY(db.String(30)), nullable=False, default=list, server_default="{}")
     assignee_id = db.Column(db.Uuid, db.ForeignKey("users.user_id", name="fk_cards_users"), nullable=True)
     order       = db.Column(db.Float, nullable=False)
+    # V6 change:
+    status       = db.Column(db.String(20), nullable=False, default="NOT_STARTED", server_default="NOT_STARTED")
+    completed_at = db.Column(db.DateTime(timezone=True), nullable=True)
     __table_args__ = (
         db.CheckConstraint("char_length(description) <= 5000", name="ck_cards_description_len"),
         db.CheckConstraint('"order" > 0', name="ck_cards_order_positive"),
+        db.CheckConstraint("status IN ('NOT_STARTED', 'IN_PROGRESS', 'DONE')", name="ck_cards_status"),   # V6
         db.Index("ix_cards_column_id_order", "column_id", "order"),
         db.Index("ix_cards_board_id", "board_id"),
         db.Index("ix_cards_assignee_id", "assignee_id"),
@@ -770,8 +1102,8 @@ class Card(SoftDeleteMixin, db.Model):
 | Model / table | Columns | Constraints and indexes |
 |---|---|---|
 | `User` / `users` | `user_id` UUID PK, `name` varchar(100) not null, `email` varchar(254) not null (always stored lowercase: normalized by `normalize_email` in the Marshmallow `pre_load` of every email-carrying schema), `password_hash` varchar(255) not null, mixin | check `ck_users_email_lowercase` (`email = lower(email)`); partial unique index `uq_users_email_active` on `email` where `is_deleted = false` (the column is already normalized, so no `lower(email)` expression index is needed) |
-| `Board` / `boards` | `board_id` UUID PK, `name` varchar(100) not null, `created_by` UUID not null, mixin | FK `fk_boards_users` (created_by to users.user_id); index `ix_boards_created_by` |
-| `BoardMembership` / `board_memberships` | `board_membership_id` UUID PK, `board_id`, `user_id`, `role` varchar(10) not null, mixin | FKs `fk_board_memberships_boards`, `fk_board_memberships_users`; check `ck_board_memberships_role` (`admin` or `member`); partial unique index `uq_board_memberships_board_user_active` on (`board_id`, `user_id`) where `is_deleted = false`; indexes `ix_board_memberships_user_id`, `ix_board_memberships_board_id` |
+| `Board` / `boards` | `board_id` UUID PK, `name` varchar(100) not null, `created_by` UUID not null, **V6:** `member_invite_token` varchar(128) null, `guest_invite_token` varchar(128) null, mixin | FK `fk_boards_users` (created_by to users.user_id); index `ix_boards_created_by`; **V6:** unique constraints `uq_boards_member_invite_token` and `uq_boards_guest_invite_token` (many NULLs allowed, so Boards that existed before V6 stay valid until their tokens are created lazily) |
+| `BoardMembership` / `board_memberships` | `board_membership_id` UUID PK, `board_id`, `user_id`, `role` varchar(10) not null, mixin | FKs `fk_board_memberships_boards`, `fk_board_memberships_users`; check `ck_board_memberships_role` (**V6 change:** `admin`, `member`, or `guest`; V5 allowed only `admin` and `member`; the partial unique index below is unchanged for all three roles); partial unique index `uq_board_memberships_board_user_active` on (`board_id`, `user_id`) where `is_deleted = false`; indexes `ix_board_memberships_user_id`, `ix_board_memberships_board_id` |
 | `Column` / `columns` | `column_id` UUID PK, `board_id`, `name` varchar(100) not null, `order` float not null, mixin | FK `fk_columns_boards`; check `order > 0`; index `ix_columns_board_id_order` on (`board_id`, `order`) |
 | `Card` / `cards` | see model above | FKs `fk_cards_boards`, `fk_cards_columns`, `fk_cards_users` |
 | `Comment` / `comments` | `comment_id` UUID PK, `card_id`, `author_id`, `content` text not null (1 to 2000 enforced by schema and `ck_comments_content_len`), mixin | FKs `fk_comments_cards`, `fk_comments_users`; index `ix_comments_card_id_created_at` |
@@ -805,12 +1137,14 @@ erDiagram
         uuid board_id PK
         string name
         uuid created_by FK
+        string member_invite_token "V6, nullable, unique"
+        string guest_invite_token "V6, nullable, unique"
     }
     board_memberships {
         uuid board_membership_id PK
         uuid board_id FK
         uuid user_id FK
-        string role
+        string role "admin, member, or guest (V6)"
     }
     columns {
         uuid column_id PK
@@ -825,6 +1159,8 @@ erDiagram
         string title
         float order
         uuid assignee_id FK
+        string status "V6, NOT_STARTED default"
+        datetime completed_at "V6, nullable"
     }
     comments {
         uuid comment_id PK
@@ -842,17 +1178,34 @@ erDiagram
     }
 ```
 
-Every table also carries `created_at`, `updated_at`, `deleted_at`, and `is_deleted` (omitted from the diagram for space).
+Every table also carries `created_at`, `updated_at`, `deleted_at`, and `is_deleted` (omitted from the diagram for space). **V6 change:** the diagram still shows 7 tables and no relationship was added; only columns changed.
+
+### V6 schema changes and migration (Requirements 2.15 to 2.17, 3.8 to 3.10; design only, no script is committed)
+
+| Table | Change | Notes for the manual Migration_Step |
+|---|---|---|
+| `boards` | add `member_invite_token`, `guest_invite_token` (varchar(128), nullable) and their two unique constraints | Autogenerate emits these. Existing rows keep NULL and get tokens lazily (A14) |
+| `cards` | add `status` varchar(20) not null with `server_default 'NOT_STARTED'`, add `completed_at` timestamptz null, add check `ck_cards_status` | The server default lets `ADD COLUMN ... NOT NULL` succeed on existing rows. **Alembic autogenerate does not detect check constraints**, so the user adds `op.create_check_constraint("ck_cards_status", "cards", "status IN ('NOT_STARTED','IN_PROGRESS','DONE')")` by hand |
+| `board_memberships` | replace `ck_board_memberships_role` with a check that allows `admin`, `member`, `guest` | Also not detected by autogenerate: the user adds `op.drop_constraint("ck_board_memberships_role", "board_memberships")` then `op.create_check_constraint(...)` by hand, and does the reverse in `downgrade()` |
+
+The user then runs `flask db upgrade` on the development database and on the test database. The 7-table check (Requirement 1.9, 3.5) is asserted by a backend test that lists the tables. The optional backfill below is run by the user only if cards sitting in a Column named `Done` should count as completed; it is not an automated task:
+
+```sql
+UPDATE cards c SET status = 'DONE', completed_at = c.updated_at
+FROM columns col
+WHERE col.column_id = c.column_id AND lower(col.name) = 'done'
+  AND c.is_deleted = false AND col.is_deleted = false;
+```
 
 ### Marshmallow schema list (Requirement 4.9)
 
 | Package | Schemas |
 |---|---|
 | auth | `RegisterSchema`, `LoginSchema` |
-| users | `UserSchema` (output), `UserUpdateSchema` |
-| boards | `BoardCreateSchema`, `BoardUpdateSchema`, `BoardSchema`, `BoardDetailSchema`, `MemberAddSchema`, `MemberSchema` |
+| users | `UserSchema` (output), `UserUpdateSchema` (V6: `name`, `password`, `current_password`; `email` always rejected) |
+| boards | `BoardCreateSchema`, `BoardUpdateSchema`, `BoardSchema`, `BoardDetailSchema`, `MemberAddSchema`, `MemberSchema`; **V6:** `InviteLinksSchema`, `InviteRoleSchema` (path role `member` or `guest`), `InviteTokenSchema` (format `^[A-Za-z0-9_-]{43,128}$`), `InviteInfoSchema`, `AcceptResultSchema` |
 | columns | `ColumnCreateSchema`, `ColumnUpdateSchema`, `ColumnReorderSchema`, `ColumnSchema` |
-| cards | `CardCreateSchema`, `CardUpdateSchema`, `CardPositionSchema`, `CardQuerySchema`, `CardSchema`, `CardSearchSchema` |
+| cards | `CardCreateSchema` (V6: `status` rejected), `CardUpdateSchema` (V6: `status` exact enum), `CardPositionSchema`, `CardQuerySchema`, `CardSchema` and `CardSearchSchema` (V6: add `status`, `completed_at`) |
 | comments | `CommentCreateSchema`, `CommentUpdateSchema`, `CommentSchema` |
 | notifications | `NotificationQuerySchema`, `NotificationSchema`, `NotificationPageSchema` |
 | analytics | `AnalyticsSchema` |
@@ -928,6 +1281,8 @@ Name fields strip whitespace and reject blank values. All input schemas set `unk
 
 **Validates: Requirements 2.12, 6.1, 6.2, 7.2, 7.4, 9.1, 9.4**
 
+*V6 change:* the PATCH `/api/users/me` clause of this property is superseded. The email can no longer be changed after registration (Property 54), so uniqueness is only exercised by registration and by add-member matching.
+
 ### Property 10: Password handling
 
 *For any* valid registration, the stored `password_hash` differs from the submitted password and verifies against it, and *for any* response from any endpoint no field named `password` or `password_hash` appears at any depth.
@@ -952,6 +1307,8 @@ Name fields strip whitespace and reject blank values. All input schemas set `unk
 
 **Validates: Requirements 8.6, 8.7, 9.9, 9.10, 9.12, 10.7, 11.15, 12.8, 14.7, 28.10, 28.11**
 
+*V6 change:* "member" in this property means a Board_Member with role `admin` or `member`. The `guest` row of the matrix is Property 47.
+
 ### Property 14: Board creation makes the creator admin
 
 *For any* authenticated user and valid Board name, creating the Board makes the creator the only member with role `admin`, and the Board appears in that user's `GET /api/boards` with `my_role = "admin"`, ordered by `created_at` descending, while a user with no membership never sees it.
@@ -975,6 +1332,8 @@ Name fields strip whitespace and reject blank values. All input schemas set `unk
 *For any* Card (or User) and any subset of updatable fields supplied in a PATCH, exactly the supplied fields change, all other fields keep their previous values, and `updated_at` does not decrease.
 
 **Validates: Requirements 7.2, 11.3**
+
+*V6 change:* the updatable User fields are now `name` and `password` only (the email is excluded, Property 54), and the updatable Card fields now include `status`; a status change also moves `completed_at` by the rule of Property 44, which is the only allowed change to a field that was not supplied.
 
 ### Property 18: Assignee must be a member and removal clears assignment
 
@@ -1018,6 +1377,8 @@ Name fields strip whitespace and reject blank values. All input schemas set `unk
 
 **Validates: Requirements 14.1, 14.2, 14.3, 14.4, 14.6**
 
+*V6 change:* the "completed" clause (Column named `Done` and `updated_at`) is superseded by Property 46 (`status = DONE` and `completed_at`). The cards-per-column, week-boundary, and soft-delete clauses stay as written.
+
 ### Property 25: Constant query count for board detail
 
 *For any* Board with a fixed number of Columns and any number of Cards from 0 to 500, `GET /api/boards/<id>` executes the same number of SQL statements, at most 5.
@@ -1042,11 +1403,15 @@ Name fields strip whitespace and reject blank values. All input schemas set `unk
 
 **Validates: Requirements 17.7, 17.8, 17.9**
 
+*V6 change:* `guardDecision` is replaced by `decideRoute`, which also takes the Welcome_Cookie and covers `/`, `/welcome`, and `/invite/<token>`. The five V5 rows above remain true for `/login`, `/register`, and ordinary protected paths. The full V6 property is Property 53.
+
 ### Property 29: Client validators mirror server rules
 
 *For any* string, the client validators for name, email, password, board name, column name, card title, comment text, and profile fields accept it iff the corresponding server rule in Property 12 accepts it, and a rejected form sends no request.
 
 **Validates: Requirements 19.2, 19.7, 20.3, 21.3, 21.7, 23.3, 23.9, 26.3**
+
+*V6 change:* the profile validators are now `validateName`, `validateNewPassword` (8 to 128), `validateCurrentPassword` (non-empty), and `validatePasswordSection`, and the email validator is no longer used by the profile page. They are part of this property.
 
 ### Property 30: Client drop order computation
 
@@ -1083,6 +1448,8 @@ Name fields strip whitespace and reject blank values. All input schemas set `unk
 *For any* original card and edited form values, `diffCardFields` returns exactly the fields whose values differ, and an unchanged form produces an empty diff.
 
 **Validates: Requirements 23.2**
+
+*V6 change:* `diffCardFields` also compares `status`, so a form whose only change is the status produces exactly `{ status }` (Requirement 23.18).
 
 ### Property 36: Token types and lifetimes
 
@@ -1132,10 +1499,114 @@ Name fields strip whitespace and reject blank values. All input schemas set `unk
 
 **Validates: Requirements 6.9, 7.6**
 
+### Property 44: Status and completed_at transition rule
+
+*For any* initial status, any sequence of PATCH operations that supply or omit `status`, and any increasing sequence of timestamps, `apply_status_change` sets `completed_at` to the current time when the status changes to `DONE` from another value, sets it to null when the status changes from `DONE` to another value, and leaves it unchanged when the status is unchanged (including `DONE` to `DONE`) or not supplied; after every step `completed_at` is not null iff the status is `DONE`; and a card that was never changed keeps `NOT_STARTED` and null.
+
+**Validates: Requirements 11.18, 11.19, 11.24**
+
+### Property 45: Status validation and position independence
+
+*For any* string, null, or case variant supplied as `status` in PATCH `/api/cards/<id>`, the request is accepted iff the value is exactly `NOT_STARTED`, `IN_PROGRESS`, or `DONE`, and a rejected request returns 400 and leaves the Card unchanged; *for any* POST `/api/columns/<id>/cards` body that contains a `status` field the response is 400 and no Card is created, and a created Card has `NOT_STARTED` and null `completed_at`; and *for any* position request, including a move into a Column named `Done` (any letter case), the Card's `status` and `completed_at` are unchanged.
+
+**Validates: Requirements 11.4, 11.17, 11.21**
+
+### Property 46: Analytics equals a naive model (V6 definition)
+
+*For any* Board with Columns, Cards (any status, any `completed_at`, any Column name including `Done`), Comments, and Memberships of all three roles with arbitrary soft-delete flags, the analytics response equals a plain in-memory computation: per-Column counts of non-deleted Cards, `completed_this_week` equal to the number of non-deleted Cards with `status = DONE` and `completed_at` from `start_of_week_utc(now)` (inclusive) to `now` (inclusive) whatever their Column, and member activity listing exactly the active memberships with role `admin` or `member` with their assigned Card and Comment counts; a `DONE` Card at Monday 00:00:00 UTC is counted, one second earlier is not, and a Card in a Column named `Done` with another status is not counted.
+
+**Validates: Requirements 14.1, 14.2, 14.3, 14.4, 14.6, 14.10**
+
+### Property 47: Guest never writes (role by endpoint matrix)
+
+*For any* role in {admin, member, guest, none} and any endpoint of the matrix in A4-V6, the outcome equals the matrix cell: a guest receives 403 on every write endpoint (Board update and delete, member add and remove, Column and Card writes, Comment writes, analytics, invite-links, regenerate) and the stored data is unchanged, a guest succeeds on the read endpoints (Board detail, members, comments, search), and `role_allows(role, level)` is true iff the rank of the role is at least the rank of the level.
+
+**Validates: Requirements 8.11, 8.12, 9.13, 9.14, 10.10, 11.23, 12.10, 12.11, 14.10, 28.14, 37.14**
+
+### Property 48: Assignee must be admin or member, guests are never notified
+
+*For any* Board whose memberships have arbitrary roles and any user as assignee in a Card create or update, the request is accepted iff the user has an active membership with role `admin` or `member`, a rejected request returns 400 and leaves the Card unchanged, and no Notification row exists for any user whose only active membership on the Board has the role `guest`; accepting an invitation creates no Notification.
+
+**Validates: Requirements 11.5, 11.22, 13.12**
+
+### Property 49: Invite tokens are well formed, unique, and regeneration invalidates
+
+*For any* set of created Boards, every Invite_Token matches `^[A-Za-z0-9_-]{43,128}$` and no token value occurs twice across all Boards and both roles; *for any* sequence of regenerate calls, a token is valid (GET `/api/invites/<token>` returns 200 with that role) iff it is the current token of its column, the replaced token returns 404, the token of the other role and all memberships are unchanged, and a token of a soft-deleted Board returns 404; and *for any* string that does not match the format, lookup returns 404.
+
+**Validates: Requirements 37.2, 37.3, 37.6, 37.9, 37.10, 37.21**
+
+### Property 50: Accept decision never lowers a role
+
+*For any* existing role in {none, guest, member, admin} and token role in {member, guest}, `resolve_accept` returns the token role with action `create` iff the existing role is none, returns `member` with action `upgrade` iff the existing role is guest and the token role is member, and otherwise returns the existing role with action `none`; the resulting rank is never lower than the existing rank, and an admin always stays admin.
+
+**Validates: Requirements 37.11, 37.12**
+
+### Property 51: Accept is idempotent and keeps one active membership
+
+*For any* user, Board, token role, and repeated or concurrent accept calls, every call returns 200 with the role from `resolve_accept`, the user ends with exactly one active membership on the Board, an existing soft-deleted membership row of the pair is left unchanged while a new active row is created, and no accept consumes a token.
+
+**Validates: Requirements 37.11, 37.12, 37.13, 37.21, 2.12**
+
+### Property 52: Safe `next` parameter
+
+*For any* string, `safeNext` returns the string iff it equals `/invite/` followed by 1 to 128 characters from `A-Z`, `a-z`, `0-9`, `_`, `-`, and returns null for every other value, including absolute URLs, protocol-relative URLs, strings with backslashes, extra slashes, query strings, fragments, percent sequences, whitespace, and paths outside `/invite/`; and the redirect target after login is `safeNext(next) ?? "/"`, so it is always `/` or an invite path of the same origin.
+
+**Validates: Requirements 19.8, 19.11, 28.15**
+
+### Property 53: Route decision with welcome cookie and invite paths
+
+*For any* pathname (`/`, `/welcome`, `/login`, `/register`, `/invite/<token>`, a malformed invite path, other protected path), authentication state (authenticated, refreshable, unauthenticated), and Welcome_Cookie flag, `decideRoute` returns exactly the outcome of the table in B4-V6: `/` redirects an unauthenticated visitor to `/welcome` iff the cookie is absent and to `/login` otherwise, and continues for an authenticated user whatever the cookie; `/welcome` redirects authenticated and refreshable users to `/` and is public otherwise; `/login` and `/register` are public and request the cookie only when absent; `/invite/<token>` redirects an unauthenticated visitor to `/login?next=<encoded path>` with or without the cookie and never to `/welcome`, and continues or refreshes for authenticated and refreshable users; any other protected path redirects an unauthenticated visitor to `/login`.
+
+**Validates: Requirements 17.7, 17.8, 17.9, 17.12, 17.13, 37.20, 38.5, 38.6, 38.7, 38.8, 38.9, 38.10, 38.11, 38.12**
+
+### Property 54: Profile update never changes the email and needs the current password
+
+*For any* User and any PATCH `/api/users/me` body: a body with an `email` key (any value) returns 400 naming `email` and changes nothing; a body with `password` succeeds iff `current_password` matches the stored password and the new password has 8 to 128 characters; a wrong or missing `current_password` returns 400 (never 403) naming `current_password` and leaves the name unchanged even when the body also contains a valid name; after a successful change the old password no longer logs in and the new one does; the stored email always equals the registered lowercase email; and no response or log record contains a password, `current_password`, or hash.
+
+**Validates: Requirements 7.2, 7.3, 7.4, 7.5, 7.8, 2.12**
+
+### Property 55: Guest UI has no edit controls and starts no drag
+
+*For any* board (any Columns and Cards) rendered with role `guest`, the output contains none of: add column, add card, column rename or delete, card delete, member panel, analytics link, invite links, comment form, status or assignee inputs enabled; every card has no `draggable` attribute and `useDragAndDrop({ enabled: false })` starts no drag, leaves the state unchanged, and sends no position request for any mouse or touch event sequence; and *for any* role in {admin, member} these controls are present.
+
+**Validates: Requirements 21.20, 22.18, 23.21, 27.8, 37.17**
+
+### Property 56: Status labels, badges, and moves
+
+*For any* `CardStatus`, `STATUS_LABEL` returns "Not started", "In progress", or "Done" and the three labels and the three variants are pairwise distinct, so board, modal, and My Tasks show the same text; and *for any* board state, Card, target Column, and valid order, `moveCardInState` returns a state in which the moved Card's `status`, `completed_at`, and every field other than `column_id` and `order` equal the original.
+
+**Validates: Requirements 21.22, 21.23, 22.19, 23.17, 25.2, 25.7**
+
+### Property 57: Invite tokens never reach the logs
+
+*For any* log message containing a request path of the form `/api/invites/<token>` or `/invite/<token>` with any token of 20 or more URL-safe characters, `redact_invite_tokens(message)` returns a string that does not contain the token and keeps the rest of the message; and *for any* string without such a path the output equals the input.
+
+**Validates: Requirements 28.13**
+
+### Property 58: E2E sources contain no literal credentials
+
+*For any* generated Playwright source text, `findCredentialLiterals` reports a finding iff the text contains an e-mail address string literal or a string literal passed to a password or email input fill, and reports none for sources that read credentials only through `requireCredentials()` and values derived from it; and the real files under `web/e2e/` produce no findings.
+
+**Validates: Requirements 33.10, 33.12**
+
 ## Error Handling
 
 | Situation | Behavior | Requirement |
 |---|---|---|
+| **V6** PATCH `/api/users/me` with `email`, with `password` but wrong or missing `current_password`, or with an empty body | 400 naming the field, User unchanged (never 403, name not saved) | 7.3 to 7.5 |
+| **V6** Guest sends any write request | 403 generic message, data unchanged | 8.12, 37.14 |
+| **V6** Card create body contains `status`, or PATCH `status` is not an exact enum value | 400 naming `status`, Card unchanged | 11.4, 11.17 |
+| **V6** Assignee is a guest, removed member, or non-participant | 400, Card unchanged | 11.5, 11.22 |
+| **V6** Invite token malformed, unknown, replaced, or Board soft deleted | 404, no membership, no Board data | 37.10 |
+| **V6** Invite request without a valid access token | 401 (before the token lookup) | 37.23 |
+| **V6** Regenerate with a role other than `member` or `guest` | 400, tokens unchanged | 37.7 |
+| **V6** Concurrent accept hits the partial unique index | rollback, re-read, 200 with the existing role (no 409) | 37.11 to 37.13 |
+| **V6** Invite page cannot copy to the clipboard | error toast, URL stays visible as selectable text | 37.15 |
+| **V6** Regenerate request fails | old link stays displayed, `useErrorHandler` toast | 37.16 |
+| **V6** Invite page: token 404 | not-found message with link to `/`, no Join button | 37.19 |
+| **V6** Card creation fails | no card, no modal, toast | 21.19 |
+| **V6** Profile 400 naming `current_password` | field error on the current-password input, user unchanged | 26.4 |
+| **V6** Refresh at the proxy fails for an invite path | 401: cookies deleted, redirect to `/login?next=...`; network error or 5xx: `/login?expired=1` without `next` | 17.8 |
 | Invalid body or query | 400, message names each invalid field, no write | 4.9, 4.10 |
 | Missing, malformed, expired JWT; deleted or unknown token user | 401 envelope | 4.13, 6.9 |
 | Role or membership failure | 403, no resource data in body | 4.14, 28.11 |
@@ -1221,6 +1692,42 @@ Runner: Vitest with jsdom and React Testing Library (`vitest --run` for `npm tes
 - Playwright covers the mouse drag only. A long-press touch drag cannot be simulated reliably in Playwright, so the touch drag is verified manually in browser DevTools device mode at 375 px (Requirements 27.8, 34.8) and by the React Testing Library tests above.
 - Mobile viewport checks (375 px) use a Playwright project with `devices["iPhone SE"]`-like viewport and assert no horizontal overflow outside the Kanban container.
 
+### Testing Strategy: V6 additions (Requirements 31.12 to 31.17, 32.15 to 32.19, 33.3, 33.4, 33.10 to 33.14, 35.1, 35.2)
+
+The V5 strategy above stays in force. V6 adds the following. Property tests use Hypothesis (Python) and fast-check (TypeScript), at least 100 iterations, one test per property, tagged `Feature: kano, Property <n>: <text>`. Tests that need the new columns are blocked until the V6 manual Migration_Step is done on the test database.
+
+**Backend (pytest).**
+
+| Area | Tests | Properties |
+|---|---|---|
+| Users (31.12) | PATCH name boundaries 0, 1, 100, 101; password boundaries 7, 8, 128, 129 with correct `current_password`, then login with the new password; 400 naming `current_password` for a wrong or missing value with the name unchanged; 400 for any body with `email` (any value, including the current email); responses and captured logs contain no password or hash | 54, 17 |
+| Cards (31.13) | default `NOT_STARTED`; 400 for `status` on create; 400 for `done`, `""`, null, unknown on PATCH; `completed_at` rules incl. `DONE` to `DONE`; `status` and `completed_at` in board detail, search, and My Tasks; position change (including into a Column named `Done`) leaves both unchanged; `apply_status_change` as a pure property and a stateful Hypothesis test over PATCH sequences | 44, 45 |
+| Analytics (31.14) | boundary Monday 00:00:00 UTC counted and one second earlier not; `DONE` in a Column not named `Done` counted; Column named `Done` with other status not counted; soft-deleted `DONE` not counted; guests excluded from member activity; compared with a naive model | 46 |
+| Guest role (31.15) | parametrized endpoint by role matrix from A4-V6 (every write endpoint of Requirement 37.14 gives 403 for a guest with the data unchanged, every guest read endpoint gives 200); guest assignee gives 400; analytics and invite-links give 403 for a guest; no notification for a guest; `role_allows` as a pure property | 47, 48 |
+| Invitations (31.16) | tokens created with the Board and lazily for NULL Boards; token format and uniqueness; invite-links and regenerate for the admin, 403 for member, guest, non-participant; regenerate invalidates the old token (404) and leaves the other role's token; accept creates `member` and `guest` memberships; guest upgraded by the member token; no downgrade; repeated accept idempotent; accept after a soft-deleted membership creates a new active row; 404 for an unknown token and for a soft-deleted Board; 401 without a token; a concurrent-accept test (two threads) ends with one active row; no new table (the 7 tables listed from `information_schema`); log capture contains no token (`redact_invite_tokens`) | 49, 50, 51, 57 |
+| Schema (2.15 to 2.17) | check constraints `ck_cards_status` and the three-role `ck_board_memberships_role` reject bad values; unique token constraints allow many NULLs | integration examples |
+| Property tests (31.17) | `completed_at` state machine over generated status sequences, `resolve_accept` over all role pairs, `role_allows` | 44, 50, 47 |
+
+**Frontend unit tests (Vitest and React Testing Library, network mocked).**
+
+| Area | Tests | Properties |
+|---|---|---|
+| Profile (32.15) | email is read-only text with no email input; name 0 and 101 characters show an error without a request; password section with one input filled shows an error without a request; new password of 7 characters errors and 8 characters is sent with `current_password`; a 400 naming `current_password` shows the error on that input; the request body never contains `email` | 29 |
+| CardDetailModal (32.16) | status control with the three options and current status preselected; a status-only change sends PATCH with only `status`; the board card and My Tasks row show the new badge; a failing PATCH keeps the modal open and the previous status; the guest view is read-only with no save, delete, or comment form | 56, 55 |
+| New-card flow (32.17) | modal opens after 201; no modal after a failure; closing keeps the title-only card | state-diagram examples |
+| Invitation UI (32.18) | `MemberPanel` shows both links with copy buttons only for the admin; regenerate asks for confirmation and replaces the link only after 200; the invite page shows board name and role and joins through POST accept; 404 shows the not-found message without Join; the guest board view hides every control of Requirement 21.20 and starts no drag; copy failure shows the error toast and keeps the URL | 55 |
+| Route and `next` (32.19) | `decideRoute` over every combination of path class, auth state, and cookie flag (fast-check over generated tokens for invite paths); `safeNext` over generated strings (valid invite paths accepted; absolute and protocol-relative URLs, backslashes, extra slashes, other paths rejected) | 52, 53 |
+| Pure libs | `status.ts` labels, `roles.ts`, `inviteRoles.acceptOutcome` parity with `resolve_accept` over all pairs, `moveCardInState` preserves status | 50, 56 |
+| Credentials scan (33.12) | `findCredentialLiterals` over generated sources, plus a test that scans every file in `web/e2e/` and fails on a finding (same style as the `waitForTimeout` check) | 58 |
+
+**Playwright (V6 changes to the V5 plan above).**
+
+- **Credentials and loading order (Requirements 33.10, 33.11).** `playwright.config.ts` loads `web/.env.test` with dotenv before reading any variable: `loadEnv({ path: path.resolve(__dirname, ".env.test"), override: false })`. dotenv never overwrites a variable that already exists in the process environment, so a value set in the shell or CI wins over the file. After loading, the config validates `E2E_BASE_URL` (absolute http or https URL) and throws an error naming the variable before any test starts (Requirement 33.2, unchanged). `E2E_USER_EMAIL` and `E2E_USER_PASSWORD` are read only through `e2e/support/credentials.ts`: `requireCredentials()` throws `Missing required environment variable: <NAME>` (never the value) when one is missing or empty, so the test that needs it fails at once with that message. The helper also builds the wrong password at run time (`password + "-wrong-" + Date.now()`) and the unique registration email by plus-addressing the local part of `E2E_USER_EMAIL` with a run stamp, so no e-mail or password literal appears in `web/e2e/`.
+- **Files.** `web/.env.test.example` is committed with placeholders for `E2E_BASE_URL`, `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`. `web/.env.test` is git-ignored. `.gitignore` keeps ignoring `.env*` and adds the exception `!.env.test.example` after it (and `!.env.example`); a check runs `git check-ignore web/.env.test` (must be ignored) and `git check-ignore web/.env.test.example` (must not be). This `.gitignore` edit is an implementation change for the tasks step. The login-based tests need an account for `E2E_USER_EMAIL` that already exists on the target database, which the user creates manually before the run (Requirement 33.14).
+- **Welcome cookie helper.** `e2e/support/welcome.ts` exports `setWelcomeSeen(context, baseURL)` that adds the `kano_welcome_seen=1` cookie, used by every scenario that visits `/` while unauthenticated (Requirement 33.3).
+- **New scenarios.** (1) Welcome: a fresh context visits `/` and lands on `/welcome`, sees the "Log in" and "Create account" buttons, "Log in" leads to `/login` and `context.cookies()` contains `kano_welcome_seen`, "Create account" leads to `/register`, and a second visit to `/` lands on `/login` (Requirement 33.13). (2) Status: open a card, choose "In progress", save, see the badge on the board; set "Done" and see "Done" in `/my-tasks`. (3) New card: add a card by title, the modal opens with the title, fill the description, Save. (4) Invite join: the pre-existing user creates a Board and reads the member and guest links in the member panel; a second browser context registers a generated user and opens the member link, joins, and sees edit controls; a third context joins through the guest link and sees the "Guest" badge and no add-column control. (5) Profile: `/profile` shows the email as text equal to `E2E_USER_EMAIL` and has no email input. The V5 auth scenarios call `setWelcomeSeen` first and use the helper credentials.
+- **Unchanged.** Auto-waiting only, no `waitForTimeout`, 10 s assertion timeout, 60 s test timeout, at most 2 retries, HTML report, serial Kanban journey (its step 1 now registers a generated email with the password from `E2E_USER_PASSWORD`).
+
 ## Part D: Deployment, Guidelines, and Documentation Design
 
 ### D1. Deployment (Requirement 34)
@@ -1258,7 +1765,9 @@ flowchart LR
 | kano-web | `NEXT_PUBLIC_API_BASE_URL` | public URL of kano-api |
 | kano-web | `API_BASE_URL` | public URL of kano-api |
 
-`app/.env.example` lists `DATABASE_URL`, `JWT_SECRET_KEY`, `JWT_ACCESS_TOKEN_EXPIRES=3600`, `JWT_REFRESH_TOKEN_EXPIRES=604800`, `CORS_ORIGINS`, `TEST_DATABASE_URL` with placeholders. `web/.env.example` lists exactly `NEXT_PUBLIC_API_BASE_URL` and `API_BASE_URL`. `.gitignore` excludes every `.env*` except `.env.example`, `__pycache__/`, `.next/`, `node_modules/`, `app/venv/`. The Playwright suite reads `E2E_BASE_URL` from the shell only.
+`app/.env.example` lists `DATABASE_URL`, `JWT_SECRET_KEY`, `JWT_ACCESS_TOKEN_EXPIRES=3600`, `JWT_REFRESH_TOKEN_EXPIRES=604800`, `CORS_ORIGINS`, `TEST_DATABASE_URL` with placeholders. `web/.env.example` lists exactly `NEXT_PUBLIC_API_BASE_URL` and `API_BASE_URL`. `.gitignore` excludes every `.env*` except `.env.example`, `__pycache__/`, `.next/`, `node_modules/`, `app/venv/`. **V6 change:** the Playwright suite no longer reads `E2E_BASE_URL` from the shell only. It reads `E2E_BASE_URL`, `E2E_USER_EMAIL`, and `E2E_USER_PASSWORD` from the git-ignored `web/.env.test` (shell values win), and `.gitignore` also excludes `.env.test` while keeping `.env.test.example` tracked (`web/.env.test.example` lists the three names with placeholders).
+
+**V6 deployment notes (Requirements 34, 35).** No new backend or frontend environment variable is needed for V6 (`.env.example` files are unchanged). Nothing is deployed yet, so there is no production migration step for V6: the first production deployment runs `flask db upgrade` once on the full migration history, which already contains the V6 columns, and the optional backfill is not needed on an empty database. The deployment verification list gains: GET `/api/boards/<id>/invite-links` as the admin, GET and POST accept with a second account, and one card PATCH with `status`. `next.config.ts` sets `Referrer-Policy: no-referrer` and `Cache-Control: no-store` for `/invite/:path*` on the Vercel frontend. `web/.env.test` is never uploaded (git-ignored and not part of the Vercel build).
 
 **MANUAL migration steps (user-owned).**
 
@@ -1297,6 +1806,8 @@ How code generation references them: every implementation task in `tasks.md` nam
 ### D3. Documentation design (Requirement 36)
 
 `README.md` at the root contains the sections Overview, AI Workflow Summary (seven subsections of at least three sentences each, one each for the project brief, Kiro specifications, Guidelines, review against the Guidelines, violations, Antigravity, and Claude Code tests and documentation, with links to `guidelines/`, the violation report, and the before/after comparison), Features, Technologies (the AI tools Kiro, Antigravity, and Claude Code are listed next to the other technologies), Local Run Steps (9 numbered steps in the required order, `flask db upgrade` marked manual), Test Steps, Screenshots, and a Security note on the non-httpOnly access and refresh cookies, the XSS exposure of both tokens (including the higher impact of the 7-day refresh token), the stateless refresh token limitation (no revocation on logout), and the mitigations (short access expiry, refresh expiry, React escaping, no `dangerouslySetInnerHTML`).
+
+**V6 change to D3 (Requirement 36.13).** The README Features list gains card status, board invitation links with the guest role, and the welcome page. Test Steps document `web/.env.test` created from `web/.env.test.example` with `E2E_BASE_URL`, `E2E_USER_EMAIL`, and `E2E_USER_PASSWORD`, and the need for a pre-existing account. Local Run Steps state that the V6 schema changes need `flask db migrate` and `flask db upgrade` as a manual Migration_Step, including the hand-added check constraints. The Security note adds the invite-token exposure (Open issue 22).
 
 ## Traceability Matrix
 
@@ -1339,7 +1850,33 @@ Every requirement maps to at least one design element. Part references point to 
 | 33 | E2E tests | none | `web/e2e/`, `playwright.config.ts` | Testing Strategy |
 | 34 | Deployment | `vercel.json`, `wsgi.py`, config incl. `JWT_ACCESS_TOKEN_EXPIRES`, `JWT_REFRESH_TOKEN_EXPIRES` (D1) | Vercel project `web/` (D1) | verification checklist |
 | 35 | Repository hygiene | `.gitignore`, `.env.example` | `web/.env.example` | checklist |
-| 36 | Documentation | none | `README.md` incl. seven AI Workflow subsections (with Antigravity), both-token XSS note and stateless refresh limitation (D3) | checklist |
+| 36 | Documentation | none | `README.md` incl. seven AI Workflow subsections (with Antigravity), both-token XSS note and stateless refresh limitation (D3, V6 note) | checklist |
+| 37 | Board invitation links and guest role (V6) | endpoints 30 to 33, A4-V6, A12-V6, A14, `boards/service/invite_service.py`, `accept.py`, `invite_routes.py` | `/invite/[token]`, `InviteJoinCard`, `InviteLinksPanel`, `InviteLinkRow`, `MemberList`, `BoardRoleContext`, `lib/inviteRoles.ts`, `lib/nextParam.ts`, `next.config.ts` headers (B4-V6, B6-V6) | Properties 47, 49, 50, 51, 52, 55, 57 |
+| 38 | Welcome page (V6) | none | `/welcome`, `WelcomeContent`, `WelcomeActions`, `lib/decideRoute.ts`, `proxy.ts`, welcome cookie helpers (B2, B4-V6) | Property 53, E2E welcome scenario |
+
+#### V6 amendments to existing rows
+
+| Req | V6 design coverage |
+|---|---|
+| 2 | Data Models (Card `status`, `completed_at`; Board tokens; three-role check), ER diagram, V6 migration table |
+| 3 | V6 manual migration note (Overview), "V6 schema changes and migration", D1 notes |
+| 7 | A3 (PATCH `/api/users/me`), endpoint row 5, B11, Properties 54 |
+| 8, 9 | A4-V6 (guest read access, writes 403), A14 (tokens created with the Board), rows 8, 12, Property 47 |
+| 10 | A4-V6 matrix (columns writer-only), Property 47 |
+| 11 | A13 (status), A10 note, A4-V6 (`assert_assignee_is_writer`), Properties 44, 45, 48 |
+| 12, 13 | A4-V6 (comment writer helpers, owner check), A7 note, Property 48 |
+| 14 | A8 (V6 query), Property 46 |
+| 17, 19 | B4-V6 (`decideRoute`, `safeNext`, `withNext`), Properties 52, 53 |
+| 20 | B2 note (role badge incl. guest) |
+| 21 | B6-V6 (role gating, new-card flow, status badge), Properties 55, 56 |
+| 22 | B6-V6 (`useDragAndDrop({ enabled })`), Properties 55, 56 |
+| 23 | B7-V6 (status control, guest read-only), Properties 35, 55, 56 |
+| 25 | B7-V6 (`StatusBadge` in My Tasks, Done kept), Property 56 |
+| 26 | B11 (read-only email, change-password section), Property 29 |
+| 27 | B9 V6 responsive note (welcome, invite, guest badge) |
+| 28 | A12-V6 (token entropy, redaction, open redirect, role checks), Properties 47, 52, 57 |
+| 31, 32 | Testing Strategy: V6 additions (backend and frontend tables) |
+| 33, 35 | Testing Strategy: V6 Playwright bullets, `.env.test` and `.gitignore` notes (D1), Property 58 |
 
 ## Open issues
 
@@ -1347,13 +1884,13 @@ These are gaps or conflicts found while designing and revising. Items marked "as
 
 1. **404 before 403 discloses existence (Requirements 4.6, 8.6).** A missing Board gives 404 and an existing Board gives 403 to a non-member. Design follows the requirements. Alternative is returning 404 for non-members; not chosen.
 2. **Glossary versus Requirement 13.** The Notification glossary says comment notifications also go to users who commented on the Card. Criteria 13.2 and 13.3 name only the assignee and the Board_Admin. Design follows the criteria.
-3. **Completed this week uses `updated_at` (Requirement 14.2).** Any edit of a Card in `Done` moves it into the current week. There is no `completed_at` column. Design follows the requirement.
+3. **Completed this week uses `updated_at` (Requirement 14.2).** Any edit of a Card in `Done` moves it into the current week. There is no `completed_at` column. Design follows the requirement. **Resolved in V6:** `cards.status` and `cards.completed_at` replace the Column-name rule (A8, A13, D14). New consequence: see item 30.
 4. **Resource directories (Requirement 15.4).** The list omits columns and analytics. Their components sit in `components/boards/`, which stretches "only files for that resource". Alternative: add `columns` and `analytics` directories.
 5. **Touch drag verification (Requirements 22.12 to 22.17, 27.8, 33.4, 34.8). Resolved in V5 by adding touch support.** The hook now handles touch by a 300 ms long-press. Automated E2E covers the mouse drag through Playwright. The touch drag is verified manually in browser DevTools device mode and covered by React Testing Library unit tests (Requirement 32.13), because Playwright cannot simulate a long-press touch drag reliably. The mobile-viewport Playwright project therefore does not repeat the drag step.
 6. **FLOAT precision.** Repeated midpoints eventually produce equal values. Requirement 22.9 rejects only non-positive values. Recommendation: also treat a computed order equal to a neighbor as invalid and show the generic error. Rebalancing is not designed.
 7. **Extra shared modules.** The design adds `soft_delete.py`, `ordering.py`, and `health.py`, and extra columns `cards.board_id`, `notifications.board_id`. Requirement 1.5 lists only six shared modules and Requirement 2.2 lists no extra columns. These additions do not conflict but should be confirmed.
 8. **Primary key naming versus plural tables (Requirement 2.3).** Tables are plural (Requirement 1.9) while keys are singular (`user_id`, `board_membership_id`). Design uses singular keys.
-9. **Next.js file convention.** The user asked for `middleware.ts`. If the scaffolded Next.js version renames this convention to `proxy.ts`, use that name with identical logic. Check at scaffold time.
+9. **Next.js file convention.** The user asked for `middleware.ts`. If the scaffolded Next.js version renames this convention to `proxy.ts`, use that name with identical logic. Check at scaffold time. **Resolved in V6:** the repository uses `web/proxy.ts`; this document keeps the old name in V5 text and the V6 notes say `proxy.ts`.
 10. **Python 3.14 on Vercel and psycopg2-binary** (see D1 risks). Verify the runtime and wheel availability before relying on them.
 11. **Health latency on cold start (Requirement 5.1).** The 500 ms limit may be missed on a Vercel cold start. Consider measuring on a warm instance.
 12. **Test database schema.** Requirement 31.10 means the test database needs its own manual `flask db upgrade`; this is an extra manual step beyond Requirement 3.3, which only names the local database.
@@ -1365,3 +1902,18 @@ These are gaps or conflicts found while designing and revising. Items marked "as
 18. **No edge auto-scroll during a touch drag (Requirements 22.13, 27.3).** While a touch drag is active, page scrolling is blocked, so a Card can only be dropped on a Column that is already visible. Reaching a Column off screen needs the board container to scroll when the finger nears its edge. This is not required and not designed. Workaround: scroll first, then drag. Alternative: add `requestAnimationFrame` edge scrolling to the hook.
 19. **Soft-deleted users exist only as test seed data (Requirement 7.7).** No endpoint creates the state that Requirements 6.6, 6.9, 6.13, and 31.11 test. The behavior is therefore only reachable through direct database writes, which production code never does. Tests insert the rows directly (Testing Strategy, soft-deleted user fixtures).
 20. **Browser-native drag on touch (Requirement 22.1 versus 22.12).** Some mobile browsers fire HTML5 `dragstart` on a long-press of a `draggable` element. The hook cancels the native event once the touch path is active (B6), but behavior differs between browsers, so it is verified manually in device mode and on a real phone before release.
+
+### V6 open issues
+
+21. **Regenerating an invite link does not remove existing members (Requirement 37.6).** A member or guest who joined through the old link keeps the membership. The admin removes unwanted people through the member panel. Alternative: a "revoke members who joined with this link" option, which needs a per-membership record of the joining token and is not designed.
+22. **Invite tokens appear in URLs (Requirements 28.13, 37).** The token is in the browser address bar, in the Referer header of any outgoing request from the invite page, in browser history, and in the path of the API call GET `/api/invites/<token>`. Mitigations designed: `Referrer-Policy: no-referrer` and `Cache-Control: no-store` on `/invite/:path*`, no third-party scripts on that page, log redaction in the application (A12-V6). Vercel's own request logs and any proxy log still record the path and cannot be redacted by the application. Alternative: send the token in a POST body, which would change Requirement 37's endpoint shapes.
+23. **The welcome cookie is not httpOnly (Requirement 38.4).** The browser must set it from the Welcome_Page buttons and the proxy reads it. A visitor can forge or delete it, which only changes whether `/` shows `/welcome` or `/login` and exposes no data.
+24. **Completed-at backfill and migration review (Requirements 3.8 to 3.10).** Cards sitting in a Column named `Done` before V6 are not counted as completed unless the user runs the optional backfill SQL. Also, Alembic autogenerate does not detect the new `ck_cards_status` check and the changed `ck_board_memberships_role` check, so the user must add them by hand to the generated migration. If this is forgotten, the application works but the database accepts invalid statuses and rejects the `guest` role only if the old role check is still there (an insert with `guest` fails with a 400 through the integrity handler). The V6 schema test catches both cases.
+25. **Password verification on PATCH `/api/users/me` has no rate limit.** An attacker who already holds a valid access token can try passwords against `current_password`. The risk is limited (the token holder is already authenticated and the response is a plain 400), but no throttling is designed. Alternative: Flask-Limiter on this route, which adds a dependency not listed in Requirement 1.11.
+26. **Invite tokens never expire and have no use limit (Requirement 37.21).** Anyone who obtains a link can join until the admin regenerates it. 256-bit tokens cannot be guessed, so enumeration is not a concern, and no rate limit on the invite endpoints is designed.
+27. **A user who was a member, was removed, and rejoins as a guest cannot edit or delete their own old comments (Requirements 12.7, 12.11).** The writer check runs before the owner check. This follows the requirements.
+28. **`decideRoute` replaces `guardDecision` (Requirement 17.12).** The V5 function and Property 28 are kept in the text as history. The implementation task should delete `guardDecision` and move its tests to `decideRoute`, so no second decision function exists.
+29. **Directory per resource (Requirement 15.4).** The V6 components `WelcomeContent`, `WelcomeActions` sit in `components/welcome/` and the invitation components in `components/boards/`, because there is no `welcome` or `invites` API resource. This stretches "only files for that resource", as with columns and analytics (item 4).
+30. **A card can be `DONE` while sitting in any Column, and a Card in the Column named `Done` can be `NOT_STARTED` (Requirements 11.21, 21.23).** The two concepts are independent by design, so the board can show a "Not started" badge in the `Done` Column. The UI does not warn about it.
+31. **The `status` filter is absent (Requirement 25.7).** My Tasks keeps `DONE` cards in the list with a badge and offers no filter. Alternative: a "hide done" toggle, not required.
+32. **Network error or 5xx during the proxy refresh drops `next` (Requirement 17.8).** The redirect goes to `/login?expired=1`, so an invitee whose refresh failed because of an outage must open the invite link again after logging in. Keeping `next` would risk a redirect loop and was not chosen (item 15).
