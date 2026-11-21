@@ -1040,7 +1040,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A9, Correctness Property 25_
     - Depends on: 27.7, 27.3, 25.4
 
-- [ ] 28. V6 backend checkpoint
+- [x] 28. V6 backend checkpoint
   - Run `pytest -v` from `app/` against the test database after task 26.1: 0 failures and 0 errors, including the file-size test of task 15.1 (split any backend file over 300 lines)
   - Ensure all tests pass, ask the user if questions arise
   - Frontend V6 tasks (29 onward) depend on this checkpoint
