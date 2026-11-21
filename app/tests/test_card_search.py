@@ -12,7 +12,7 @@ pytestmark = pytest.mark.e2e
 URL = "/api/cards"
 RESULT_FIELDS = {
     "card_id", "board_id", "column_id", "title", "description", "due_date", "labels",
-    "assignee", "order", "created_at", "updated_at", "board_name", "column_name",
+    "assignee", "order", "status", "completed_at", "created_at", "updated_at", "board_name", "column_name",
 }
 
 

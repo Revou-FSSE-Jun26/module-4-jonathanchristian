@@ -9,6 +9,10 @@ from app.errors import OrderField, UtcDateTime, UuidField
 from app.extensions import db
 from app.soft_delete import SoftDeleteMixin
 
+# Card_Status values (exact, case-sensitive); the rule that moves between them is
+# `cards/service/status.py`. Defined here so schema.py never imports a service module.
+CARD_STATUSES = ("NOT_STARTED", "IN_PROGRESS", "DONE")
+
 
 class Card(SoftDeleteMixin, db.Model):
     __tablename__ = "cards"
@@ -63,6 +67,8 @@ class CardSchema(Schema):
     labels = fields.List(fields.String())
     assignee = fields.Nested(UserRefSchema, allow_none=True)
     order = fields.Float()
+    status = fields.String()
+    completed_at = UtcDateTime()
     created_at = UtcDateTime()
     updated_at = UtcDateTime()
 
@@ -95,9 +101,14 @@ class CardCreateSchema(Schema):
 
 
 class CardUpdateSchema(CardCreateSchema):
-    """PATCH: every field optional; only supplied fields change. `title` cannot be null."""
+    """PATCH: every field optional; only supplied fields change. `title` and `status` cannot be null.
+
+    POST (CardCreateSchema) does not declare `status`, so `unknown = RAISE` rejects it with 400.
+    """
 
     title = fields.String(validate=validate.Length(min=1, max=200))
+    # Exact, case-sensitive; null is rejected. `completed_at` is never accepted from the client.
+    status = fields.String(validate=validate.OneOf(CARD_STATUSES), allow_none=False)
 
 
 class CardPositionSchema(Schema):

@@ -236,3 +236,12 @@ def refresh_header(app):
         return {"Authorization": f"Bearer {token}"}
 
     return factory
+
+
+@pytest.fixture
+def fast_hash(monkeypatch):
+    """Property tests run many password changes; hash them cheaply (the rule is unchanged)."""
+    from app.blueprints.users import service as users_service
+    from data_fixtures import _fast_hash
+
+    monkeypatch.setattr(users_service, "hash_password", _fast_hash)

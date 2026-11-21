@@ -1,22 +1,26 @@
 openapi: 3.0.3
 info:
   title: Kano API
-  version: "1.0.0"
+  version: "2.0.0"
   description: |
     REST API of Kano, a Trello-like task management app. Reference for frontend development.
 
     **Response envelope.** Every body is exactly `{ "data": ... }` on success or `{ "error": "<message, max 500 chars>" }` on failure. The status code is never part of the body.
 
-    **Status codes.** 201 only for the six creating POSTs (register, create board, add member, create column, create card, create comment). Every other success is 200, and DELETE returns 200 with a `data` object (never 204).
+    **Status codes.** 201 only for the six creating POSTs (register, create board, add member, create column, create card, create comment). Every other success is 200 (including `POST /api/auth/login`, `POST /api/auth/refresh`, `POST /api/boards/{board_id}/invite-links/{role}/regenerate`, and `POST /api/invites/{token}/accept`), and DELETE returns 200 with a `data` object (never 204).
     Failures: 400 validation, 401 missing/invalid/expired/wrong-type token, 403 not allowed, 404 missing, soft-deleted, or malformed id, 405 wrong method, 409 duplicate, 500 `"Internal server error"`.
+
+    **Roles.** Every board member has one role per board: `admin` (the creator), `member` (can edit), or `guest` (view only, joined through a guest invitation link). Reader endpoints accept any of the three; writer endpoints need `admin` or `member` and answer 403 to a guest; admin endpoints need `admin`. Comment edits and deletes also need to be the author.
 
     **Authentication.** `POST /api/auth/login` returns an access token and a refresh token. Send the access token as `Authorization: Bearer <token>`. A refresh token is accepted only by `POST /api/auth/refresh`; on any other endpoint it gets 401.
 
-    **Check order.** For board-scoped endpoints the server checks 401, then 404 (resource missing or soft-deleted), then 403 (not a member, then not an admin / not the owner), and only then validates the body (400). A 403 body never contains resource data.
+    **Check order.** For board-scoped endpoints the server checks 401, then 404 (resource missing or soft-deleted), then 403 (not a participant, then a role below the required level: a guest on a write endpoint, a member on an admin endpoint, a non-author on a comment edit), and only then validates the body (400). A 403 body never contains resource data.
 
     **Formats.** Ids are lowercase hyphenated UUID strings. Timestamps are ISO 8601 UTC ending in `Z`. `due_date` is an ISO date (`YYYY-MM-DD`). `order` values are floats greater than 0; the server allocates the last position on create, the client computes the value for moves (midpoint of neighbours, or half of the first).
 
-    **Deletes** are soft deletes with cascades: a Board deletes its memberships, columns, cards, and comments; a Column deletes its cards and comments; a Card deletes its comments.
+    **Card status.** Every card has a `status` (`NOT_STARTED`, `IN_PROGRESS`, or `DONE`, exact and case-sensitive) and a `completed_at` timestamp that the server sets when the status becomes `DONE` and clears when it leaves `DONE`. Moving a card to another column never changes either field. Analytics counts completed cards from `status` and `completed_at`, not from the name of a column.
+
+    **Deletes** are soft deletes with cascades: a Board deletes its memberships (all three roles), columns, cards, and comments, and its invitation tokens stop working; a Column deletes its cards and comments; a Card deletes its comments.
 servers:
   - url: http://localhost:5000
     description: Local development (`flask run`)
@@ -31,6 +35,7 @@ tags:
   - name: Comments
   - name: Notifications
   - name: Analytics
+  - name: Invitations
 security:
   - bearerAuth: []
 
@@ -158,32 +163,38 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
     patch:
       tags: [Users]
-      summary: Update name and/or email
-      description: At least one of `name` or `email` is required. Any other field (for example `password`) is rejected with 400.
+      summary: Update name and/or password
+      description: |
+        Send `name`, or `password` together with `current_password`, or both. The email is fixed after registration, so any `email` field (with any value) is rejected with 400 naming `email`. A wrong or missing `current_password` is 400 (never 403) naming `current_password`, and then nothing is saved, not even a `name` sent in the same request. `current_password` without `password`, a body with neither `name` nor `password`, and unknown fields are 400 too. Tokens stay valid after a password change (tokens are stateless).
       requestBody:
         required: true
         content:
           application/json:
             schema: { $ref: "#/components/schemas/UserUpdateRequest" }
-            example: { name: Ada King }
+            examples:
+              rename: { summary: Change the name, value: { name: Ada King } }
+              password: { summary: Change the password, value: { password: n3wsecretpass, current_password: s3cretpass } }
       responses:
         "200":
-          description: Updated profile
+          description: Updated profile (never contains a password or hash)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/UserEnvelope" }
-        "400": { $ref: "#/components/responses/ValidationError" }
-        "401": { $ref: "#/components/responses/Unauthorized" }
-        "409":
-          description: Email already used by another user
+        "400":
+          description: Validation failed, `email` was sent, or `current_password` is wrong or missing
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+              examples:
+                email: { value: { error: "email: email cannot be changed" } }
+                current_password: { value: { error: "current_password: does not match" } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
 
   /api/boards:
     post:
       tags: [Boards]
       summary: Create a board (the creator becomes its admin)
+      description: Also creates the board's two invitation tokens (member and guest) in the same transaction. They are not part of this response; the admin reads them with `GET /api/boards/{board_id}/invite-links`.
       requestBody:
         required: true
         content:
@@ -210,7 +221,7 @@ paths:
       summary: List my boards (newest first)
       responses:
         "200":
-          description: Boards where the caller is an active member
+          description: Boards where the caller has an active membership of any role (`my_role` says which)
           content:
             application/json:
               schema:
@@ -227,7 +238,7 @@ paths:
     get:
       tags: [Boards]
       summary: Board detail with columns and cards
-      description: Members and admins see every non-deleted card. Columns are ordered by `order`, cards by `order` within their column. Runs a fixed number of queries regardless of card count.
+      description: "Any role may read it (a guest gets `my_role: guest` and the same data). Every non-deleted card is returned, each with `status` and `completed_at`. Columns are ordered by `order`, cards by `order` within their column. Runs a fixed number of queries regardless of card count."
       responses:
         "200":
           description: Board with nested columns and cards
@@ -256,6 +267,8 @@ paths:
                           labels: [docs]
                           assignee: { user_id: 3f2b1c1e-7d54-4c1a-9a43-0b5e2f6f1d11, name: Ada Lovelace }
                           order: 1.0
+                          status: NOT_STARTED
+                          completed_at: null
                           created_at: "2026-11-16T10:25:00.000000Z"
                           updated_at: "2026-11-16T10:25:00.000000Z"
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -300,6 +313,7 @@ paths:
     post:
       tags: [Members]
       summary: Add a member by email (admin only)
+      description: Always creates the role `member`. Guests join only through the guest invitation link.
       requestBody:
         required: true
         content:
@@ -328,14 +342,15 @@ paths:
               schema: { $ref: "#/components/schemas/ErrorEnvelope" }
               example: { error: No user with that email }
         "409":
-          description: Already a member
+          description: Already has an active membership on this board (any role)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorEnvelope" }
               example: { error: User is already a member of this board }
     get:
       tags: [Members]
-      summary: List members (oldest first, any member)
+      summary: List members (oldest first, any role including guest)
+      description: Each row carries the member's role (`admin`, `member`, or `guest`).
       responses:
         "200":
           description: Members
@@ -360,8 +375,8 @@ paths:
         schema: { type: string, format: uuid }
     delete:
       tags: [Members]
-      summary: Remove a member (admin only)
-      description: Clears the removed user's assignments on this board's cards in the same transaction. An admin cannot remove themselves (400).
+      summary: Remove a member or guest (admin only)
+      description: Works for every role. Clears the removed user's assignments on this board's cards in the same transaction. An admin cannot remove themselves (400).
       responses:
         "200":
           description: Removed
@@ -393,7 +408,7 @@ paths:
       - $ref: "#/components/parameters/BoardId"
     post:
       tags: [Columns]
-      summary: Create a column (any member)
+      summary: Create a column (admin or member; a guest gets 403)
       description: Placed after the last active column (`order` 1.0 for the first).
       requestBody:
         required: true
@@ -423,7 +438,7 @@ paths:
       - $ref: "#/components/parameters/BoardId"
     patch:
       tags: [Columns]
-      summary: Set a column's order (any member)
+      summary: Set a column's order (admin or member; a guest gets 403)
       description: Stores the client-supplied `order`. A column of another board, or a deleted/unknown column, gives 400.
       requestBody:
         required: true
@@ -450,7 +465,7 @@ paths:
         schema: { type: string, format: uuid }
     patch:
       tags: [Columns]
-      summary: Rename a column (any member)
+      summary: Rename a column (admin or member; a guest gets 403)
       requestBody:
         required: true
         content:
@@ -469,7 +484,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
     delete:
       tags: [Columns]
-      summary: Soft delete a column with its cards and comments (any member)
+      summary: Soft delete a column with its cards and comments (admin or member; a guest gets 403)
       responses:
         "200":
           description: Deleted
@@ -495,8 +510,8 @@ paths:
         schema: { type: string, format: uuid }
     post:
       tags: [Cards]
-      summary: Create a card in a column (any member)
-      description: Placed after the last active card of the column. If `assignee_id` is another board member, that user gets an `assignment` notification.
+      summary: Create a card in a column (admin or member; a guest gets 403)
+      description: Placed after the last active card of the column, always with `status` `NOT_STARTED` and `completed_at` null. A `status` (or `completed_at`) in the body is rejected with 400. The assignee must be an admin or member of the board; if it is another user, that user gets an `assignment` notification.
       requestBody:
         required: true
         content:
@@ -525,10 +540,12 @@ paths:
                   labels: [docs]
                   assignee: { user_id: 3f2b1c1e-7d54-4c1a-9a43-0b5e2f6f1d11, name: Ada Lovelace }
                   order: 1.0
+                  status: NOT_STARTED
+                  completed_at: null
                   created_at: "2026-11-16T10:25:00.000000Z"
                   updated_at: "2026-11-16T10:25:00.000000Z"
         "400":
-          description: Validation error, or the assignee is not a board member
+          description: Validation error, `status` in the body, or the assignee is not an admin or member of the board (a guest, a removed member, and a non-participant are all rejected)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorEnvelope" }
@@ -542,7 +559,7 @@ paths:
       summary: Search cards, or list my tasks
       description: |
         Valid combinations only: `assignee=me`, or `q` with an optional `board_id`. Anything else (no parameters, empty `q`, `q` over 100 chars, bad `board_id`, `assignee` together with `q`, unknown parameters) gives 400.
-        Search matches title or description case-insensitively across the caller's boards; `%`, `_`, and `\` are literal. `board_id` restricts the search; a board the caller is not a member of gives 403. Soft-deleted cards, columns, and boards are excluded. Results are ordered by board name, column order, card order.
+        Search matches title or description case-insensitively across the boards where the caller has any role (guests included); `%`, `_`, and `\` are literal. `board_id` restricts the search; a board where the caller has no membership gives 403. Every result carries `status` and `completed_at`. Soft-deleted cards, columns, and boards are excluded. Results are ordered by board name, column order, card order.
       parameters:
         - name: assignee
           in: query
@@ -576,6 +593,8 @@ paths:
                     labels: [docs]
                     assignee: { user_id: 3f2b1c1e-7d54-4c1a-9a43-0b5e2f6f1d11, name: Ada Lovelace }
                     order: 1.0
+                    status: NOT_STARTED
+                    completed_at: null
                     created_at: "2026-11-16T10:25:00.000000Z"
                     updated_at: "2026-11-16T10:25:00.000000Z"
                     board_name: Product roadmap
@@ -590,8 +609,8 @@ paths:
       - $ref: "#/components/parameters/CardId"
     patch:
       tags: [Cards]
-      summary: Update a card (any member)
-      description: Partial update; only supplied fields change. `description`, `due_date`, and `assignee_id` may be `null` to clear them; `title` and `labels` may not be null. An empty body is a no-op. Changing the assignee to another user creates an `assignment` notification.
+      summary: Update a card (admin or member; a guest gets 403)
+      description: Partial update; only supplied fields change. `status` must be exactly `NOT_STARTED`, `IN_PROGRESS`, or `DONE` (null, an empty string, and other letter cases are 400). Changing the status to `DONE` sets `completed_at` to now, leaving `DONE` clears it, and repeating the current status (or omitting it) leaves it unchanged; `completed_at` itself cannot be sent. `description`, `due_date`, and `assignee_id` may be `null` to clear them; `title` and `labels` may not be null. An empty body is a no-op. Changing the assignee to another user creates an `assignment` notification.
       requestBody:
         required: true
         content:
@@ -605,7 +624,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/CardEnvelope" }
         "400":
-          description: Validation error, or the assignee is not a board member
+          description: Validation error, `status` in the body, or the assignee is not an admin or member of the board (a guest, a removed member, and a non-participant are all rejected)
           content:
             application/json:
               schema: { $ref: "#/components/schemas/ErrorEnvelope" }
@@ -614,7 +633,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
     delete:
       tags: [Cards]
-      summary: Soft delete a card and its comments (any member)
+      summary: Soft delete a card and its comments (admin or member; a guest gets 403)
       responses:
         "200":
           description: Deleted
@@ -637,8 +656,8 @@ paths:
       - $ref: "#/components/parameters/CardId"
     patch:
       tags: [Cards]
-      summary: Move a card to a column and order (drag and drop; any member)
-      description: Stores the client-supplied `order`. The target column must be active and in the same board as the card, otherwise 400.
+      summary: Move a card to a column and order (drag and drop; admin or member; a guest gets 403)
+      description: Stores the client-supplied `order`. The target column must be active and in the same board as the card, otherwise 400. The card's `status` and `completed_at` never change here, not even when the target column is named `Done`.
       requestBody:
         required: true
         content:
@@ -661,7 +680,7 @@ paths:
       - $ref: "#/components/parameters/CardId"
     post:
       tags: [Comments]
-      summary: Add a comment (any member)
+      summary: Add a comment (admin or member; a guest gets 403)
       description: Notifies the card's assignee and the board admin (type `comment`), never the author, at most once per person.
       requestBody:
         required: true
@@ -689,7 +708,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
     get:
       tags: [Comments]
-      summary: List comments (oldest first, any member)
+      summary: List comments (oldest first, any role including guest)
       responses:
         "200":
           description: Comments (empty list when none)
@@ -713,7 +732,7 @@ paths:
         schema: { type: string, format: uuid }
     patch:
       tags: [Comments]
-      summary: Edit a comment (owner only, even admins get 403)
+      summary: Edit a comment (author only; admins, other members, and guests get 403)
       requestBody:
         required: true
         content:
@@ -732,7 +751,7 @@ paths:
         "404": { $ref: "#/components/responses/NotFound" }
     delete:
       tags: [Comments]
-      summary: Soft delete a comment (owner only)
+      summary: Soft delete a comment (author only; a guest gets 403 even for an old own comment)
       responses:
         "200":
           description: Deleted
@@ -748,6 +767,95 @@ paths:
               example: { data: { comment_id: a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c44 } }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/boards/{board_id}/invite-links:
+    parameters:
+      - $ref: "#/components/parameters/BoardId"
+    get:
+      tags: [Invitations]
+      summary: Read the member and guest invitation tokens (admin only)
+      description: Boards created before V6 have no tokens yet; they are created and stored on the first request. The invitation link for a token is `<web origin>/invite/<token>`. Members, guests, and non-participants get 403 and never see a token.
+      responses:
+        "200":
+          description: Both tokens
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InviteLinksEnvelope" }
+              example:
+                data:
+                  member: { role: member, token: q3Zr8mT1vK9xWc2LpN6aYb4sD7eFh0JgUiOtRkEyXzA }
+                  guest: { role: guest, token: B5nHc1VdSx8QwErTyUiOp3AsDfGhJkLzXcVbNm7Pq2Y }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/boards/{board_id}/invite-links/{role}/regenerate:
+    parameters:
+      - $ref: "#/components/parameters/BoardId"
+      - name: role
+        in: path
+        required: true
+        schema: { type: string, enum: [member, guest] }
+    post:
+      tags: [Invitations]
+      summary: Replace the token of one role (admin only)
+      description: No body. The old token stops working at once; the other role's token and all memberships are unchanged. The board is checked first (404, 403), then the role (400 for anything but `member` or `guest`). Returns 200, not 201.
+      responses:
+        "200":
+          description: The new token
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InviteLinkEnvelope" }
+              example: { data: { role: guest, token: Zy9XwVu8TsRq7PoNm6LkJi5HgFe4DcBa3ZyXwVuTsRq } }
+        "400":
+          description: The role is neither `member` nor `guest`
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorEnvelope" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/invites/{token}:
+    parameters:
+      - $ref: "#/components/parameters/InviteToken"
+    get:
+      tags: [Invitations]
+      summary: What an invitation token grants
+      description: Any authenticated user who knows the token may call it. Tokens do not expire and are not consumed. An unknown, replaced, malformed (not 43 to 128 characters of `A-Z a-z 0-9 _ -`), or soft-deleted-board token gives 404 with no board data.
+      responses:
+        "200":
+          description: The board, the role the token grants, and the caller's current role
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InviteInfoEnvelope" }
+              example:
+                data:
+                  board_id: 9c1f6a52-2d0e-4f9c-8f64-6d5d3f7a0c01
+                  board_name: Product roadmap
+                  role: guest
+                  current_role: null
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /api/invites/{token}/accept:
+    parameters:
+      - $ref: "#/components/parameters/InviteToken"
+    post:
+      tags: [Invitations]
+      summary: Join a board through an invitation token
+      description: |
+        No body. Always answers 200 (not 201) with the resulting role, and is safe to repeat or to send twice at the same time.
+        With no active membership, one is created with the token's role. A `guest` who accepts the member token is upgraded to `member`. A `member` or `admin` never loses a role (a member accepting the guest token stays `member`; an admin stays `admin`). A soft-deleted membership of the same user is left untouched and a new active one is created. No notification is created and the token is not consumed.
+      responses:
+        "200":
+          description: The caller's role on the board
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AcceptResultEnvelope" }
+              example: { data: { board_id: 9c1f6a52-2d0e-4f9c-8f64-6d5d3f7a0c01, role: guest } }
+        "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
 
   /api/notifications:
@@ -811,7 +919,7 @@ paths:
     get:
       tags: [Analytics]
       summary: Board analytics (admin only)
-      description: Cards per non-deleted column (0 for empty ones, in column order); cards completed this week (cards in a column named `Done`, case-insensitive, updated from Monday 00:00 UTC up to now; 0 when there is no such column); assigned cards and written comments for every active member.
+      description: Cards per non-deleted column (0 for empty ones, in column order); cards completed this week (non-deleted cards with `status` `DONE` and `completed_at` from Monday 00:00 UTC up to and including now, whatever column they are in; 0 when there are none); assigned cards and written comments for every active admin and member (guests are not listed). A guest or a member gets 403.
       responses:
         "200":
           description: Analytics
@@ -854,6 +962,12 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    InviteToken:
+      name: token
+      in: path
+      required: true
+      description: A random URL-safe invitation token (43 characters as generated)
+      schema: { type: string, pattern: "^[A-Za-z0-9_-]{43,128}$" }
 
   responses:
     ValidationError:
@@ -869,7 +983,7 @@ components:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
           example: { error: Authentication required }
     Forbidden:
-      description: Not a board member, not an admin, or not the owner. The message never contains resource data.
+      description: Not a participant of the board, a role below the required level (a guest on a write endpoint, a member on an admin endpoint), or not the comment author. The message never contains resource data or tokens.
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorEnvelope" }
@@ -921,9 +1035,11 @@ components:
       type: object
       additionalProperties: false
       minProperties: 1
+      description: "`email` is not accepted (400 for any value). `password` and `current_password` go together."
       properties:
         name: { type: string, minLength: 1, maxLength: 100 }
-        email: { type: string, format: email, maxLength: 254 }
+        password: { type: string, minLength: 8, maxLength: 128 }
+        current_password: { type: string, minLength: 1, description: Required with `password`; must match the stored password }
     NameRequest:
       type: object
       additionalProperties: false
@@ -960,13 +1076,14 @@ components:
           type: array
           maxItems: 10
           items: { type: string, minLength: 1, maxLength: 30 }
-        assignee_id: { type: string, format: uuid, nullable: true, description: Must be a member of the card's board }
+        assignee_id: { type: string, format: uuid, nullable: true, description: Must have the role admin or member on the card's board }
     CardUpdateRequest:
       type: object
       additionalProperties: false
-      description: Same fields as create, all optional. `title` cannot be null.
+      description: Same fields as create, all optional, plus `status`. `title` and `status` cannot be null.
       properties:
         title: { type: string, minLength: 1, maxLength: 200 }
+        status: { $ref: "#/components/schemas/CardStatus" }
         description: { type: string, maxLength: 5000, nullable: true }
         due_date: { type: string, format: date, nullable: true }
         labels:
@@ -974,6 +1091,10 @@ components:
           maxItems: 10
           items: { type: string, minLength: 1, maxLength: 30 }
         assignee_id: { type: string, format: uuid, nullable: true }
+    CardStatus:
+      type: string
+      enum: [NOT_STARTED, IN_PROGRESS, DONE]
+      description: Exact and case-sensitive. Shown to users as Not started, In progress, and Done.
     CommentRequest:
       type: object
       additionalProperties: false
@@ -999,7 +1120,7 @@ components:
       properties:
         board_id: { type: string, format: uuid }
         name: { type: string }
-        my_role: { type: string, enum: [admin, member], description: The caller's role on this board }
+        my_role: { type: string, enum: [admin, member, guest], description: The caller's role on this board }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
     Member:
@@ -1008,7 +1129,7 @@ components:
         user_id: { type: string, format: uuid }
         name: { type: string }
         email: { type: string, format: email }
-        role: { type: string, enum: [admin, member] }
+        role: { type: string, enum: [admin, member, guest] }
     Column:
       type: object
       properties:
@@ -1031,6 +1152,8 @@ components:
             - $ref: "#/components/schemas/UserRef"
           nullable: true
         order: { type: number, format: double }
+        status: { $ref: "#/components/schemas/CardStatus" }
+        completed_at: { type: string, format: date-time, nullable: true, description: "Set when the status becomes DONE, null otherwise" }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
     CardSearchResult:
@@ -1085,6 +1208,28 @@ components:
         per_page: { type: integer }
         total: { type: integer }
         unread_count: { type: integer }
+    InviteLink:
+      type: object
+      properties:
+        role: { type: string, enum: [member, guest] }
+        token: { type: string, description: Secret; only the board admin ever receives it }
+    InviteLinks:
+      type: object
+      properties:
+        member: { $ref: "#/components/schemas/InviteLink" }
+        guest: { $ref: "#/components/schemas/InviteLink" }
+    InviteInfo:
+      type: object
+      properties:
+        board_id: { type: string, format: uuid }
+        board_name: { type: string }
+        role: { type: string, enum: [member, guest], description: The role this token grants }
+        current_role: { type: string, enum: [admin, member, guest], nullable: true, description: "The caller's active role on the board, or null" }
+    AcceptResult:
+      type: object
+      properties:
+        board_id: { type: string, format: uuid }
+        role: { type: string, enum: [admin, member, guest], description: The caller's role after accepting }
     Analytics:
       type: object
       properties:
@@ -1172,6 +1317,22 @@ components:
       type: object
       properties:
         data: { $ref: "#/components/schemas/NotificationPage" }
+    InviteLinksEnvelope:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/InviteLinks" }
+    InviteLinkEnvelope:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/InviteLink" }
+    InviteInfoEnvelope:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/InviteInfo" }
+    AcceptResultEnvelope:
+      type: object
+      properties:
+        data: { $ref: "#/components/schemas/AcceptResult" }
     AnalyticsEnvelope:
       type: object
       properties:

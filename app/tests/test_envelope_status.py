@@ -1,4 +1,4 @@
-"""Envelope, status code, and serialization tests across all endpoints (task 14.3)."""
+"""Envelope, status code, and serialization tests across all 33 endpoint rows plus 3a (V6)."""
 import re
 import uuid
 
@@ -91,7 +91,10 @@ def test_success_has_one_data_key_and_the_documented_status(client, full, header
 
 def test_exactly_six_endpoints_answer_201():
     assert {e.id for e, _ in ALL if e.success == 201} == CREATING_POSTS
-    assert len(ALL) == 30  # the 29 endpoints of design A11 plus 3a
+    assert len(ALL) == 34  # the 33 endpoint rows of design A11 plus 3a
+    assert {e.id for e, _ in ALL if e.id in ("regenerate_invite_link", "accept_invite")} == {
+        "regenerate_invite_link", "accept_invite"}
+    assert all(e.success == 200 for e, _ in ALL if e.id in ("regenerate_invite_link", "accept_invite"))  # R4.3
 
 
 # --- failures -------------------------------------------------------------------------------------------------
@@ -129,7 +132,26 @@ def test_conflicts_are_409(client, full, auth_header):
     assert_envelope(client.post("/api/auth/register", json=body), 409)
     members = f"/api/boards/{full.board.board_id}/members"
     assert_envelope(client.post(members, json={"email": full.extra.email}, headers=auth_header(full.admin)), 409)
-    assert_envelope(client.patch("/api/users/me", json={"email": full.admin.email}, headers=auth_header(full.member)), 409)
+
+
+def test_email_in_patch_me_is_400_and_status_on_card_create_is_400(client, full, auth_header):
+    headers = auth_header(full.member)
+    for email in (full.admin.email, full.member.email, "new@example.com"):
+        assert "email" in assert_envelope(client.patch("/api/users/me", json={"email": email}, headers=headers), 400)
+    body = {"title": "T", "status": "DONE"}
+    response = client.post(f"/api/columns/{full.column.column_id}/cards", json=body, headers=headers)
+    assert "status" in assert_envelope(response, 400)
+
+
+def test_completed_at_and_invite_responses_use_the_documented_formats(client, full, auth_header):
+    headers = auth_header(full.admin)
+    card = assert_envelope(client.patch(f"/api/cards/{full.card.card_id}", json={"status": "DONE"}, headers=headers), 200)
+    assert TIME_RE.match(card["completed_at"])
+    assert assert_envelope(client.patch(f"/api/cards/{full.card.card_id}", json={"status": "NOT_STARTED"}, headers=headers), 200)["completed_at"] is None
+    links = assert_envelope(client.get(f"/api/boards/{full.board.board_id}/invite-links", headers=headers), 200)
+    accepted = assert_envelope(client.post(f"/api/invites/{links['guest']['token']}/accept", headers=auth_header(full.newbie)), 200)
+    assert UUID_RE.match(accepted["board_id"]) and accepted["role"] == "guest"
+    assert UUID_RE.match(assert_envelope(client.get(f"/api/invites/{links['guest']['token']}", headers=headers), 200)["board_id"])
 
 
 def test_error_messages_never_exceed_500_characters(client, full, auth_header):
@@ -178,10 +200,10 @@ def test_database_violations_map_to_statuses_without_sql_details(client, full, a
 @given(index=st.integers(0, len(ALL) - 1), scenario=st.sampled_from(["ok", "no_token", "unknown_id", "bad_body", "wrong_method"]))
 def test_property_every_outcome_has_one_envelope_key_and_its_status(
     client, make_user, make_board, make_member, make_column, make_card, make_comment, make_notification,
-    headers_for, reset_database, index, scenario,
+    headers_for, persist, reset_database, index, scenario,
 ):
     reset_database()
-    w = build_world(make_user, make_board, make_member, make_column, make_card, make_comment)
+    w = build_world(make_user, make_board, make_member, make_column, make_card, make_comment, persist)
     w.note = make_notification(w.member, w.card)
     endpoint, auth = ALL[index]
     headers = headers_for(w, auth)
@@ -218,14 +240,19 @@ def test_property_every_outcome_has_one_envelope_key_and_its_status(
 )
 def test_property_ids_are_lowercase_uuids_and_timestamps_end_in_z(
     client, make_user, make_board, make_member, make_column, make_card, make_comment, make_notification,
-    auth_header, reset_database, title, content,
+    auth_header, persist, reset_database, title, content,
 ):
     reset_database()
-    w = build_world(make_user, make_board, make_member, make_column, make_card, make_comment)
+    w = build_world(make_user, make_board, make_member, make_column, make_card, make_comment, persist)
     w.note = make_notification(w.member, w.card)
     headers = auth_header(w.admin)
     created = assert_envelope(client.post(f"/api/columns/{w.column.column_id}/cards", json={"title": title, "assignee_id": str(w.member.user_id)}, headers=headers), 201)
     assert_envelope(client.post(f"/api/cards/{created['card_id']}/comments", json={"content": content}, headers=headers), 201)
+    done = assert_envelope(client.patch(f"/api/cards/{created['card_id']}", json={"status": "DONE"}, headers=headers), 200)
+    assert TIME_RE.match(done["completed_at"])
+    links = assert_envelope(client.get(f"/api/boards/{w.board.board_id}/invite-links", headers=headers), 200)
+    for link in links.values():
+        assert_envelope(client.get(f"/api/invites/{link['token']}", headers=headers), 200)
     for url in (
         f"/api/boards/{w.board.board_id}", f"/api/cards/{created['card_id']}/comments", "/api/boards",
         f"/api/boards/{w.board.board_id}/analytics", f"/api/boards/{w.board.board_id}/members",

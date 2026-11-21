@@ -23,7 +23,7 @@ def register(data):
     user = User(
         name=data["name"],
         email=data["email"],
-        password_hash=generate_password_hash(data["password"]),
+        password_hash=users_service.hash_password(data["password"]),
     )
     db.session.add(user)
     db.session.commit()

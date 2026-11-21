@@ -21,4 +21,4 @@ def get_me():
 @jwt_required()
 def update_me():
     data = load_json(update_schema)
-    return ok(service.update_profile(current_user, data))
+    return ok(service.update_me(current_user, data))

@@ -4,6 +4,7 @@ from sqlalchemy.orm import joinedload
 
 from app.blueprints.cards.schema import Card, CardSchema
 from app.blueprints.comments.schema import Comment
+from app.blueprints.cards.service.status import apply_status_change
 from app.blueprints.notifications import service as notifications
 from app.extensions import db
 from app.ordering import next_last_order
@@ -65,6 +66,10 @@ def update_card(user, card_id, load_data):
     for key in UPDATABLE_FIELDS:
         if key in data:
             setattr(card, key, data[key])
+    # One call, same transaction and same UPDATE as the other fields (design A13).
+    card.status, card.completed_at = apply_status_change(
+        card.status, card.completed_at, data.get("status"), utcnow()
+    )
     if assignee_changed:
         _notify_assignment(card, new_assignee, user)
     db.session.commit()

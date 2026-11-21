@@ -65,19 +65,30 @@ class UserRefSchema(Schema):
 
 
 class UserUpdateSchema(Schema):
-    """PATCH /api/users/me. `password` (or any unknown key) is rejected with 400."""
+    """PATCH /api/users/me: `name` and/or `password` (with `current_password`).
+
+    The email is fixed after registration, so any `email` key is rejected with 400 naming
+    `email`. Other unknown keys are rejected by `unknown = RAISE`.
+    """
 
     class Meta:
         unknown = RAISE
 
     name = fields.String(**NAME_FIELD_ARGS)
-    email = fields.String(validate=EMAIL_VALIDATORS)
+    password = fields.String(validate=validate.Length(min=8, max=128))
+    current_password = fields.String(load_only=True, validate=validate.Length(min=1))
 
     @pre_load
     def _clean(self, data, **kwargs):
-        return clean_text_fields(data, "name", "email")
+        if isinstance(data, dict) and "email" in data:  # any value, including null or ""
+            raise ValidationError("email cannot be changed", "email")
+        return clean_text_fields(data, "name")
 
     @validates_schema
-    def _at_least_one_field(self, data, **kwargs):
-        if "name" not in data and "email" not in data:
-            raise ValidationError("Provide at least one of name or email", "_schema")
+    def _consistent_fields(self, data, **kwargs):
+        if "name" not in data and "password" not in data and "current_password" not in data:
+            raise ValidationError("Provide at least one of name or password", "_schema")
+        if "password" in data and "current_password" not in data:
+            raise ValidationError("current_password is required to change the password", "current_password")
+        if "current_password" in data and "password" not in data:
+            raise ValidationError("current_password can only be sent together with password", "password")

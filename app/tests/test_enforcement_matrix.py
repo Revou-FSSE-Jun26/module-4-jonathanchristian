@@ -1,4 +1,4 @@
-"""Role and membership enforcement matrix over every Board-scoped endpoint (task 14.1)."""
+"""Role and membership enforcement matrix over every Board-scoped endpoint (V6: four actors)."""
 import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
@@ -8,7 +8,8 @@ from helpers import assert_envelope
 
 pytestmark = pytest.mark.e2e
 
-ACTORS = ["nonmember", "member", "admin"]
+ACTORS = ["nonmember", "guest", "member", "admin"]
+READ_ONLY_ENDPOINTS = {e.id for e in ENDPOINTS if "guest" in e.allowed}
 BY_ID = {endpoint.id: endpoint for endpoint in ENDPOINTS}
 
 
@@ -45,6 +46,37 @@ def test_403_body_is_identical_for_every_endpoint_and_leaks_nothing(app, client,
     assert len(messages) == 1  # no resource data and no distinction between the 403 reasons
 
 
+def test_guest_gets_403_on_every_write_and_succeeds_on_every_read(app, client, auth_header, world):
+    for endpoint in ENDPOINTS:
+        before = snapshot(app)
+        response = call(client, endpoint, world, auth_header(world.guest))
+        if endpoint.id in READ_ONLY_ENDPOINTS:
+            assert_envelope(response, endpoint.success)
+        else:
+            assert_envelope(response, 403)
+            assert snapshot(app) == before, endpoint.id
+    assert READ_ONLY_ENDPOINTS == {"get_board", "list_members", "search_cards", "list_comments"}
+
+
+@pytest.mark.parametrize("method,body", [("patch", {"content": "Edited"}), ("delete", None)])
+def test_guest_who_authored_an_old_comment_still_gets_403(app, client, auth_header, world, method, body):
+    before = snapshot(app)
+    kwargs = {"headers": auth_header(world.guest)}
+    if body:
+        kwargs["json"] = body
+    response = getattr(client, method)(f"/api/comments/{world.guest_comment.comment_id}", **kwargs)
+    assert_envelope(response, 403)
+    assert snapshot(app) == before
+
+
+def test_no_role_but_the_admin_can_read_the_invite_tokens(app, client, auth_header, world):
+    for actor in ("nonmember", "guest", "member"):
+        message = assert_envelope(
+            client.get(f"/api/boards/{world.board.board_id}/invite-links", headers=auth_header(world.actors[actor])), 403
+        )
+        assert world.member_token not in message and world.guest_token not in message
+
+
 def test_removed_member_is_locked_out_of_every_endpoint(app, client, auth_header, world):
     removed_headers = auth_header(world.extra)
     board_url = f"/api/boards/{world.board.board_id}"
@@ -57,15 +89,16 @@ def test_removed_member_is_locked_out_of_every_endpoint(app, client, auth_header
     assert snapshot(app) == before
 
 
-# Feature: kano, Property 13: Role and membership enforcement
+# Feature: kano, Property 13: Role and membership enforcement (member means admin or member)
+# Feature: kano, Property 47: Guest never writes (role by endpoint matrix), database-backed part
 @settings(max_examples=100, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(endpoint_id=st.sampled_from(ENDPOINT_IDS), actor=st.sampled_from(ACTORS), body_ok=st.booleans())
 def test_property_forbidden_requests_get_403_before_validation_and_never_leak(
     app, client, auth_header, make_user, make_board, make_member, make_column, make_card, make_comment,
-    reset_database, endpoint_id, actor, body_ok,
+    persist, reset_database, endpoint_id, actor, body_ok,
 ):
     reset_database()
-    w = build_world(make_user, make_board, make_member, make_column, make_card, make_comment)
+    w = build_world(make_user, make_board, make_member, make_column, make_card, make_comment, persist)
     endpoint = BY_ID[endpoint_id]
     body = "default" if (body_ok or endpoint.bad_body is None) else endpoint.bad_body
     before = snapshot(app)

@@ -27,7 +27,7 @@ def test_board_detail_orders_columns_and_cards(
     assert cards[1]["assignee"] == {"user_id": str(member.user_id), "name": member.name}
     assert set(cards[0]) == {
         "card_id", "board_id", "column_id", "title", "description", "due_date",
-        "labels", "assignee", "order", "created_at", "updated_at",
+        "labels", "assignee", "order", "status", "completed_at", "created_at", "updated_at",
     }
 
 

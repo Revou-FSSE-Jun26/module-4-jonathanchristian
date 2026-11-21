@@ -914,8 +914,8 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Requirements: 3.10, 11.24_
     - _Design: Data Models (optional backfill SQL), Open issue 24_
 
-- [ ] 27. Phase 14 (V6): Backend features and pytest tests
-  - [ ] 27.1 Rewrite PATCH `/api/users/me` (name and password with `current_password`, email fixed)
+- [x] 27. Phase 14 (V6): Backend features and pytest tests
+  - [x] 27.1 Rewrite PATCH `/api/users/me` (name and password with `current_password`, email fixed)
     - `users/schema.py`: `UserUpdateSchema` with `name` (1 to 100), `password` (8 to 128), `current_password` (load only, non-empty), and an explicit `email` field whose validator always raises `email cannot be changed`; `@validates_schema` rejects a body with neither `name` nor `password`, a `current_password` without `password`, and a `password` without `current_password`
     - `users/service.update_me`: verify `current_password` with `check_password_hash` first (400 naming `current_password`, nothing saved, never 403), then set `name`, then `password_hash` through `users/service.hash_password`, one commit; no token invalidation; the log filter keeps dropping `password` and `current_password`
     - Supersedes the V5 behaviour of task 6.1 (email update accepted, password rejected); 6.1 stays as history
@@ -923,7 +923,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A3 (V6 change), A11 row 5_
     - Depends on: 26.1, 25.4
 
-  - [ ] 27.2 Update the users tests for the V6 PATCH contract
+  - [x] 27.2 Update the users tests for the V6 PATCH contract
     - Supersedes the V5 behaviour tested in task 6.2 (email update, 409 duplicate email on PATCH, password field rejected); 6.2 stays as history
     - Cover: name boundaries 0, 1, 100, 101; password boundaries 7, 8, 128, 129 with a correct `current_password`, then a login with the new password and a failing login with the old one; 400 naming `current_password` for a wrong or missing value with the name unchanged even when the body also has a valid name; 400 naming `email` for any `email` value including the current email; empty body 400; GET still 401 for deleted-user and wrong-type tokens; no password, `current_password`, or hash in responses or captured logs
     - Property tests: **Property 54: Profile update never changes the email and needs the current password**; **Property 17: Partial update** (user part: only `name` and `password` are updatable); **Property 9** user part reduced to registration and add-member matching; **Property 43** re-run for both user endpoints
@@ -932,7 +932,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A3, Correctness Properties 9, 17, 43, 54_
     - Depends on: 27.1
 
-  - [ ] 27.3 Add card status to the cards service and schemas
+  - [x] 27.3 Add card status to the cards service and schemas
     - `CardCreateSchema` does not declare `status` (so `unknown = RAISE` returns 400 naming `status`); the service always stores `NOT_STARTED` and null `completed_at` on create
     - `CardUpdateSchema.status` is `fields.String(validate=OneOf(CARD_STATUSES), allow_none=False)`; the update calls `apply_status_change` once inside the same UPDATE and transaction as the other fields; `completed_at` is never accepted from the client
     - `position_service` never reads or writes `status` or `completed_at`, including a move into a Column named `Done`; `CardSchema`, `CardSearchSchema`, and the board detail include `status` and `completed_at`; assignee checks use `assert_assignee_is_writer`
@@ -941,7 +941,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A13, A10, A11 rows 18, 19, 22_
     - Depends on: 25.4, 26.1
 
-  - [ ] 27.4 Update and extend the cards tests for status, assignee, and guests
+  - [x] 27.4 Update and extend the cards tests for status, assignee, and guests
     - Supersedes the V5 tests of tasks 11.3 and 11.5 where they assume that any member can be assignee, that the card fields have no status, or that a partial update changes only the supplied fields; 11.3, 11.4, and 11.5 stay as history
     - Cover: default `NOT_STARTED` and null `completed_at`; 400 for `status` in the create body; 400 for `done`, an empty string, null, and an unknown value on PATCH; `completed_at` rules including `DONE` to `DONE`; `status` and `completed_at` in board detail, search, and My Tasks; a position change (including into a Column named `Done`, any letter case) leaves both unchanged; guest as assignee 400; removed member and non-participant as assignee 400; no Notification row for a user whose only role is `guest`; accepting an invitation creates no Notification
     - Property tests: **Property 44** (stateful PATCH sequences against the database), **Property 45: Status validation and position independence**, **Property 48: Assignee must be admin or member, guests are never notified**, **Property 17** (card part: a status change also moves `completed_at`), **Property 12** (status values)
@@ -950,14 +950,14 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A13, A7 (V6 change), Correctness Properties 12, 17, 44, 45, 48_
     - Depends on: 27.3
 
-  - [ ] 27.5 Rewrite the analytics service for the status rule and guests
+  - [x] 27.5 Rewrite the analytics service for the status rule and guests
     - `analytics/service.py`: completed this week counts non-deleted Cards with `status = 'DONE'` and `completed_at` from `start_of_week_utc(now)` (inclusive) to `now` (inclusive), whatever their Column, with no join to `columns`; cards per Column still count every non-deleted Card; member activity lists only memberships with role `admin` or `member`
     - Supersedes the V5 behaviour of task 13.1 (Column named `Done` and `updated_at`); 13.1 stays as history
     - _Requirements: 14.2, 14.3, 14.4, 14.6, 14.10_
     - _Design: A8 (V6 change), D14_
     - Depends on: 25.1, 26.1
 
-  - [ ] 27.6 Update the analytics tests for the V6 definition
+  - [x] 27.6 Update the analytics tests for the V6 definition
     - Supersedes the V5 tests of task 13.2 (completed through the Column named `Done`); 13.2 stays as history
     - Cover: `DONE` at Monday 00:00:00 UTC counted and one second earlier not; `DONE` in a Column not named `Done` counted; a Column named `Done` with another status not counted; soft-deleted `DONE` not counted; no `DONE` card gives 0; guests excluded from member activity; 403 for member, guest, and non-participant; 404; 401
     - Property test: **Property 46: Analytics equals a naive model (V6 definition)**
@@ -966,7 +966,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A8, Correctness Property 46_
     - Depends on: 27.5
 
-  - [ ] 27.7 Create both invite tokens with the Board and expose the guest role in Board responses
+  - [x] 27.7 Create both invite tokens with the Board and expose the guest role in Board responses
     - `boards/service.create_board` generates both tokens (retrying on a unique collision up to 3 times) and inserts the admin membership in one transaction; any failure rolls back all of them
     - Board detail returns `my_role` `guest` for guests; the members list returns the role `guest`; removing a guest membership follows the member removal rules; Board detail still runs exactly 4 queries
     - Supersedes the V5 behaviour of tasks 8.1 and 8.2 for creation and roles; 8.1 and 8.2 stay as history
@@ -974,7 +974,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A14 (generation), A9, A11 rows 6, 8, 12_
     - Depends on: 25.4, 26.1
 
-  - [ ] 27.8 Implement the invitation links and accept endpoints
+  - [x] 27.8 Implement the invitation links and accept endpoints
     - `invite_schemas.py`: `InviteLinksSchema`, `InviteRoleSchema` (`member` or `guest`), `InviteTokenSchema`, `InviteInfoSchema`, `AcceptResultSchema`
     - `invite_service.py`: lazy creation with `COALESCE` for NULL tokens, regenerate (new token for one role only, old token invalid at once), `find_board_by_token` (format check first, 404 for malformed, unknown, replaced, or soft-deleted Board), `accept.py` accept transaction (`SELECT ... FOR UPDATE`, `resolve_accept`, create, conditional upgrade, `IntegrityError` caught locally and re-read so concurrent accepts end with one active membership)
     - `invite_routes.py` on the boards blueprint: GET `/api/boards/<uuid:id>/invite-links` (admin), POST `/api/boards/<uuid:id>/invite-links/<role>/regenerate` (admin, 200), GET `/api/invites/<token>` (200), POST `/api/invites/<token>/accept` (200 in every case); services never put a token into an exception message
@@ -982,7 +982,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A14, A11 rows 30 to 33, A12-V6_
     - Depends on: 27.7, 25.5
 
-  - [ ] 27.9 Write pytest tests for invitations and accept
+  - [x] 27.9 Write pytest tests for invitations and accept
     - Tokens created with the Board and lazily for a Board with NULL tokens; token format and uniqueness; invite-links and regenerate for the admin and 403 for member, guest, and non-participant; 400 for a bad role; regenerate invalidates the old token (404) and leaves the other role's token and all memberships; accept creates `member` and `guest` memberships; guest upgraded by the member token; no downgrade of member or admin; repeated accept idempotent; accept after a soft-deleted membership creates a new active row and leaves the old row unchanged; 404 for unknown, malformed, and soft-deleted-Board tokens; 401 without a token and with a refresh token; no Notification created; a two-thread concurrent accept ends with one active row; log capture contains no token for 400, 401, 403, 404, and 500 invite requests
     - Property tests: **Property 49: Invite tokens are well formed, unique, and regeneration invalidates**, **Property 51: Accept is idempotent and keeps one active membership**, **Property 57** (integration: captured logs)
     - **Validates: Requirements 37.2 to 37.13, 37.21, 37.23, 28.13**
@@ -990,7 +990,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A14, Correctness Properties 49, 51, 57_
     - Depends on: 27.8
 
-  - [ ] 27.10 Update the board and member tests for roles, tokens, and guests
+  - [x] 27.10 Update the board and member tests for roles, tokens, and guests
     - Supersedes the V5 tests of tasks 8.3 and 8.4; 8.3 and 8.4 stay as history
     - Cover: creation also creates both tokens and the atomic-creation fault injection leaves no Board, membership, or token; detail returns `my_role` `guest` and the same Columns and Cards; members list includes `guest` rows; the admin removes a guest (200) and a guest cannot add or remove (403); a removed guest gets 403 afterwards; assignee cleared on removal; membership uniqueness ignores soft-deleted rows for all three roles
     - Property tests: **Property 14**, **Property 8** (Board creation part including tokens), **Property 9** (membership uniqueness), **Property 18** (removal part)
@@ -999,7 +999,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A4-V6, A14, Correctness Properties 8, 9, 14, 18_
     - Depends on: 27.7
 
-  - [ ] 27.11 Update the role and membership enforcement matrix for the guest role
+  - [x] 27.11 Update the role and membership enforcement matrix for the guest role
     - Supersedes the V5 matrix of task 14.1 (non-member, member, admin only); 14.1 stays as history
     - Parametrize admin, member, guest, and non-participant over every endpoint of the matrix in design A4-V6 (Board, members, Columns, Cards, Comments, analytics, invite-links, regenerate, search): a guest gets 403 on every write endpoint with the data unchanged and the body free of resource data, 200 on the read endpoints; a guest who authored an old Comment still gets 403 on PATCH and DELETE
     - Property tests: **Property 47: Guest never writes (role by endpoint matrix)** (database-backed part), **Property 13: Role and membership enforcement** (updated: member means admin or member)
@@ -1008,14 +1008,14 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A4-V6 (matrix), Correctness Properties 13, 47_
     - Depends on: 27.8, 27.3, 27.5
 
-  - [ ] 27.12 Write database-level V6 schema tests
+  - [x] 27.12 Write database-level V6 schema tests
     - Against the test database after task 26.1: `ck_cards_status` rejects an unknown status, the three-role `ck_board_memberships_role` accepts `guest` and rejects another value, the two token unique constraints allow many NULLs and reject a duplicate token, a `cards` insert without status gets `NOT_STARTED`, and `information_schema` lists exactly the 7 tables
     - A failure message tells the user to review the hand-added check constraints of task 26.1
     - _Requirements: 2.15, 2.16, 2.17, 3.9, 31.16_
     - _Design: Data Models (V6 schema changes and migration), Open issue 24_
     - Depends on: 26.1
 
-  - [ ] 27.13 Update the envelope, status code, and serialization tests for the V6 endpoints
+  - [x] 27.13 Update the envelope, status code, and serialization tests for the V6 endpoints
     - Supersedes the V5 endpoint list of task 14.3 (29 endpoints plus 3a); 14.3 stays as history
     - Parametrize over the 33 endpoint rows of design A11 plus 3a: exactly one top-level key, 201 only for the six creating POSTs (regenerate and accept return 200), 200 elsewhere, each failure type maps to the right status (including 400 for `email` in PATCH `/api/users/me` and for `status` on card create), UUID and timestamp formats, `completed_at` format
     - Property tests: **Property 1: Envelope shape**, **Property 2: Status code by outcome**, **Property 3: Serialization format** (updated)
@@ -1024,7 +1024,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A11, Correctness Properties 1, 2, 3_
     - Depends on: 27.8, 27.1, 27.3
 
-  - [ ] 27.14 Update the soft-delete, hygiene, and log tests for V6
+  - [x] 27.14 Update the soft-delete, hygiene, and log tests for V6
     - Supersedes the V5 coverage of tasks 14.2 and 14.4 where V6 adds behaviour; 14.2 and 14.4 stay as history
     - Cover: soft-deleting a Board makes its invite tokens answer 404 and cascades guest memberships; soft-deleted `DONE` cards are excluded from analytics; log capture contains no `current_password`, password, token, or hash for failing PATCH `/api/users/me` requests; the static scan for SQL built by string formatting also covers the new invite and analytics code
     - Property tests: **Property 6** and **Property 7** re-run with Cards that have a status and Boards that have tokens
@@ -1032,7 +1032,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A5, A12-V6, Correctness Properties 6, 7_
     - Depends on: 27.8
 
-  - [ ] 27.15 Update the performance and query-count tests for V6
+  - [x] 27.15 Update the performance and query-count tests for V6
     - Supersedes the V5 tests of task 14.5; 14.5 stays as history
     - Board detail with 20 Columns and 500 Cards still runs at most 5 queries with the V6 role helper and the extra card fields, and the count is identical for 10 and 500 Cards; p95 under 500 ms for 100 requests; GET invite-links with lazy token creation stays within a fixed query count; search and `assignee=me` stay under 500 ms for 2000 Cards with status
     - Property test: **Property 25: Constant query count for board detail** (re-run)

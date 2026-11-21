@@ -2,9 +2,10 @@
 import uuid
 
 from sqlalchemy import select
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.blueprints.users.schema import User, UserSchema
-from app.errors import Conflict
+from app.errors import BadRequest
 from app.extensions import db, jwt
 from app.soft_delete import active
 
@@ -50,12 +51,22 @@ def email_taken(email, exclude_user_id=None):
     return db.session.execute(query).first() is not None
 
 
-def update_profile(user, data):
-    """Update only the supplied fields; 409 if the email belongs to another active User."""
-    if "email" in data and email_taken(data["email"], exclude_user_id=user.user_id):
-        raise Conflict("Email already registered")
-    for field in ("name", "email"):
-        if field in data:
-            setattr(user, field, data[field])
+def hash_password(password):
+    """Salted adaptive hash, shared by registration and the password change."""
+    return generate_password_hash(password)
+
+
+def update_me(user, data):
+    """Change `name` and/or `password`. The current password is verified before any write.
+
+    A wrong `current_password` is 400 (never 403) and nothing is saved, not even a name sent
+    in the same request. No token is invalidated: tokens are stateless (Requirement 6.15).
+    """
+    if "password" in data and not check_password_hash(user.password_hash, data["current_password"]):
+        raise BadRequest("current_password: does not match")
+    if "name" in data:
+        user.name = data["name"]
+    if "password" in data:
+        user.password_hash = hash_password(data["password"])
     db.session.commit()
     return user_schema.dump(user)

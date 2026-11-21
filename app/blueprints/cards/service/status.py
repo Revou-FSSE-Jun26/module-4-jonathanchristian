@@ -1,12 +1,11 @@
 """Card_Status constants and the pure transition rule (design A13, D14).
 
-This module imports no database code, so the rule is unit and property testable.
+The rule itself touches no database, so it is unit and property testable.
 """
 
-NOT_STARTED = "NOT_STARTED"
-IN_PROGRESS = "IN_PROGRESS"
-DONE = "DONE"
-CARD_STATUSES = (NOT_STARTED, IN_PROGRESS, DONE)  # exact and case-sensitive
+from app.blueprints.cards.schema import CARD_STATUSES  # exact and case-sensitive
+
+NOT_STARTED, IN_PROGRESS, DONE = CARD_STATUSES
 
 
 def apply_status_change(old_status, old_completed_at, new_status, now):

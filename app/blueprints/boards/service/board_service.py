@@ -10,7 +10,7 @@ from app.blueprints.boards.schema import (
     BoardMembership,
     BoardSchema,
 )
-from app.blueprints.boards.service import cascade
+from app.blueprints.boards.service import cascade, invite_service as invites
 from app.blueprints.cards.schema import Card
 from app.blueprints.columns.schema import Column
 from app.extensions import db
@@ -31,8 +31,15 @@ def _new_membership(board, user, role):
 
 
 def create_board(user, data):
-    """Create the Board and the creator's admin membership in one transaction."""
-    board = Board(name=data["name"], created_by=user.user_id)
+    """Create the Board, both Invite_Tokens, and the creator's admin membership in one transaction."""
+    member_token = invites.generate_unique_token(db.session)
+    guest_token = invites.generate_unique_token(db.session, exclude=(member_token,))
+    board = Board(
+        name=data["name"],
+        created_by=user.user_id,
+        member_invite_token=member_token,
+        guest_invite_token=guest_token,
+    )
     db.session.add(board)
     db.session.flush()  # the Board row exists; the membership follows in the same transaction
     db.session.add(_new_membership(board, user, ADMIN))

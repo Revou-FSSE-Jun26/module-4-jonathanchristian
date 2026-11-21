@@ -1,4 +1,4 @@
-"""Endpoint table (design A11, board-scoped rows) and the `world` fixture shared by the
+"""Endpoint table (design A11, board-scoped rows plus the V6 invitation rows) and the `world` fixture shared by the
 cross-cutting tests (loaded as a pytest plugin by conftest)."""
 from dataclasses import dataclass
 from types import SimpleNamespace
@@ -16,7 +16,8 @@ SECRETS = {
     "member": "SecretMemberName",
     "admin": "SecretAdminName",
 }
-MEMBER_AND_ADMIN = frozenset({"member", "admin"})
+READERS = frozenset({"guest", "member", "admin"})  # any role (V6)
+MEMBER_AND_ADMIN = frozenset({"member", "admin"})  # writers; a guest gets 403
 ADMIN_ONLY = frozenset({"admin"})
 OWNER_ONLY = frozenset({"member"})  # the world's comment is written by `member`
 
@@ -44,11 +45,11 @@ def _b(w):
 
 
 ENDPOINTS = [
-    Endpoint("get_board", "GET", lambda w: _b(w), None, MEMBER_AND_ADMIN, 200),
+    Endpoint("get_board", "GET", lambda w: _b(w), None, READERS, 200),
     Endpoint("patch_board", "PATCH", lambda w: _b(w), lambda w: {"name": "Renamed"}, ADMIN_ONLY, 200, {"name": ""}),
     Endpoint("delete_board", "DELETE", lambda w: _b(w), None, ADMIN_ONLY, 200),
     Endpoint("add_member", "POST", lambda w: _b(w) + "/members", lambda w: {"email": w.newbie.email}, ADMIN_ONLY, 201, {"email": "x"}),
-    Endpoint("list_members", "GET", lambda w: _b(w) + "/members", None, MEMBER_AND_ADMIN, 200),
+    Endpoint("list_members", "GET", lambda w: _b(w) + "/members", None, READERS, 200),
     Endpoint("remove_member", "DELETE", lambda w: _b(w) + f"/members/{w.extra.user_id}", None, ADMIN_ONLY, 200),
     Endpoint("create_column", "POST", lambda w: _b(w) + "/columns", lambda w: {"name": "New"}, MEMBER_AND_ADMIN, 201, {"name": ""}),
     Endpoint("rename_column", "PATCH", lambda w: f"/api/columns/{w.column.column_id}", lambda w: {"name": "Renamed"}, MEMBER_AND_ADMIN, 200, {"name": ""}),
@@ -64,12 +65,17 @@ ENDPOINTS = [
         "move_card", "PATCH", lambda w: f"/api/cards/{w.card.card_id}/position",
         lambda w: {"column_id": str(w.column2.column_id), "order": 2.0}, MEMBER_AND_ADMIN, 200, {"order": -1},
     ),
-    Endpoint("search_cards", "GET", lambda w: f"/api/cards?q=Card&board_id={w.board.board_id}", None, MEMBER_AND_ADMIN, 200, has_id=False),
+    Endpoint("search_cards", "GET", lambda w: f"/api/cards?q=Card&board_id={w.board.board_id}", None, READERS, 200, has_id=False),
     Endpoint("create_comment", "POST", lambda w: f"/api/cards/{w.card.card_id}/comments", lambda w: {"content": "Hello"}, MEMBER_AND_ADMIN, 201, {"content": ""}),
-    Endpoint("list_comments", "GET", lambda w: f"/api/cards/{w.card.card_id}/comments", None, MEMBER_AND_ADMIN, 200),
+    Endpoint("list_comments", "GET", lambda w: f"/api/cards/{w.card.card_id}/comments", None, READERS, 200),
     Endpoint("update_comment", "PATCH", lambda w: f"/api/comments/{w.comment.comment_id}", lambda w: {"content": "Edited"}, OWNER_ONLY, 200, {"content": ""}),
     Endpoint("delete_comment", "DELETE", lambda w: f"/api/comments/{w.comment.comment_id}", None, OWNER_ONLY, 200),
     Endpoint("get_analytics", "GET", lambda w: _b(w) + "/analytics", None, ADMIN_ONLY, 200),
+    Endpoint("get_invite_links", "GET", lambda w: _b(w) + "/invite-links", None, ADMIN_ONLY, 200),
+    Endpoint(
+        "regenerate_invite_link", "POST", lambda w: _b(w) + "/invite-links/member/regenerate",
+        None, ADMIN_ONLY, 200,
+    ),
 ]
 ENDPOINT_IDS = [endpoint.id for endpoint in ENDPOINTS]
 
@@ -97,28 +103,41 @@ def snapshot(app):
         }
 
 
-def build_world(make_user, make_board, make_member, make_column, make_card, make_comment):
-    """One Board with an admin, a member (who wrote the comment), and an outsider."""
+def build_world(make_user, make_board, make_member, make_column, make_card, make_comment, persist=None):
+    """One Board with an admin, a member (who wrote the comment), a guest, and an outsider.
+
+    With `persist`, the Board also gets both Invite_Tokens (`world.member_token`, `world.guest_token`).
+    """
     admin = make_user(name=SECRETS["admin"])
     member = make_user(name=SECRETS["member"])
     board = make_board(admin, name=SECRETS["board"])
     make_member(board, member)
     extra = make_member(board).member
+    guest = make_member(board, role="guest").member
     column = make_column(board, SECRETS["column"])
     column2 = make_column(board, "Other column")
     card = make_card(column, SECRETS["card"])
     comment = make_comment(card, member, SECRETS["comment"])
+    guest_comment = make_comment(card, guest, "Written while the guest could still write")
     outsider = make_user()
+    member_token = guest_token = None
+    if persist is not None:
+        from app.blueprints.boards.service.invite_service import new_invite_token
+
+        board.member_invite_token, board.guest_invite_token = new_invite_token(), new_invite_token()
+        persist(board)
+        member_token, guest_token = board.member_invite_token, board.guest_invite_token
     return SimpleNamespace(
-        admin=admin, member=member, outsider=outsider, newbie=make_user(), extra=extra,
+        admin=admin, member=member, guest=guest, outsider=outsider, newbie=make_user(), extra=extra,
         board=board, column=column, column2=column2, card=card, comment=comment,
-        actors={"nonmember": outsider, "member": member, "admin": admin},
+        guest_comment=guest_comment, member_token=member_token, guest_token=guest_token,
+        actors={"nonmember": outsider, "guest": guest, "member": member, "admin": admin},
     )
 
 
 @pytest.fixture
-def world(make_user, make_board, make_member, make_column, make_card, make_comment):
-    return build_world(make_user, make_board, make_member, make_column, make_card, make_comment)
+def world(make_user, make_board, make_member, make_column, make_card, make_comment, persist):
+    return build_world(make_user, make_board, make_member, make_column, make_card, make_comment, persist)
 
 
 # --- user-level endpoints (design A11 rows 1 to 7, 27, 28, 3a) -------------------------------------
@@ -158,6 +177,17 @@ USER_ENDPOINTS = [
         "member",
     ),
     (Endpoint("list_boards", "GET", lambda w: "/api/boards", None, frozenset(), 200, has_id=False), "member"),
+    (
+        Endpoint("get_invite_info", "GET", lambda w: f"/api/invites/{w.member_token}", None, frozenset(), 200, has_id=False),
+        "member",
+    ),
+    (
+        Endpoint(
+            "accept_invite", "POST", lambda w: f"/api/invites/{w.member_token}/accept", None,
+            frozenset(), 200, has_id=False,
+        ),
+        "member",
+    ),
     (Endpoint("list_notifications", "GET", lambda w: "/api/notifications", None, frozenset(), 200, has_id=False), "member"),
     (
         Endpoint("mark_read", "PATCH", lambda w: f"/api/notifications/{w.note.notification_id}/read", None, frozenset(), 200),
@@ -167,7 +197,7 @@ USER_ENDPOINTS = [
 
 
 def with_auth():
-    """Every endpoint (29 rows plus 3a) as `(endpoint, auth)`; `auth` is none, refresh, member, or admin."""
+    """Every endpoint (33 rows plus 3a) as `(endpoint, auth)`; `auth` is none, refresh, member, or admin."""
     board_level = [(e, "admin" if "admin" in e.allowed else "member") for e in ENDPOINTS]
     return USER_ENDPOINTS + board_level
 

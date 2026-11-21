@@ -4,9 +4,17 @@ Flask REST API for **Kano**, a Trello-like task management app. This folder (`ap
 
 ## What Kano is
 
-Kano lets teams plan work on **boards**. A board has **columns** (for example To Do, Doing, Done), and each column holds **cards** that members can assign, comment on, and drag between columns. Users get **notifications** when a card is assigned to them or commented on, can search cards, see their own tasks across boards, and board admins get simple **analytics**.
+Kano lets teams plan work on **boards**. A board has **columns** (for example To Do, Doing, Done), and each column holds **cards** that members can assign, comment on, and drag between columns. Every card has a **status** (Not started, In progress, Done). Users get **notifications** when a card is assigned to them or commented on, can search cards, see their own tasks across boards, and board admins get simple **analytics**. Admins invite people with **invitation links**, one for members and one for view-only guests.
 
-**Roles are per board.** The user who creates a board is its *admin*: they manage members, can delete the board, and see analytics. Users added by email are *members*: they manage columns, cards, and their own comments.
+**Roles are per board.** There are three:
+
+| Role | How a user gets it | What they can do |
+|---|---|---|
+| `admin` | creates the board | everything: rename or delete the board, add or remove members and guests, read and regenerate the invitation links, see analytics, plus all member actions |
+| `member` | added by email, or accepts the member invitation link | manage columns, cards, and their own comments |
+| `guest` | accepts the guest invitation link | read-only: board detail, members list, comments, card search. Every write answers 403 |
+
+A guest cannot be a card assignee and never receives notifications. The email of an account is fixed after registration; users change only their name and password.
 
 ## Aim of the project
 
@@ -30,19 +38,20 @@ app/
   config.py            Config.from_env(): reads and validates environment variables
   extensions.py        db, migrate, jwt instances
   errors.py            ok()/fail(), ApiError family, error handlers, serializers
-  permissions.py       membership and role checks (404, then 403)
+  permissions.py       role levels (reader, writer, admin) and the membership checks (404, then 403)
   soft_delete.py       SoftDeleteMixin, active(), soft_delete_where()
   ordering.py          FLOAT order formulas
   health.py            GET /api/health
   wsgi.py              entry point for flask run / gunicorn / Vercel
-  blueprints/<feature>/ routes.py, service.py (or service/), schema.py
+  blueprints/<feature>/ routes.py, service.py, schema.py (each may be a package once it nears 300 lines:
+                       boards has routes/, service/, schema/; cards has service/)
                        auth, users, boards, columns, cards, comments, notifications, analytics
   migrations/          Alembic migrations (created and applied by you, never by the agent)
   tests/               pytest suite
   openapi.yaml         API reference for frontend development
 ```
 
-Each feature package follows the same split: `routes.py` parses input and returns `ok(...)`, `service.py` holds the logic and queries, and `schema.py` holds the SQLAlchemy model and Marshmallow schemas.
+Each feature package follows the same split: `routes.py` parses input and returns `ok(...)`, `service.py` holds the logic and queries, and `schema.py` holds the SQLAlchemy model and Marshmallow schemas. The boards package also owns the invitation links (`service/invite_service.py`, `service/accept.py`, `routes/invite_routes.py`); the card status rule is the pure function `apply_status_change` in `cards/service/status.py`.
 
 ## Database schema
 
@@ -65,10 +74,10 @@ users 1 ──< board_memberships >── 1 boards 1 ──< columns 1 ──< c
 | Table | Columns (besides the common ones) | Constraints and indexes |
 |---|---|---|
 | `users` | `user_id`, `name` varchar(100), `email` varchar(254), `password_hash` varchar(255) | email always lowercase (`ck_users_email_lowercase`); unique partial index `uq_users_email_active` on `email` |
-| `boards` | `board_id`, `name` varchar(100), `created_by` → `users` | `fk_boards_users`; index on `created_by` |
-| `board_memberships` | `board_membership_id`, `board_id` → `boards`, `user_id` → `users`, `role` (`admin` or `member`) | `fk_board_memberships_boards`, `fk_board_memberships_users`; role check; unique partial index `uq_board_memberships_board_user_active` on (`board_id`, `user_id`); indexes on `board_id` and `user_id` |
+| `boards` | `board_id`, `name` varchar(100), `created_by` → `users`, `member_invite_token` varchar(128) null, `guest_invite_token` varchar(128) null | `fk_boards_users`; index on `created_by`; unique constraints `uq_boards_member_invite_token` and `uq_boards_guest_invite_token` (many NULLs allowed, so boards from before the invitation feature stay valid) |
+| `board_memberships` | `board_membership_id`, `board_id` → `boards`, `user_id` → `users`, `role` (`admin`, `member`, or `guest`) | `fk_board_memberships_boards`, `fk_board_memberships_users`; role check `ck_board_memberships_role`; unique partial index `uq_board_memberships_board_user_active` on (`board_id`, `user_id`); indexes on `board_id` and `user_id` |
 | `columns` | `column_id`, `board_id` → `boards`, `name` varchar(100), `order` float | `fk_columns_boards`; `order > 0`; index (`board_id`, `order`) |
-| `cards` | `card_id`, `board_id` → `boards` (denormalized from the column, never changes), `column_id` → `columns`, `title` varchar(200), `description` text (max 5000), `due_date` date, `labels` varchar(30)[] (default empty), `assignee_id` → `users` (nullable), `order` float | `fk_cards_boards`, `fk_cards_columns`, `fk_cards_users`; `order > 0`; description length check; indexes (`column_id`, `order`), `board_id`, `assignee_id` |
+| `cards` | `card_id`, `board_id` → `boards` (denormalized from the column, never changes), `column_id` → `columns`, `title` varchar(200), `description` text (max 5000), `due_date` date, `labels` varchar(30)[] (default empty), `assignee_id` → `users` (nullable), `order` float, `status` varchar(20) (default `NOT_STARTED`), `completed_at` timestamptz (nullable) | `fk_cards_boards`, `fk_cards_columns`, `fk_cards_users`; `order > 0`; description length check; `ck_cards_status` (`NOT_STARTED`, `IN_PROGRESS`, or `DONE`); indexes (`column_id`, `order`), `board_id`, `assignee_id` |
 | `comments` | `comment_id`, `card_id` → `cards`, `author_id` → `users`, `content` text (1 to 2000) | `fk_comments_cards`, `fk_comments_users`; length check; index (`card_id`, `created_at`) |
 | `notifications` | `notification_id`, `recipient_id` → `users`, `card_id` → `cards`, `board_id` → `boards`, `type` (`assignment` or `comment`), `message` varchar(255), `is_read` boolean (default false) | `fk_notifications_users`, `fk_notifications_cards`, `fk_notifications_boards`; type check; index (`recipient_id`, `created_at`); partial index on unread rows |
 
@@ -76,7 +85,7 @@ users 1 ──< board_memberships >── 1 boards 1 ──< columns 1 ──< c
 
 | Deleted | Also soft deleted |
 |---|---|
-| Board | its memberships, columns, cards, and comments (notifications are kept) |
+| Board | its memberships (all roles), columns, cards, and comments (notifications are kept); its invitation tokens stop working |
 | Column | its cards and their comments |
 | Card | its comments |
 | Membership | nothing; the member's card assignments on that board are cleared |
@@ -87,10 +96,11 @@ All paths are under `/api`. The full request and response reference, with exampl
 
 **Conventions**
 
-- Success body `{"data": ...}`, failure body `{"error": "<message>"}`. 201 only for the six creating POSTs; every other success is 200 (DELETE returns 200 with an object).
+- Success body `{"data": ...}`, failure body `{"error": "<message>"}`. 201 only for the six creating POSTs (register, create board, add member, create column, create card, create comment); every other success is 200, including login, refresh, regenerate, and accept (DELETE returns 200 with an object).
 - Errors: 400 validation, 401 bad/missing/expired/wrong-type token, 403 not allowed, 404 missing, soft-deleted, or malformed id, 405 wrong method, 409 duplicate, 500 generic `"Internal server error"`.
 - Send `Authorization: Bearer <access_token>`. The refresh token works only on `POST /api/auth/refresh`.
-- Checks run in this order: 401, 404, 403 (non-member, then non-admin or non-owner), then body validation (400).
+- Checks run in this order: 401, 404, 403 (not a participant, then a role below the required level, or not the comment author), then body validation (400).
+- "Who" below: **participant** = any role (admin, member, or guest), **writer** = admin or member (a guest gets 403), **admin** = admin only.
 
 | Method | Path | Who | Purpose |
 |---|---|---|---|
@@ -99,32 +109,44 @@ All paths are under `/api`. The full request and response reference, with exampl
 | POST | `/api/auth/login` | public | Access and refresh tokens plus user |
 | POST | `/api/auth/refresh` | refresh token | New access token |
 | GET | `/api/users/me` | user | Own profile |
-| PATCH | `/api/users/me` | user | Update name and/or email |
-| POST | `/api/boards` | user | Create board, caller becomes admin (201) |
-| GET | `/api/boards` | user | List own boards, newest first |
-| GET | `/api/boards/<id>` | member | Board with columns and cards |
+| PATCH | `/api/users/me` | user | Update `name` and/or `password` (with `current_password`); an `email` field is always 400 |
+| POST | `/api/boards` | user | Create board, caller becomes admin, both invitation tokens are created (201) |
+| GET | `/api/boards` | user | List own boards (with `my_role`), newest first |
+| GET | `/api/boards/<id>` | participant | Board with columns and cards |
 | PATCH | `/api/boards/<id>` | admin | Rename board |
 | DELETE | `/api/boards/<id>` | admin | Soft delete board tree |
-| POST | `/api/boards/<id>/members` | admin | Add member by email (201) |
-| GET | `/api/boards/<id>/members` | member | List members |
-| DELETE | `/api/boards/<id>/members/<user_id>` | admin | Remove member (not yourself) |
-| POST | `/api/boards/<id>/columns` | member | Create column (201) |
-| PATCH | `/api/boards/<id>/columns/reorder` | member | Set a column's order |
-| PATCH | `/api/columns/<id>` | member | Rename column |
-| DELETE | `/api/columns/<id>` | member | Soft delete column, cards, comments |
-| POST | `/api/columns/<id>/cards` | member | Create card (201) |
+| POST | `/api/boards/<id>/members` | admin | Add member by email, role `member` (201) |
+| GET | `/api/boards/<id>/members` | participant | List members with roles |
+| DELETE | `/api/boards/<id>/members/<user_id>` | admin | Remove a member or guest (not yourself) |
+| GET | `/api/boards/<id>/invite-links` | admin | Read the member and guest tokens (created on first use for older boards) |
+| POST | `/api/boards/<id>/invite-links/<role>/regenerate` | admin | Replace the `member` or `guest` token; the old one stops working |
+| GET | `/api/invites/<token>` | user | What the token grants and the caller's current role |
+| POST | `/api/invites/<token>/accept` | user | Join the board (200 in every case, never lowers a role) |
+| POST | `/api/boards/<id>/columns` | writer | Create column (201) |
+| PATCH | `/api/boards/<id>/columns/reorder` | writer | Set a column's order |
+| PATCH | `/api/columns/<id>` | writer | Rename column |
+| DELETE | `/api/columns/<id>` | writer | Soft delete column, cards, comments |
+| POST | `/api/columns/<id>/cards` | writer | Create card, always `NOT_STARTED` (201) |
 | GET | `/api/cards?assignee=me` | user | My Tasks |
-| GET | `/api/cards?q=<text>[&board_id=<id>]` | user | Search cards in own boards |
-| PATCH | `/api/cards/<id>` | member | Partial card update |
-| DELETE | `/api/cards/<id>` | member | Soft delete card and comments |
-| PATCH | `/api/cards/<id>/position` | member | Move card (`column_id`, `order`) |
-| POST | `/api/cards/<id>/comments` | member | Add comment (201) |
-| GET | `/api/cards/<id>/comments` | member | List comments, oldest first |
-| PATCH | `/api/comments/<id>` | comment owner | Edit comment |
-| DELETE | `/api/comments/<id>` | comment owner | Soft delete comment |
+| GET | `/api/cards?q=<text>[&board_id=<id>]` | user | Search cards in boards where the caller has any role |
+| PATCH | `/api/cards/<id>` | writer | Partial card update, including `status` |
+| DELETE | `/api/cards/<id>` | writer | Soft delete card and comments |
+| PATCH | `/api/cards/<id>/position` | writer | Move card (`column_id`, `order`); status is untouched |
+| POST | `/api/cards/<id>/comments` | writer | Add comment (201) |
+| GET | `/api/cards/<id>/comments` | participant | List comments, oldest first |
+| PATCH | `/api/comments/<id>` | comment author | Edit comment (an admin who is not the author, and any guest, get 403) |
+| DELETE | `/api/comments/<id>` | comment author | Soft delete comment |
 | GET | `/api/notifications?page=&per_page=` | user | Own notifications, paginated, with `unread_count` |
 | PATCH | `/api/notifications/<id>/read` | recipient | Mark as read (idempotent) |
 | GET | `/api/boards/<id>/analytics` | admin | Cards per column, completed this week, member activity |
+
+### Card status
+
+A card's `status` is exactly `NOT_STARTED` (default), `IN_PROGRESS`, or `DONE`. It cannot be sent when creating a card (400) and changes only through `PATCH /api/cards/<id>`. The server maintains `completed_at`: it is set to now when the status changes to `DONE`, cleared when it leaves `DONE`, and untouched when the status is unchanged or omitted. Moving a card to another column, even one named `Done`, changes neither field. Analytics counts a card as completed this week when its `status` is `DONE` and `completed_at` is between Monday 00:00 UTC and now, whatever column it is in.
+
+### Invitation links
+
+Each board has a member token and a guest token (256 bits of randomness, URL-safe). The web app builds the link `<origin>/invite/<token>`. The admin reads them with `GET /api/boards/<id>/invite-links` and can replace either one with the regenerate endpoint; a replaced token answers 404 immediately. Tokens do not expire and are not used up by accepting. `POST /api/invites/<token>/accept` creates a membership with the token's role; a guest who uses the member link becomes a member; a member or admin never loses a role; repeating or racing the request leaves exactly one active membership. Unknown, malformed, replaced, and soft-deleted-board tokens all answer 404 without board data. Tokens are removed from request lines in the logs.
 
 ## Setup
 
@@ -172,13 +194,13 @@ The app refuses to start and names every missing or invalid variable (without pr
 
 ### 4. Apply the database migrations
 
-Migrations are created and applied by you; the code never generates them. The initial migration is already in `migrations/`. With the virtual environment active, from `app/`:
+Migrations are created and applied by you; the code never generates them. `migrations/versions/` holds the initial schema and the "v6 schema update" (card `status` and `completed_at`, the two invitation token columns, the `guest` role, and the check constraints `ck_cards_status` and `ck_board_memberships_role`; Alembic does not detect check constraints, so those were added to the script by hand). With the virtual environment active, from `app/`:
 
 ```powershell
 flask db upgrade
 ```
 
-Then apply the same schema to the test database by running `flask db upgrade` once with `DATABASE_URL` pointed at `kano_test` (for example in a temporary shell: `$env:DATABASE_URL = "<the kano_test URL>"; flask db upgrade`). Check that the 7 tables exist in both databases. If you change a model, create a new migration yourself with `flask db migrate -m "message"`, review it, and upgrade both databases.
+Then apply the same schema to the test database by running `flask db upgrade` once with `DATABASE_URL` pointed at `kano_test` (for example in a temporary shell: `$env:DATABASE_URL = "<the kano_test URL>"; flask db upgrade`). Check that the 7 tables exist in both databases and that both are at the latest revision (`flask db current`); the test suite fails with `UndefinedColumn` errors otherwise. If you change a model, create a new migration yourself with `flask db migrate -m "message"`, review it, and upgrade both databases.
 
 ### 5. Run the API
 
