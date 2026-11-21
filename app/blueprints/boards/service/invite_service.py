@@ -65,7 +65,9 @@ def generate_unique_token(session, exclude=()):
 
 def _read_tokens(board_id):
     return db.session.execute(
-        select(Board.member_invite_token, Board.guest_invite_token).where(Board.board_id == board_id)
+        select(Board.member_invite_token, Board.guest_invite_token).where(
+            Board.board_id == board_id, active(Board)
+        )
     ).one()
 
 
@@ -82,7 +84,7 @@ def get_invite_links(user, board_id):
         fresh_guest = generate_unique_token(db.session, exclude=(fresh_member,))
         db.session.execute(
             update(Board)
-            .where(Board.board_id == board_id)
+            .where(Board.board_id == board_id, active(Board))
             .values(
                 member_invite_token=db.func.coalesce(Board.member_invite_token, fresh_member),
                 guest_invite_token=db.func.coalesce(Board.guest_invite_token, fresh_guest),

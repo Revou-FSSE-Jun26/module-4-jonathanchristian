@@ -6,8 +6,7 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from helpers import assert_envelope
-from test_hygiene import APP_DIR, _is_dynamic_sql, _source_files
+from helpers import APP_DIR, assert_envelope, is_dynamic_sql, source_files
 
 pytestmark = pytest.mark.e2e
 
@@ -119,7 +118,7 @@ def test_an_unexpected_failure_while_changing_the_password_logs_no_secret(client
 
 
 def test_the_sql_scan_covers_the_invite_and_analytics_code():
-    scanned = {path.relative_to(APP_DIR).as_posix() for path in _source_files()}
+    scanned = {path.relative_to(APP_DIR).as_posix() for path in source_files()}
     for name in (
         "blueprints/boards/service/invite_service.py",
         "blueprints/boards/service/accept.py",
@@ -139,7 +138,7 @@ def test_no_v6_module_builds_sql_from_strings():
                 func = node.func
                 called = func.id if isinstance(func, ast.Name) else getattr(func, "attr", "")
                 if called in ("text", "execute", "exec_driver_sql"):
-                    assert not _is_dynamic_sql(node.args[0]), (name, node.lineno)
+                    assert not is_dynamic_sql(node.args[0]), (name, node.lineno)
 
 
 # --- properties ---------------------------------------------------------------------------------------------------

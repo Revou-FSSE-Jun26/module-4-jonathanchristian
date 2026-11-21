@@ -2,16 +2,14 @@
 import ast
 import logging
 import os
-from pathlib import Path
 
 import pytest
 from sqlalchemy.exc import OperationalError, ProgrammingError
 
-from helpers import assert_envelope
+from helpers import APP_DIR, assert_envelope, is_dynamic_sql, source_files
 
 pytestmark = pytest.mark.e2e
 
-APP_DIR = Path(__file__).resolve().parents[1]
 DANGEROUS = [
     "'; DROP TABLE users; --",
     '" OR 1=1 --',
@@ -119,42 +117,20 @@ def test_sql_metacharacters_in_names_are_stored_and_returned_literally(client, m
 # --- static check -----------------------------------------------------------------------------------------------
 
 
-def _source_files():
-    for path in APP_DIR.rglob("*.py"):
-        relative = path.relative_to(APP_DIR).parts
-        if relative[0] in ("venv", "migrations", "__pycache__") or ".venv" in relative:
-            continue
-        yield path
-
-
-def _is_dynamic_sql(node):
-    """True for an f-string, `%` or `+` formatting, or `.format(...)` used as SQL text."""
-    if isinstance(node, ast.JoinedStr):
-        return True
-    if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Mod, ast.Add)):
-        return any(isinstance(side, (ast.Constant, ast.JoinedStr)) for side in (node.left, node.right))
-    return (
-        isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Attribute)
-        and node.func.attr == "format"
-        and isinstance(node.func.value, ast.Constant)
-    )
-
-
 def test_no_sql_is_built_by_string_formatting():
     offenders = []
-    for path in _source_files():
+    for path in source_files():
         for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
             if not isinstance(node, ast.Call) or not node.args:
                 continue
             func = node.func
             name = func.id if isinstance(func, ast.Name) else getattr(func, "attr", "")
-            if name in ("text", "execute", "exec_driver_sql") and _is_dynamic_sql(node.args[0]):
+            if name in ("text", "execute", "exec_driver_sql") and is_dynamic_sql(node.args[0]):
                 offenders.append(f"{path.relative_to(APP_DIR)}:{node.lineno}")
     assert offenders == []
 
 
 def test_static_check_detects_a_formatted_query():
     sample = ast.parse('db.session.execute(f"SELECT {x}")\ntext("a" % b)\ntext("a".format(b))\ntext("fine")')
-    flagged = [_is_dynamic_sql(call.args[0]) for call in ast.walk(sample) if isinstance(call, ast.Call) and call.args]
+    flagged = [is_dynamic_sql(call.args[0]) for call in ast.walk(sample) if isinstance(call, ast.Call) and call.args]
     assert flagged.count(True) == 3 and os.path.exists(APP_DIR)

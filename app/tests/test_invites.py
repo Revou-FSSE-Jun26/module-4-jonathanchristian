@@ -204,3 +204,20 @@ def test_invite_endpoints_need_an_access_token(client, make_board, make_user, re
         assert_envelope(method(f"/api/invites/{token}{suffix}"), 401)
         assert_envelope(method(f"/api/invites/{token}{suffix}", headers=refresh_header(user)), 401)
         assert_envelope(method(f"/api/invites/{token}{suffix}", headers={"Authorization": "Bearer junk"}), 401)
+
+
+def test_token_reads_and_lazy_creation_never_touch_a_soft_deleted_board(app, client, make_board, auth_header, fetch):
+    from sqlalchemy.exc import NoResultFound
+
+    from app.blueprints.boards.service import invite_service
+
+    board = make_board()  # NULL tokens, so lazy creation would otherwise write to the row
+    assert_envelope(client.delete(f"/api/boards/{board.board_id}", headers=auth_header(board.owner)), 200)
+    with app.app_context():
+        with pytest.raises(NoResultFound):
+            invite_service._read_tokens(board.board_id)
+    row = board_row(fetch, board)
+    assert row.is_deleted and row.member_invite_token is None and row.guest_invite_token is None
+    assert_envelope(client.get(links_url(board), headers=auth_header(board.owner)), 404)
+    row = board_row(fetch, board)
+    assert row.member_invite_token is None and row.guest_invite_token is None

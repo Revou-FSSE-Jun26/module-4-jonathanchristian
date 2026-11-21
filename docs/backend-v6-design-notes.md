@@ -35,14 +35,13 @@ Notes from implementing tasks 25 to 28 (card status, guest role, invitation link
 
 - **Property tests with cheap hashing.** `test_users_properties.py` patches `users.service.hash_password` with a fast pbkdf2 (`fast_hash` fixture) to keep 100 examples quick. The rule under test (current password needed, email fixed) is unaffected, but those properties do not exercise the real scrypt cost. Separate example tests use the real hash.
 - **Log assertions use `caplog`, not a real server.** Flask's test client does not emit werkzeug request lines, so `test_invites_accept.py` and `test_v6_deletes_and_logs.py` log a werkzeug-style line themselves and check it is redacted. That proves the filter is installed on the `werkzeug` logger, not what a live `flask run` prints.
-- **Duplicated helpers.** `links_url`, `regen_url`, `active_memberships`, and the `tokens` fixture exist in `test_invites.py` and `test_invites_accept.py`; a `members_url` helper is defined in both `test_members.py` and `test_boards_roles.py`. They were duplicated to stay under 300 lines per file. A shared module would be cleaner.
+- **Duplicated helpers.** `links_url`, `regen_url`, `active_memberships`, and the `tokens` fixture exist in `test_invites.py` and `test_invites_accept.py`; a `members_url` helper is defined in both `test_members.py` and `test_boards_roles.py`. (The cross-module import of private scan helpers was removed; they are in `tests/helpers.py` now.) They were duplicated to stay under 300 lines per file. A shared module would be cleaner.
 - **Time-dependent tests.** The analytics week-boundary tests compute Monday 00:00 UTC at run time; a run that straddles that instant could flake. Not seen in any run.
 - **Runtime.** The full suite takes about 11 minutes, mostly the Hypothesis database tests. `pytest -m "not perf"` and `pytest -m unit` remain the quick options.
 
 ## 5. Suggested follow-ups
 
-1. Add `active(Board)` to `_read_tokens` and the lazy `UPDATE` (violation report, G-DB-05).
-2. Move `_source_files` and `_is_dynamic_sql` to `tests/helpers.py`.
-3. Decide whether the G-BE-09 and G-BE-08 exceptions should become guideline text (a `permissions.get_membership_for_update` helper and a `load_path` helper).
-4. Reword G-DB-12 to allow owner-requested migration edits.
-5. Consider catching `IntegrityError` on token writes and retrying, if invitation traffic ever grows.
+1. ~~Add `active(Board)` to `_read_tokens` and the lazy `UPDATE`~~ (done) and ~~move the scan helpers to `tests/helpers.py`~~ (done); see the violation report.
+2. Decide whether the G-BE-09 and G-BE-08 exceptions should become guideline text (a `permissions.get_membership_for_update` helper and a `load_path` helper).
+3. Reword G-DB-12 to allow owner-requested migration edits.
+4. Consider catching `IntegrityError` on token writes and retrying, if invitation traffic ever grows.

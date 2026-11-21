@@ -1,5 +1,10 @@
-"""Shared test helpers: envelope assertions and a SQL statement counter."""
+"""Shared test helpers: envelope assertions, a SQL statement counter, and the source scan."""
+import ast
+from pathlib import Path
+
 from sqlalchemy import event
+
+APP_DIR = Path(__file__).resolve().parents[1]
 
 
 def assert_envelope(response, status):
@@ -36,3 +41,25 @@ class QueryCounter:
     @property
     def count(self):
         return len(self.statements)
+
+
+def source_files():
+    for path in APP_DIR.rglob("*.py"):
+        relative = path.relative_to(APP_DIR).parts
+        if relative[0] in ("venv", "migrations", "__pycache__") or ".venv" in relative:
+            continue
+        yield path
+
+
+def is_dynamic_sql(node):
+    """True for an f-string, `%` or `+` formatting, or `.format(...)` used as SQL text."""
+    if isinstance(node, ast.JoinedStr):
+        return True
+    if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Mod, ast.Add)):
+        return any(isinstance(side, (ast.Constant, ast.JoinedStr)) for side in (node.left, node.right))
+    return (
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "format"
+        and isinstance(node.func.value, ast.Constant)
+    )
