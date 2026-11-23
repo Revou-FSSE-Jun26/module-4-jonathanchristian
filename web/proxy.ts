@@ -2,9 +2,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import {
   ACCESS_COOKIE,
   REFRESH_COOKIE,
+  WELCOME_COOKIE,
+  WELCOME_COOKIE_MAX_AGE,
   decodeJwtExp,
-  guardDecision,
 } from "@/lib/authCookie";
+import { decideRoute, type AuthState } from "@/lib/decideRoute";
 import type { RefreshResult } from "@/lib/types";
 
 // Next.js 16.4.6 replaced the `middleware.ts` convention with `proxy.ts` (`export function proxy`).
@@ -15,8 +17,42 @@ function deleteAuthCookies(response: NextResponse): NextResponse {
   return response;
 }
 
+function applyWelcomeCookie(
+  response: NextResponse,
+  shouldSet: boolean | undefined,
+  isHttps: boolean
+): NextResponse {
+  if (shouldSet) {
+    response.cookies.set(WELCOME_COOKIE, "1", {
+      path: "/",
+      sameSite: "lax",
+      httpOnly: false,
+      maxAge: WELCOME_COOKIE_MAX_AGE,
+      secure: isHttps,
+    });
+  }
+  return response;
+}
+
+function computeAuthState(
+  accessToken: string | null,
+  refreshToken: string | null,
+  now: number
+): AuthState {
+  const accessExp = decodeJwtExp(accessToken);
+  if (accessExp !== null && accessExp > now) {
+    return "authenticated";
+  }
+  const refreshExp = decodeJwtExp(refreshToken);
+  if (refreshExp !== null && refreshExp > now) {
+    return "refreshable";
+  }
+  return "unauthenticated";
+}
+
 export async function proxy(request: NextRequest): Promise<NextResponse> {
-  const { pathname, searchParams } = request.nextUrl;
+  const { pathname, searchParams, protocol } = request.nextUrl;
+  const isHttps = protocol === "https:";
 
   if (pathname === "/login" && searchParams.get("expired") === "1") {
     return deleteAuthCookies(NextResponse.next());
@@ -24,28 +60,25 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
   const accessToken = request.cookies.get(ACCESS_COOKIE)?.value ?? null;
   const refreshToken = request.cookies.get(REFRESH_COOKIE)?.value ?? null;
+  const welcomeSeen = request.cookies.get(WELCOME_COOKIE)?.value === "1";
   const now = Math.floor(Date.now() / 1000);
 
-  const decision = guardDecision({
-    pathname,
-    accessExp: decodeJwtExp(accessToken),
-    refreshExp: decodeJwtExp(refreshToken),
-    now,
-  });
+  const auth = computeAuthState(accessToken, refreshToken, now);
+  const decision = decideRoute({ pathname, auth, welcomeSeen });
 
-  if (decision === "allow") {
-    return NextResponse.next();
+  if (decision.kind === "continue") {
+    return applyWelcomeCookie(NextResponse.next(), decision.setWelcomeCookie, isHttps);
   }
 
-  if (decision === "redirect-home") {
-    return NextResponse.redirect(new URL("/", request.url));
+  if (decision.kind === "redirect") {
+    return applyWelcomeCookie(
+      NextResponse.redirect(new URL(decision.to, request.url)),
+      decision.setWelcomeCookie,
+      isHttps
+    );
   }
 
-  if (decision === "redirect-login") {
-    return NextResponse.redirect(new URL("/login", request.url));
-  }
-
-  // decision === "refresh"
+  // decision.kind === "refresh-then-continue"
   const rawBaseUrl = process.env.API_BASE_URL?.trim();
   if (!rawBaseUrl || !refreshToken) {
     return deleteAuthCookies(NextResponse.redirect(new URL("/login?expired=1", request.url)));
@@ -61,7 +94,14 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     });
 
     if (res.status === 401) {
-      return deleteAuthCookies(NextResponse.redirect(new URL("/login", request.url)));
+      const fallback = decideRoute({ pathname, auth: "unauthenticated", welcomeSeen });
+      const target = fallback.kind === "redirect" ? fallback.to : "/login";
+      const response = deleteAuthCookies(NextResponse.redirect(new URL(target, request.url)));
+      return applyWelcomeCookie(
+        response,
+        fallback.kind === "redirect" ? fallback.setWelcomeCookie : undefined,
+        isHttps
+      );
     }
 
     if (!res.ok) {
@@ -86,7 +126,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
       sameSite: "lax",
       httpOnly: false,
       maxAge: Math.max(0, Math.floor(expiresIn)),
-      secure: request.nextUrl.protocol === "https:",
+      secure: isHttps,
     });
     return response;
   } catch {

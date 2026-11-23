@@ -1,9 +1,15 @@
 import { LoginForm } from "@/components/auth/LoginForm";
+import { safeNext } from "@/lib/nextParam";
 
-export default function LoginPage() {
+export interface LoginPageProps {
+  searchParams?: Promise<{ next?: string }>;
+}
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const sp = searchParams ? await searchParams : {};
   return (
     <div className="px-4 py-12">
-      <LoginForm />
+      <LoginForm next={safeNext(sp.next)} />
     </div>
   );
 }
