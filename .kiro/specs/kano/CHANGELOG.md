@@ -280,3 +280,103 @@ ew_password, member_invite_token, guest_invite_token.
 - Requirements 35.1, 35.2, 35.7, 1.14, 15.5: behaviour unchanged.
 - Design: Testing Strategy V6 additions (Files), with a V7 note.
 - Tasks: 33.1 and 33.2 done. Task 23.7 still includes the `git check-ignore` check. Tasks 33.3 to 33.5 are not affected.
+
+## V8 - 2026-11-23
+Source: `improvements/improvements2.md` (frontend only, no backend change). Only `requirements.md` is changed in this step (now V8). `design.md` and `tasks.md` stay at V7 and will be updated to V8 in the following steps. The HTML example files in `improvements/` were used only as visual and content direction and are not referenced by any specification or documentation file.
+
+### Changes
+Classification: all items below are **specification changes, frontend only**. No design change, implementation change, bug fix, or breaking change is made in this step. No API, model, migration, or backend test changes.
+
+1. **Header logo link (new Requirement 18 criteria 14 and 15, new Requirement 17 criterion 14).** The Kano logo and wordmark in the Header is one link. An unauthenticated visitor goes to `/welcome` regardless of the Welcome_Cookie, an authenticated User goes to `/` (Dashboard), and the link never targets `/login`. "Authenticated" for the Header means the AuthContext holds a User or an access or refresh cookie is present, and the target is recomputed when that state changes. `decideRoute` and the middleware are unchanged.
+2. **Welcome page content and layout (Requirement 38 criteria 1, 2, 10 amended; criteria 15 to 21 appended; Requirement 27 criterion 10 appended).** The page now has a Header with Log in and Register, a hero (eyebrow, headline, subheadline, "Get started"), a decorative board preview, a features section with four cards, a bottom call to action ("Create account" and "Log in"), and the Footer. Exact texts and targets are fixed in criterion 16. The visual rules follow `guidelines/design-system.md` (Inter 400/500/600, tokens only, flat, 1 px line borders, one primary button per region).
+3. **Claims removed.** The visual examples contained statements that are not true for Kano. Criterion 19 forbids them with a string list: usage numbers, uptime, latency, ratings, testimonial and customer name, "free", "credit card", "60 seconds", "real-time", websockets, "fuzzy" search, "threaded" discussions, checklists and subtasks, and ticket ids such as "KAN-". Replacements are true statements (drag and drop by mouse and touch, labels, due dates, card status, comments, notifications, My Tasks, card search, member and guest invitation links, board analytics) in criteria 16 and 17. The board preview (criterion 18) is allowed as a decorative illustration with sample data, with `aria-hidden="true"`, no focusable elements, and no text that claims real usage.
+4. **Board toolbar separator (Requirement 21 criteria 24 to 28 appended; Requirement 27 criterion 10).** One horizontal separator, 1 px in the `line` color, between the board toolbar (title, role badge, search, action controls) and the Kanban columns area, for admin, member, and guest views, from 375 px to 1920 px, with no overlap and no horizontal page overflow, and never a second line.
+5. **Tests (Requirement 32 criteria 20 to 22 appended; Requirement 33 criteria 13 amended, 15 and 16 appended).** Unit tests for the logo target, the welcome page sections and forbidden strings, and the board separator. E2E tests for the logo from `/login` and `/register` (anonymous) and from a board page (logged in), and for 375 px and 1920 px layout checks.
+6. **Documentation (Requirement 36 criterion 14 appended).** The README and the spec documents must not mention, link, or embed the example HTML files and describe the look in words only.
+
+#### Before / After
+- R38.1 before: "THE Kano_Web SHALL provide a public page `/welcome` rendered as a Server Component that sends no request to the Kano_API and shows what Kano is (1 to 5 sentences) and what a User can do with it, listing at least these items: boards, columns, drag and drop of cards, comments, notifications, My Tasks, invitation of members and guests by link or email, and board analytics."
+- R38.1 after: "... presents Kano and what a User can do with it in the sections, order, texts, and visual rules defined in criteria 15 to 21 ..." The former capability list is now carried by criteria 16 and 17 (the page text names boards, columns, drag and drop by mouse and touch, labels, due dates, card status, comments, notifications, My Tasks, card search, member and guest invitation links with read-only guest access, and board analytics). "Invitation by email" is no longer a required page item because it is not shown as a feature card; no behavior changes.
+- R38.2 before: "THE Welcome_Page SHALL render exactly one Header and one Footer (Requirement 18 criterion 13) and SHALL provide a "Log in" BaseButton that navigates to `/login` and a "Create account" BaseButton that navigates to `/register`."
+- R38.2 after: "... exactly one Header and one Footer ... and SHALL provide the five navigation actions of criterion 16: "Log in" and "Register" in the Header, "Get started" in the hero section, and "Create account" and "Log in" in the bottom call-to-action section, each rendered through BaseButton ..."
+- R38.10 before: "... or selects the "Log in" or "Create account" BaseButton on the Welcome_Page, THE Kano_Web SHALL set the Welcome_Cookie, ..."
+- R38.10 after: "... or selects any of the five navigation actions of criterion 16 on the Welcome_Page (the Header "Log in" or "Register", "Get started", or the bottom "Create account" or "Log in"), THE Kano_Web SHALL set the Welcome_Cookie, ..." The logo link does not set the cookie (R18.14).
+- R33.13 before: "... that the page shows the "Log in" and "Create account" buttons, that the "Log in" button leads to `/login` and sets the `kano_welcome_seen` cookie, that the "Create account" button leads to `/register`, and that a second visit to `/` then redirects to `/login`."
+- R33.13 after: "... that the page shows the Header "Log in" and "Register" links, the hero "Get started" button, and the bottom "Create account" and "Log in" buttons (each located within its own section), that the Header "Log in" link leads to `/login` and sets the `kano_welcome_seen` cookie, that the bottom "Create account" button leads to `/register`, and that a second visit to `/` then redirects to `/login`." (Labels are scoped per section because "Log in" now appears twice.)
+- R18.13 before and after: unchanged ("exactly one Header and one Footer"). New R18.14 and R18.15 add the logo link (no Before text).
+- R17.8, R17.9, R38.5 to R38.9, R38.11 to R38.13: unchanged. New R17.14 states that the logo link does not change `decideRoute`.
+- Requirement 27 criterion 9 before and after: unchanged (Join, Log in, and Create account tap targets). New criterion 10 adds the other Welcome_Page controls and the board toolbar.
+- New criteria without Before text: R17.14, R18.14, R18.15, R21.24 to R21.28, R27.10, R32.20 to R32.22, R33.15, R33.16, R36.14, R38.15 to R38.21.
+- Version marker before: "V7 (no requirement change from V6)". After: "V8 (frontend-only changes to the Header logo, the Welcome_Page, and the board toolbar; V7 had no requirement change from V6)".
+
+#### Consistency check (requirements only)
+- R18.13 versus R38.2 and R38.15: consistent, the Welcome_Page uses the shared Header and Footer once each.
+- R17.8 and R17.9 versus the logo link: consistent. An anonymous visitor reaches `/welcome` without a redirect (R38.9), an authenticated User or a visitor with a valid refresh cookie is redirected from `/welcome` to `/` (R17.9, R38.8), and `/` for an anonymous visitor with the Welcome_Cookie still redirects to `/login` (R38.6). No path sends an anonymous logo click to `/login`.
+- R33.13 and R33.3 versus the new labels: R33.13 amended; R33.3 needed no change.
+- R32.19 (decideRoute properties for R38.5 to R38.11) and R38.14: unchanged and still correct.
+- R27.9 versus the new buttons: extended through R27.10 and R38.21. The reference examples used 32 px controls, which conflict with R27.6, so 44 px applies.
+- Design system conflict: the reference examples used a 40 px headline, bold weight, and an extra radius, which the design system does not define. R38.20 uses the design-system roles, weights, and radii.
+- One primary button per region (design-system rule 3) versus the Header "Register" and the hero "Get started": resolved by treating the Header, the hero, and the bottom section as separate regions (R38.20).
+
+### Reason
+- improvements2: the Header logo sent an unauthenticated visitor to the login page instead of the Welcome page, the Welcome page needed the refined desktop and mobile look, and the board page needed a clear line between the toolbar and the board content.
+
+### Impact
+- **Requirements:** 17 (criterion 14), 18 (criteria 14, 15), 21 (criteria 24 to 28), 27 (criterion 10), 32 (criteria 20 to 22), 33 (criterion 13 amended; 15, 16), 36 (criterion 14), 38 (criteria 1, 2, 10 amended; 15 to 21). Version marker V8.
+- **Design and tasks (to be updated in the next steps):** `design.md` needs the Header logo target logic (B3 and B4-V6), the Welcome page structure and copy, the decorative preview, the toolbar separator in the board page (B6-V6), the testing strategy, and the traceability rows for 17, 18, 21, 27, 32, 33, 36, and 38. `tasks.md` needs new frontend and test tasks, and the pending task 33.3 (manual browser verification) and Playwright tasks need the new scenarios.
+- **Implementation:** none in this step. The Welcome page, the Header, and the board page code change in a later step.
+- **No backend change:** no API, model, migration, or backend test is affected.
+- **Open points for the user:** the exact copy in Requirement 38 criteria 16 and 17 is a proposal and can be reworded; the forbidden string list in criterion 19 includes the whole word "free", so any price statement is excluded.
+
+#### Design edits (step 2: `design.md` V7 to V8, classification: design changes, frontend only; no implementation change)
+No V1 to V7 text was deleted. Where V8 supersedes earlier text, the old text stays and a "V8 change" note names the replacement.
+- Version marker set to V8 with a V8 change summary and section index.
+- New decisions D16 (`logoTarget` and `isVisitorAuthenticated`, `decideRoute` and `proxy.ts` unchanged) and D17 (Welcome_Page component split, one copy module `lib/welcomeContent.ts`, `findForbiddenClaims`, one separator element in the board page).
+- New sections B12 (Header logo link), B13 (Welcome_Page files, copy, decorative preview, design-system and Tailwind approach, layout by width), B14 (`BoardToolbar` extraction and the single `hr` separator in `BoardView`). V8 notes added to B2 (`/welcome` row), B3 (Header), and B4-V6.
+- New Correctness Properties 59 (logo target) and 60 (forbidden-claims scan).
+- Testing Strategy: V8 additions (Requirements 32.20 to 32.22, 33.13, 33.15, 33.16). Traceability: V8 amendments table. New open issues 33 to 38.
+- Inconsistencies found between requirements V8 and the design: R38.2 versus R38.16 (BaseButton or link for the Header actions), R21.24 (add-column control in the toolbar versus its real place in the Kanban row), R38.20 versus design-system 4.6 (shadow on a dragged card), R38.19 (substring versus whole-word matching), R38.18 versus R38.21 (no focusable element versus a scrolling preview). Recommendations are in design open issues 34 to 38. No requirement text was changed in this step.
+
+#### Refinements after consistency check (V8, no version bump)
+Classification: specification refinements, frontend only. Only `requirements.md` and this file changed. No numbering changed. `design.md` and `tasks.md` still need the same refinements (see "Remaining").
+
+1. **R38.2 (links versus buttons).**
+   - Before: "... the five navigation actions of criterion 16: "Log in" and "Register" in the Header, "Get started" in the hero section, and "Create account" and "Log in" in the bottom call-to-action section, each rendered through BaseButton ..."
+   - After: Header "Log in" and "Register" are rendered as links (anchor elements); "Get started", bottom "Create account", and bottom "Log in" are rendered through BaseButton; all five navigate as in criterion 16.
+   - R38.16, R33.13, and R27.10 already say "link" for the Header and "button" elsewhere and were left unchanged. R32.21 now asserts that the Header items are anchors and not BaseButton, and that the others are BaseButton.
+2. **R21.24 (add-column control).**
+   - Before: "... the action controls available to the current role (member management, analytics link, and the add-column control where present) in one board toolbar ..."
+   - After: "... (member management and the analytics link) in one board toolbar ... THE add-column control SHALL NOT be part of the board toolbar and SHALL stay at the end of the row of Columns inside the Kanban columns area."
+   - R21.25 to R21.28, R21.20, R27.10, R32.22, and R33.16 were checked and need no change.
+3. **R38.20 (shadow).**
+   - Before: "flat surfaces with 1 px `line` borders and no gradient, drop shadow, blur, or glass effect"
+   - After: "... no gradient, blur, or glass effect, and no drop shadow except the design-system overlay shadow (`shadow-overlay`), which only the one dragged Card of the board preview (criterion 18) MAY carry". R32.21 gained "only the dragged preview Card carries a shadow".
+4. **R38.19 (matching rule).**
+   - Before: the list ended with "... because none of these statements is true for Kano."
+   - After: adds that matching is case-insensitive substring matching for every listed string except "free" (whole word), that unrelated words containing a forbidden string (for example "operating", "integrating", "generating" contain "rating") are also violations, and that the copy must avoid them. The copy of criteria 16 and 17 was checked by hand and contains no such word.
+5. **R38.18 and R38.21 (preview scroller).**
+   - Before: "`aria-hidden="true"` on its container, SHALL contain no link, button, or other focusable element" (R38.18) and "inside a container that scrolls horizontally" (R38.21).
+   - After: `aria-hidden="true"` is on the container of the preview content, which has no focusable element; the horizontal scroller lies outside that container and has `tabindex="-1"` so it is not a tab stop. R38.21 refers to "the horizontal scroller of criterion 18". R32.21 asserts the same.
+6. **R18.15, R17.14, R32.20 (one authentication check).**
+   - Before (R18.15): "THE Header SHALL treat the visitor as authenticated WHILE the AuthContext holds a User or the access cookie or the refresh cookie is present, and as unauthenticated otherwise, and SHALL recompute the link target ..."
+   - After (R18.15): one shared check, used by the logo target and by every authentication-dependent part of the Header navigation, returns authenticated only WHILE the AuthContext status is `authenticated` (a User is held), and unauthenticated in every other status (session restoration in progress, failed restoration, logout). It does not read cookies. The target and navigation are recomputed on every status change, including to `/` when restoration succeeds.
+   - R17.14 after: adds that the logo takes its state only from this check and not from `decideRoute` inputs, so a visitor with a valid refresh cookie may see `/welcome` during restoration and the middleware then redirects to `/` (R17.9).
+   - R32.20 before: "a visitor with only a refresh cookie gets the target `/`". After: that visitor gets `/welcome` while the status is not `authenticated` and `/` once restoration succeeds; logo and navigation always match.
+
+##### Reason
+- The user decided the five points of the consistency check (R38.2 versus R38.16, R21.24, the preview shadow, the forbidden-string matching, the preview scroller) and asked for a single authentication rule for the logo and the navigation.
+
+##### Impact
+- Requirements: 17 (14), 18 (15), 21 (24), 32 (20, 21), 38 (2, 18, 19, 20, 21).
+- Design (not yet updated): B12 (Header logo, `isVisitorAuthenticated` must use AuthContext status only and no cookies), B13 (Welcome preview scroller, shadow), B14 (add-column outside `BoardToolbar`), Property 59 (refresh-cookie case), design open issues 34 to 38 (resolved by these decisions).
+- Tasks (not yet updated): Header logo tasks and tests, Welcome page tasks (scroller, shadow, anchors for Header actions), board toolbar tasks, the forbidden-claims scanner (case-insensitive substring, "free" whole word).
+
+#### Design refinements (V8, no version bump)
+Classification: design changes, frontend only. Only `design.md` and this file changed. No backend, guidelines, or requirements change. `design.md` follows the refined requirements above; superseded text was kept and marked.
+- **B12, D16, Property 59.** `isVisitorAuthenticated(status)` now uses only the AuthContext `status` (true only for `authenticated`), with no cookie, token, or user input. The logo target and all authentication-dependent Header navigation (My Tasks, bell, user menu, Log in, Register) share this one value. Restore-time behavior is documented: the logo is `/welcome` while `status` is `loading`, and `proxy.ts` redirects `/welcome` to `/` when a valid cookie exists. A 5xx or network restore failure keeps the cookies and sets `status` to `anonymous` (never stuck at `loading`). The first V8 form (User or any token present) is kept as a "Superseded" note.
+- **B3, B13.** Header "Log in" and "Register" are anchor links; "Get started", "Create account", and the bottom "Log in" are `BaseButton`.
+- **B13.** The preview scroller lies outside the `aria-hidden` container and has `tabindex="-1"`; the preview content has no focusable element. Only the dragged preview card carries `shadow-overlay`; everything else is flat. The first V8 text "no shadow" is marked superseded.
+- **B14.** The add-column control stays at the end of the Kanban row, outside `BoardToolbar`.
+- **B13, Property 60.** `findForbiddenClaims` uses case-insensitive substring matching, with "free" as a whole word. False-positive words such as "operating", "integrating", and "generating" (contain "rating") are documented and covered by a test.
+- **Testing Strategy (R32.20 to R32.22), Traceability.** Test rows updated for the status-only logo cases (including the refresh-cookie-only case), anchors versus `BaseButton`, scroller `tabindex`, single `shadow-overlay`, and add-column placement. Traceability rows 17, 18, 21, 32, and 38 updated.
+- **Open issues 33 to 38.** Text kept, each marked "Resolved in V8 refinement".

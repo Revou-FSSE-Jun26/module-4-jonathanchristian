@@ -1,6 +1,10 @@
 # Design Document
 
-**Version:** V7 (revised against requirements V6, unchanged in V7; initial design was V3)
+**Version:** V8 (revised against requirements V8, frontend only; requirements V6 and V7 text unchanged by this step; initial design was V3)
+
+> **V8 change summary.** V8 is a frontend-only revision (no endpoint, model, migration, or backend test changes). It adds (1) the Header logo link target `logoTarget` (B12), (2) the redesigned Welcome_Page structure, copy, and decorative preview (B13), (3) the single 1 px separator between the board toolbar and the board content (B14), plus the V8 testing strategy, Correctness Properties 59 and 60, traceability rows, and Open issues 33 to 38. Where V8 supersedes V6 text (the B2 `/welcome` row, the B7-V6 welcome responsive note, the `WelcomeActions` row of B1, and the single-toolbar markup of `BoardView`), the V6 text stays and a "V8 change" note names the replacement. `proxy.ts` and `decideRoute` are unchanged. Index of V8 sections: D16 and D17 (decisions), B12, B13, B14, Correctness Properties 59 and 60, Testing Strategy (V8 additions), Traceability (V8 table), Open issues 33 to 38.
+
+> **V8 design refinements (no version bump).** After the V8 consistency check the requirements were refined (CHANGELOG V8, "Refinements after consistency check"). This design follows them: (1) `isVisitorAuthenticated` uses only the AuthContext `status` and no cookie or token (B12, D16, Property 59); (2) the Header "Log in" and "Register" are anchor links and the other Welcome actions are `BaseButton` (B3, B13); (3) the preview scroller lies outside the `aria-hidden` container and has `tabindex="-1"`, and only the dragged preview card carries `shadow-overlay` (B13); (4) the add-column control stays at the end of the Kanban row, outside `BoardToolbar` (B14); (5) the forbidden-claims scan is a case-insensitive substring match with "free" as a whole word (B13, Property 60). Superseded text is kept and marked "V8 change" or "Superseded". Open issues 33 to 38 are marked resolved.
 
 > **V6 change summary.** V6 adds card status, the guest role, board invitation links, a fixed email with password change, a welcome page, and E2E credentials from `web/.env.test`. Amended or new design sections are marked with a "V6 change" note. No V5 decision was deleted. Where V6 supersedes a V5 decision, the V5 text stays and the note says what replaced it. Index of V6 sections: D12 to D15 (decisions), V6 migration note, A3 (users PATCH), A4 and A4-V6 (roles and permission matrix), A7 and A8 (notifications, analytics), A10, A11 (endpoints), A12-V6 (security), A13 (card status), A14 (invitations), B1 to B11 (frontend), Data Models (V6 columns, ER, migration), Correctness Properties 44 to 58, Error Handling, Testing Strategy (V6), D1 and D3 notes, Traceability (V6 table, rows 37 and 38), Open issues 21 to 32.
 
@@ -27,6 +31,13 @@ Key design decisions:
 | D13 | **V6.** Invitation logic lives inside the `boards` Blueprint_Package (`boards/service/invite_service.py`, `boards/service/accept.py`, `boards/routes/invite_routes.py`). The two tokens are columns of `boards`. No ninth package and no new table. | Requirement 1.2 allows exactly 8 packages and Requirement 37.1 allows no new table. |
 | D14 | **V6.** Card status is stored on `cards` (`status`, `completed_at`) and changes only through PATCH `/api/cards/<id>`. The transition rule is the pure function `apply_status_change`. Moving a card never changes its status. Analytics uses `status = DONE` and `completed_at`, not the Column named `Done`. | Requirements 11.17 to 11.21, 14.2. Supersedes the V5 rule "completed = in Column named Done with `updated_at` in this week" (see A8 and Open issue 3). |
 | D15 | **V6.** Route decisions come from one pure function `decideRoute` (replaces `guardDecision`). The first-visit redirect to `/welcome` uses the cookie `kano_welcome_seen`. `/invite/<token>` is a protected route that sends anonymous visitors to `/login?next=...`. The `next` value is validated by one pure function `safeNext`. | Requirements 17.7 to 17.13, 19.11, 38. One function makes the whole routing table property-testable and prevents open redirects. |
+
+**V8 decisions (frontend only).**
+
+| # | Decision | Rationale |
+|---|----------|-----------|
+| D16 | **V8.** The Header logo target comes from one pure function `logoTarget(isAuthenticated)` in `lib/logoTarget.ts`, with the input computed by a second pure function `isVisitorAuthenticated(status)` (**V8 refinement:** AuthContext `status` only, no cookie and no token; the first V8 form `isVisitorAuthenticated({ user, accessToken, refreshToken })` is superseded, see B12). The target is `/welcome` or `/`, never `/login`. `decideRoute`, `proxy.ts`, and the Welcome_Cookie logic are not touched. | Requirements 18.14, 18.15, 17.14. A pure function makes "never `/login`" property-testable, and leaving `decideRoute` alone keeps Properties 52 and 53 valid. |
+| D17 | **V8.** The Welcome_Page is a Server Component tree of small presentational components (one per file, each at most 300 lines), with one Client Component for the call-to-action buttons. All copy and link targets live in one constants module `lib/welcomeContent.ts`, and a pure function `findForbiddenClaims(text)` scans that copy. The board preview is decorative (`aria-hidden`, no focusable element). The separator on the board page is a single element in a new `BoardToolbar` boundary, so no second border can appear (V8 refinement: the add-column control is not part of that toolbar, and the forbidden-claims scan is a case-insensitive substring match with "free" as a whole word). | Requirements 38.15 to 38.21, 21.24 to 21.28. One copy module makes the forbidden-claims check (R38.19) testable over exactly what is rendered, and `BoardView.tsx` is already near the 300-line limit (Requirement 30.6). |
 
 Pure logic (ordering, validation boundaries, recipient computation, pagination, week boundaries, optimistic-move reducers, route-guard decisions, badge formatting) is isolated in side-effect-free functions so it can be tested with property-based tests. See Correctness Properties.
 
@@ -596,6 +607,8 @@ Directories under `components/` follow API resources (auth, boards, cards, comme
 | `/welcome` | Server page, `WelcomeContent` Server, `WelcomeActions` Client | none | V6, public. 1 to 5 sentences plus the eight listed capabilities, "Log in" and "Create account" `BaseButton`s that set the Welcome_Cookie and navigate |
 | `/invite/[token]` | Server page, `InviteJoinCard` Client | GET `/api/invites/<token>`, then POST `/api/invites/<token>/accept` | V6, protected by `proxy.ts`. Never renders for an anonymous visitor. 404 shows a not-found message with a link to `/`; 401 calls `redirect("/login?expired=1")` |
 
+**V8 change, `/welcome` row.** The V6 row text "1 to 5 sentences plus the eight listed capabilities, Log in and Create account buttons" is superseded by B13: hero, decorative preview, four feature cards, bottom call to action, with the copy of Requirement 38 criteria 16 and 17. The page is still public and still a Server Component without an API call.
+
 **V6 change, other pages.** `/` shows the role badge `admin`, `member`, or `guest` per Board (`ROLE_VARIANT` in `lib/roles.ts`). `/boards/[id]` provides `my_role` through `BoardRoleContext` and gates every edit control (B6). `/my-tasks` shows a `StatusBadge` per task (B7). `/login` and `/register` read `next` through `safeNext` (B4).
 
 Unauthenticated access to protected pages is blocked in `middleware.ts` before rendering. A 401 inside a Server Component (the middleware has already refreshed an expired access token, so this means the API rejected the token) calls `redirect("/login?expired=1")`.
@@ -610,6 +623,8 @@ Unauthenticated access to protected pages is blocked in `middleware.ts` before r
 | `ConfirmDialog` | `open`, `message`, `onConfirm`, `onCancel`, `busy` | `BaseModal` wrapper used for delete confirmations |
 | `ErrorPanel` | `message`, `onRetry?` | Error text with a `BaseButton` retry |
 | `StatusBadge` (V6) | `status: CardStatus` | Renders `BaseBadge` with `STATUS_LABEL[status]` and `STATUS_VARIANT[status]` from `lib/status.ts`; the only place a status becomes text, so board, modal, and My Tasks always agree |
+
+**V8 change, Header.** The brand link (logo mark and wordmark) no longer has the fixed target `/`. Its `href` is `logoTarget(isVisitorAuthenticated(auth))` (B12). The Header links "Log in" and "Register" for anonymous visitors stay plain `Link`s with the V5 classes (see Open issue 34). **V8 refinement:** this is now the rule (Requirement 38.2): the two Header actions are anchor elements, never `BaseButton`. The logo link and every authentication-dependent part of the Header (the Log in and Register links, "My Tasks", `NotificationBell`, `UserMenu`) read one shared check, `isVisitorAuthenticated(status)` (B12), so they cannot disagree.
 
 Every button in pages and feature components uses `BaseButton` (Requirement 18.6). `Header` contains the app link, `NotificationBell`, `UserMenu` (profile link, logout) and links to `/my-tasks`; it shows only login and register links for anonymous visitors.
 
@@ -752,6 +767,8 @@ sequenceDiagram
     V->>P: later GET / (unauthenticated, welcomeSeen true)
     P-->>V: redirect /login
 ```
+
+**V8 change (Requirement 17.14).** The table above is unchanged in V8. The Header logo (B12) is a plain link and does not call `decideRoute`: an anonymous click goes to `/welcome`, which the table serves without a redirect (`welcome` row, unauthenticated); an authenticated click goes to `/`, which the table continues (`root` row, authenticated). The first-visit redirect of `/` is not involved, so the logo never reaches `/login`.
 
 **Safe `next` (`lib/nextParam.ts`, pure).**
 
@@ -1050,6 +1067,161 @@ validatePasswordSection(cur, next) // both empty: ok (section unused); exactly o
 ```
 
 Submit builds the body `{ name }` plus `{ password, current_password }` only when both password inputs are filled and valid, and never contains `email`. The button is disabled until the request finishes. On 200 the form calls `updateUser(returned user)` (tokens and cookies untouched), shows a success toast, and, when a password was sent, clears both password inputs. On status 400 with a message that names `current_password` (`errorNamesField(err, "current_password")`), the form shows the field error on the current-password input, keeps the entered name, and leaves the AuthContext user unchanged (no toast). Any other error goes to `useErrorHandler` and the entered values stay (Requirements 26.2 to 26.8). A password change does not log the user out and does not invalidate tokens.
+
+### B12. V8: Header logo link (Requirements 17.14, 18.14, 18.15, 27.10)
+
+**V8 change.** In V5 and V6 the brand link of the Header had the fixed target `/`, so an anonymous click reached `proxy.ts`, which redirected to `/login` (Welcome_Cookie present) or `/welcome` (absent). V8 replaces the fixed target. The V5 text of B3 and the file tree stay as history.
+
+**Pure functions (`lib/logoTarget.ts`, no I/O, no `document`).**
+
+```ts
+export type LogoTarget = "/welcome" | "/";
+export type AuthStatus = "loading" | "authenticated" | "anonymous";   // same union as AuthState.status in lib/types.ts
+// R18.15 (V8 refinement): authenticated ONLY while the AuthContext status is "authenticated" (a User is held).
+// No cookie and no token is read. "loading", "anonymous" (failed restore, logout) are unauthenticated.
+export function isVisitorAuthenticated(status: AuthStatus): boolean {
+  return status === "authenticated";
+}
+// R18.14: never "/login", independent of the Welcome_Cookie
+export function logoTarget(isAuthenticated: boolean): LogoTarget {
+  return isAuthenticated ? "/" : "/welcome";
+}
+```
+
+> **Superseded (first V8 text, kept as history).** The first V8 design computed `isVisitorAuthenticated({ user, accessToken, refreshToken })` as "a User is held, or an access or refresh token is present", so the logo could point to `/` during session restoration while the navigation still showed the anonymous links, and a stale cookie also gave `/` (old Open issue 33). The refined Requirement 18.15 replaces this with the single status-only check above.
+
+**Header change (`components/Header.tsx`, Client Component, one component, well under 300 lines).**
+
+| Aspect | V8 design |
+|---|---|
+| Source of state (**V8 refinement**) | `const { status } = useAuth(); const isAuth = isVisitorAuthenticated(status);` then `href = logoTarget(isAuth)`. This one `isAuth` value is the only authentication input of the Header: the logo target and the "My Tasks" link, `NotificationBell`, `UserMenu`, "Log in", and "Register" all use it, so they cannot disagree (R18.15). The Header reads no cookie, no token, and no `user` object. The server render and the first client render both start with `status` `loading` (the `AuthProvider` initial state), so both give `/welcome` and there is no hydration mismatch. |
+| Recomputed after state changes | The Header re-renders on every `status` change. `logout()` and `sessionExpired()` set `status` to `anonymous`, so the target becomes `/welcome` and the navigation switches to Log in and Register. A successful session restoration or `login()` sets `status` to `authenticated`, so the target becomes `/` and the user controls appear (R18.15). |
+| Restore-time behavior | While a cookie exists and session restoration runs (`status` `loading`), the logo targets `/welcome` and the navigation shows the anonymous links. A click in that window requests `/welcome`; `proxy.ts` sees a valid access or refresh cookie (`decideRoute` `welcome` row, authenticated or refreshable) and redirects to `/`, so the visitor still reaches the Dashboard (R17.9, R17.14). After the restoration succeeds the target is `/` directly. |
+| Restore failure with 5xx or network error | `AuthProvider` keeps both cookies, leaves the User unset, and sets `status` to `anonymous` (B4, R17.5), never leaving it at `loading`. The Header therefore shows `/welcome` and the anonymous links, plus the `useErrorHandler` toast. A logo click requests `/welcome`, and `proxy.ts` redirects it to `/` while the cookies are still valid, where the Server Component fetch runs again. A 401 that survives the refresh flow clears both cookies, and the logo then reaches `/welcome` without a redirect. |
+| Link markup | One `Link` containing the mark and the wordmark. The existing classes stay (44 px minimum target, `rounded-md`, `text-base font-semibold text-ink`). The mark `span` gets `aria-hidden="true"` so the accessible name of the link is exactly "Kano". |
+| Side effects | None. The link sets and deletes no cookie and sends no request. `Link` prefetch is allowed: a prefetch of `/welcome` for an anonymous visitor is a public page, and a prefetch of `/` for an authenticated User is the Dashboard. |
+| Navigation links | The "My Tasks" link, `NotificationBell`, `UserMenu`, "Log in", and "Register" now use the same `isVisitorAuthenticated(status)` value as the logo (the V6 condition `status === "authenticated"` is exactly that check). "Log in" and "Register" are anchor elements (`Link`), not `BaseButton` (R38.2). Open issue 33 is resolved by this. |
+| Layout | `layout.tsx` still renders exactly one `Header` and one `Footer` around `children` (R18.13). No page renders its own Header or Footer. |
+
+**Relation to `proxy.ts` and `decideRoute` (unchanged).** The logo link needs no new routing rule, as shown by this table (rows copied from the B4-V6 decision table):
+
+| Click | Request | `decideRoute` outcome | Result |
+|---|---|---|---|
+| Anonymous, any page, Welcome_Cookie present or absent | `/welcome` | `welcome` + unauthenticated: continue, no cookie write | Welcome_Page |
+| Authenticated (valid access cookie) | `/` | `root` + authenticated: continue | Dashboard |
+| Only a refresh cookie, valid | `/` | `root` + refreshable: refresh then continue | Dashboard |
+| Any visitor while `status` is not `authenticated` (restore in progress, failed restore, stale cookies, logout) | `/welcome` | `welcome`: continue when unauthenticated, redirect to `/` when a valid access or refresh cookie exists | Welcome_Page, or the Dashboard after the redirect |
+| Stale cookies (V8 refinement: no longer reach `/` through the logo) | `/welcome` | unauthenticated: continue | Welcome_Page (resolves Open issue 33) |
+
+```mermaid
+flowchart LR
+    S["AuthContext status (loading, authenticated, anonymous)"] --> F["isVisitorAuthenticated(status): status is authenticated"]
+    F -->|true| L1["logoTarget gives /"]
+    F -->|false| L2["logoTarget gives /welcome"]
+    L1 --> P["proxy.ts decideRoute: root + authenticated, continue"]
+    L2 --> W["proxy.ts decideRoute: welcome + unauthenticated, continue; with a valid cookie during restore: redirect to /"]
+    F --> N["Header navigation: same value"]
+    LO["logout() or sessionExpired()"] --> S
+```
+
+### B13. V8: Welcome page structure, copy, and visual rules (Requirements 38.1, 38.2, 38.10, 38.15 to 38.21, 27.10)
+
+**V8 change.** Supersedes the V6 `WelcomeContent` description (B2 row, B7-V6 responsive note). `/welcome` stays public, a Server Component, with no API call (R38.1). No backend file is involved.
+
+**Files (one component per file, each far below 300 lines; the new and rewritten files are all under `web/`).**
+
+| File | Type | Content |
+|---|---|---|
+| `app/welcome/page.tsx` | Server | Exports `metadata` (title "Welcome to Kano", description `WELCOME_COPY.metaDescription`) and renders `WelcomeContent` inside `<main>`. Renders no Header or Footer (the layout does, R18.13). |
+| `components/welcome/WelcomeContent.tsx` | Server | Rewritten. Composes, in this order, `WelcomeHero`, `BoardPreview`, `FeaturesSection`, `WelcomeCta` (R38.15 parts b to e). |
+| `components/welcome/WelcomeHero.tsx` | Server | `<section aria-labelledby="welcome-hero-title">`: eyebrow, the only `h1`, subheadline, `<WelcomeActions placement="hero" />`. |
+| `components/welcome/BoardPreview.tsx` | Server | Decorative preview (below). Uses `PreviewColumn.tsx` and `PreviewCard.tsx`. |
+| `components/welcome/PreviewColumn.tsx`, `PreviewCard.tsx` | Server | One component each. |
+| `components/welcome/FeaturesSection.tsx`, `FeatureCard.tsx` | Server | `<section aria-labelledby="welcome-features-title">` with an `h2`, one sentence, and four `FeatureCard`s. |
+| `components/welcome/WelcomeCta.tsx` | Server | `<section aria-labelledby="welcome-cta-title">` with an `h2`, one sentence, and `<WelcomeActions placement="cta" />`. |
+| `components/welcome/WelcomeActions.tsx` | **Client** | The only Client Component of the page. Prop `placement: "hero" or "cta"`. Hero: one primary `BaseButton` "Get started". CTA: primary "Create account" and secondary "Log in". Each `onClick` calls `setWelcomeSeenCookie()` (from `lib/authCookie.ts`, V6 helper) and then `router.push(target)`. **V8 refinement (R38.2):** these three section actions are `BaseButton`s. The Header "Log in" and "Register" are anchor links (`Link`) in `Header.tsx` and are not part of this component. |
+| `lib/welcomeContent.ts` | pure | `WELCOME_COPY` (all page texts and link targets), `FEATURES` (icon name, title, description), `PREVIEW_SAMPLE` (all preview texts), `FORBIDDEN_CLAIMS` is not here (see next row). |
+| `lib/forbiddenClaims.ts` | pure | `FORBIDDEN_CLAIMS` list of Requirement 38 criterion 19 and `findForbiddenClaims(text): string[]` (Property 60). Matching (V8 refinement, R38.19): the text and each entry are lowercased, every entry except "free" is a plain substring match, and "free" is a whole-word match (`/(^|[^\p{L}\p{N}_])free($|[^\p{L}\p{N}_])/iu`). Substring matching has false positives by design: "operating", "integrating", and "generating" contain "rating", and a number such as "14.9" contains "4.9"; the copy must avoid such words, and a hit is reported, not filtered. Kept outside `components/welcome/` so a source scan of the welcome files does not match the list itself. |
+
+**Sections, copy, and targets (exactly Requirement 38 criteria 16 and 17; `WELCOME_COPY` is the single source).**
+
+| Part | Element | Text | Target / style |
+|---|---|---|---|
+| (a) Header (shared, `Header.tsx`) | link | "Log in" | `/login`, non-primary classes (V5, unchanged) |
+| (a) Header | link | "Register" | `/register`, primary classes (V5, unchanged) |
+| (b) Hero | eyebrow badge | "Kanban boards for teams" | `bg-primary-100 text-primary-700 rounded-full text-xs font-medium h-5 px-2.5` |
+| (b) Hero | `h1` | "Organize work smoothly, from idea to done" | `text-xl md:text-2xl font-semibold text-ink` (H1 role below 768 px, Display role from 768 px) |
+| (b) Hero | subheadline | "Plan work on boards and columns, move cards by drag and drop, and keep your team aligned with comments, notifications, and invitation links." | `text-base text-ink-muted max-w-prose` |
+| (b) Hero | button | "Get started" | `/register`, `BaseButton` primary |
+| (c) Preview | decorative | sample data only (B13 preview) | none |
+| (d) Features | `h2` and sentence | "Everything your team needs to execute" / "Kano keeps boards simple so your team can focus on what to do next." | |
+| (d) Features | card 1 | "Drag and drop on mouse and touch" / "Move cards between columns with a mouse or by touch, and Kano keeps the order you chose." | icon `Move` |
+| (d) Features | card 2 | "Stay organized at a glance" / "Add labels, due dates, and a status (Not started, In progress, or Done) to every card." | icon `Tag` |
+| (d) Features | card 3 | "Collaborate with your team" / "Comment on cards, get notifications about assignments and comments, and invite members or read-only guests with a link." | icon `Users` |
+| (d) Features | card 4 | "Find and focus" / "Search the cards of a board, see the cards assigned to you in My Tasks, and let board admins view analytics." | icon `Search` |
+| (e) Bottom CTA | `h2` and sentence | "Ready to bring calm to your project planning?" / "Create an account to start your first board, or log in to pick up where you left off." | panel `bg-sunken` |
+| (e) Bottom CTA | button | "Create account" | `/register`, primary |
+| (e) Bottom CTA | button | "Log in" | `/login`, secondary |
+| (f) Footer | shared `Footer.tsx` | unchanged | |
+
+Icons come from `lucide-react` (already a dependency, as used by `BoardView`), `size-5` inside a `size-10 rounded-md bg-primary-50 text-primary-600` square, `aria-hidden="true"`. The four icon names are checked at implementation time.
+
+**Welcome_Cookie (R38.10).** The five actions all set the cookie. The two Header links reach `/login` or `/register`, where `proxy.ts` already sets the cookie when it is absent (`decideRoute` `setWelcomeCookie`, B4-V6), so the Header needs no click handler. The three section buttons set it in `WelcomeActions` before navigating (V6 behavior kept). The logo link does not set it (R18.14).
+
+**Decorative board preview (R38.18).**
+- Outer wrapper `div` with `overflow-x-auto` and `tabIndex={-1}` (**V8 refinement:** the horizontal scroller for narrow screens lies outside the hidden subtree and is not a tab stop), then the container `div aria-hidden="true"` that holds all preview markup. The preview content has no focusable element: inside the container only `div`, `span`, and `p` elements, with no `a`, `button`, `input`, `select`, `textarea`, `summary`, `tabindex`, `onClick`, or `draggable`. The `tabindex="-1"` sits on the scroller, which is outside the container, so the "no `[tabindex]` inside the container" test still holds (Open issue 35 resolved).
+- Three Columns "To do", "In progress", "Done" (`bg-sunken rounded-lg p-2`, `w-72 shrink-0` below 768 px, `md:w-auto` in a three-column grid from 768 px). Each Column has two or three sample Cards (`bg-surface border border-line rounded-md p-3`) with a title, one or two label chips from the fixed pairs (`bg-label-green-bg text-label-green-fg` and so on), avatar initials circles (`rounded-full`, label token pairs), and a status `BaseBadge`-style chip with the text "Not started", "In progress", or "Done" only (the chip is markup in the preview, not the `StatusBadge` component, to keep the subtree free of logic).
+- One Card in the middle Column is shown as being dragged (`rotate-2 border-primary-200 shadow-overlay`; **V8 refinement:** this is the only element of the page that may carry the design-system overlay shadow, R38.20; the first V8 text said "no shadow", superseded) next to a dashed placeholder (`border-2 border-dashed border-primary-200 bg-primary-50 rounded-md`).
+- Sample texts are generic task titles ("Draft the project brief", "Design the login page", "Set up the database", and similar) kept in `PREVIEW_SAMPLE`. No ticket ids, counts of people, metrics, or claims. Tailwind classes in these files are written as complete static strings (a lookup object from sample color name to full class string), never built with template strings, so the Tailwind v4 scanner finds them.
+
+**Design-system and Tailwind approach (read-only use of `guidelines/design-system.md` and the existing `web/app/globals.css`).**
+- No new token, no `globals.css` change, no `tailwind.config`. The `@theme` block of `globals.css` already resets default palettes and defines `primary-*`, `canvas`, `surface`, `sunken`, `line`, `ink*`, the eight label pairs, `rounded-sm|md|lg|full`, and the type scale, and `@source "../components"` already scans the new component files. `app/welcome/page.tsx` sits in `app/`, which Tailwind v4 scans by default.
+- Only tokens and the documented recipes are used (design-system section 0 rule 2). Fonts are Inter weights 400, 500, 600 only (`font-medium`, `font-semibold`, never bold). Surfaces are flat: 1 px `border-line`, no gradient, no blur, and no `shadow-*` except `shadow-overlay` on the one dragged preview Card (R38.20). Everything else on the page is flat. Page background is `canvas` (from `html`), cards `surface`, bottom panel `sunken`. Spacing uses the 4, 8, 12, 16, 24, 32, 48 px steps (`gap-2|3|4`, `p-6`, `py-12`).
+- One primary button per region: the Header "Register", the hero "Get started", and the bottom "Create account" are in three separate regions.
+- Contrast uses only documented pairs (white on `primary-500` at 4.58:1, `primary-700` on `primary-100`, `ink` and `ink-muted` on `canvas`, `surface`, `sunken`).
+
+**Layout by width (R38.21, R27.1, R27.2, R27.10).**
+
+| Part | Below 768 px | From 768 px |
+|---|---|---|
+| Hero | single column, centered text, `px-4 py-12`, button `w-full min-h-[44px]` | `max-w-3xl`, centered, button `md:w-auto` |
+| Preview | scroller `overflow-x-auto`, three Columns `w-72` (288 px, at least 240 px) side by side inside it, so the page has no horizontal scroll | `md:grid md:grid-cols-3 gap-4`, no scrolling |
+| Features | `grid-cols-1 gap-4` | `md:grid-cols-2 gap-4` |
+| Bottom CTA | `flex flex-col gap-2`, buttons `w-full min-h-[44px]` | `md:flex-row md:justify-center`, buttons `md:w-auto` |
+| Header links and logo | 44 px targets (already in `Header.tsx`) | same |
+
+Root containers use `min-w-0` and `max-w-full`. The only horizontally scrolling element is the preview scroller.
+
+```mermaid
+flowchart TB
+    H["Header (layout.tsx)"] --> M["main: app/welcome/page.tsx"]
+    M --> A["WelcomeHero: eyebrow, h1, subheadline, WelcomeActions hero (client)"]
+    A --> B["BoardPreview (aria-hidden, decorative)"]
+    B --> C["FeaturesSection: 4 FeatureCards"]
+    C --> D["WelcomeCta: WelcomeActions cta (client)"]
+    D --> F["Footer (layout.tsx)"]
+```
+
+### B14. V8: Board toolbar and the single separator line (Requirements 21.24 to 21.28, 27.10)
+
+**V8 change.** In V6, `BoardView.tsx` rendered the toolbar inline (a `div` with `mb-6`) directly above the Kanban row, with no line between them. `BoardView.tsx` is already near the 300-line limit (Requirement 30.6), so V8 extracts the toolbar.
+
+| File | Change |
+|---|---|
+| `components/boards/BoardToolbar.tsx` | New Client Component (one component). Props: `boardName`, `role`, `boardId`, `onSearchResults`, `onSearchClear`, `onOpenMembers`, `onOpenAnalytics`. Contains the back link "Boards", the `h1` title, the role `BaseBadge` ("Guest" for a guest), `CardSearchInput`, and, only for the admin, the Members and Analytics `BaseButton`s. Root element: `<div data-testid="board-toolbar" className="flex flex-wrap items-center justify-between gap-3 pb-4 min-w-0">` with the same inner markup as V6. No `border-*` class on it. |
+| `components/boards/BoardView.tsx` | Replaces the inline toolbar with `<BoardToolbar ... />`, then renders exactly one `<hr data-testid="board-separator" className="m-0 h-px w-full border-0 bg-line" />`, then `<div data-testid="board-content" className="pt-6 min-w-0">` that holds the search results list or the Kanban row (V6 markup, with its `mb-6` and any border removed). The separator is rendered once, unconditionally inside `BoardView`, so it appears for every role and in the search-results state too. If `BoardView.tsx` still exceeds 300 lines, the search-results `ul` moves to `SearchResultList.tsx`. |
+
+**Why one `hr`.** `hr` has the implicit role `separator` with horizontal orientation (R21.25), is block level so it always starts a new line below the last wrapped toolbar line (R21.26), and `h-px bg-line` (token `line`, `#E1E4EA`) draws exactly 1 px with Tailwind preflight's `border-width` removed by `border-0`. It sits inside the `px-4 sm:px-6` page padding wrapper, so it spans the full toolbar width. `BoardToolbar` and `board-content` carry no `border-t` or `border-b` class, so a second line cannot appear (R21.28). The Kanban row keeps its V6 `overflow-x-auto`, so the page itself does not scroll horizontally (R21.26).
+
+```
+BoardRoleProvider
+  div.px-4.sm:px-6.py-6.min-w-0
+    BoardToolbar      (title, role badge, search, Members and Analytics for admin)   pb-4
+    hr#separator      1 px, bg-line, full width
+    div.board-content (search results OR Kanban row, AddColumnForm at the end)        pt-6
+```
+
+**Role and state coverage (R21.27).** `BoardToolbar` and the `hr` render for admin, member, and guest. In the 403 and 404 states the board page renders `BoardAccessMessage` instead of `BoardView`, so no toolbar, no separator, and no Column exist. The add-column control stays at the end of the Kanban row inside the Kanban columns area, outside `BoardToolbar` (V8 refinement, R21.24: `BoardToolbar` has no add-column prop and renders no add-column form; Open issue 36 resolved). The `Header`'s own `border-b` belongs to the shared Header, not to the board toolbar.
 
 ## Data Models
 
@@ -1589,6 +1761,20 @@ Name fields strip whitespace and reject blank values. All input schemas set `unk
 
 **Validates: Requirements 33.10, 33.12**
 
+### Property 59: Logo target depends only on authentication
+
+*For any* AuthContext status in {`loading`, `authenticated`, `anonymous`}, `isVisitorAuthenticated(status)` is true iff the status is `authenticated`, so it is false during session restoration, after a failed restoration (including a 5xx or network failure that keeps the cookies), and after a logout; `logoTarget(isVisitorAuthenticated(status))` is `/` when it is true and `/welcome` otherwise; the result is always one of these two values and is never `/login`; the Header navigation uses the same `isVisitorAuthenticated(status)` value, so the logo target is `/` iff the user controls are shown; and *for any* sequence of statuses (restore, login, logout, session expiry), the target after each step equals the function applied to the status after that step alone, with no input for cookies, tokens, the Welcome_Cookie, or the current path.
+
+*V8 change (refinement):* the first V8 form of this property quantified over a user value and access and refresh tokens (true when a User or any non-empty token is present). That form is superseded by Requirement 18.15 as refined; it let the logo and the navigation disagree during restoration.
+
+**Validates: Requirements 18.14, 18.15, 17.14**
+
+### Property 60: Forbidden-claims scan
+
+*For any* text built from words that contain none of the forbidden strings, and any one forbidden string of Requirement 38 criterion 19 other than "free" inserted at any position in any letter case, `findForbiddenClaims` reports that string even when it sits inside a longer word (case-insensitive substring match, so "operating", "integrating", and "generating" report "rating"); *for any* text that contains the word "free" only inside a longer word (for example "freedom"), it does not report "free", and it reports "free" when it stands as a whole word (also next to punctuation, in any letter case); *for any* text without a forbidden string it returns an empty list; and the whole Welcome_Page text (`WELCOME_COPY`, `FEATURES`, `PREVIEW_SAMPLE`, every `aria-label`, `alt`, and `title`, and the page description) returns an empty list.
+
+**Validates: Requirements 38.18, 38.19**
+
 ## Error Handling
 
 | Situation | Behavior | Requirement |
@@ -1727,6 +1913,30 @@ The V5 strategy above stays in force. V6 adds the following. Property tests use 
 - **Welcome cookie helper.** `e2e/support/welcome.ts` exports `setWelcomeSeen(context, baseURL)` that adds the `kano_welcome_seen=1` cookie, used by every scenario that visits `/` while unauthenticated (Requirement 33.3).
 - **New scenarios.** (1) Welcome: a fresh context visits `/` and lands on `/welcome`, sees the "Log in" and "Create account" buttons, "Log in" leads to `/login` and `context.cookies()` contains `kano_welcome_seen`, "Create account" leads to `/register`, and a second visit to `/` lands on `/login` (Requirement 33.13). (2) Status: open a card, choose "In progress", save, see the badge on the board; set "Done" and see "Done" in `/my-tasks`. (3) New card: add a card by title, the modal opens with the title, fill the description, Save. (4) Invite join: the pre-existing user creates a Board and reads the member and guest links in the member panel; a second browser context registers a generated user and opens the member link, joins, and sees edit controls; a third context joins through the guest link and sees the "Guest" badge and no add-column control. (5) Profile: `/profile` shows the email as text equal to `E2E_USER_EMAIL` and has no email input. The V5 auth scenarios call `setWelcomeSeen` first and use the helper credentials.
 - **Unchanged.** Auto-waiting only, no `waitForTimeout`, 10 s assertion timeout, 60 s test timeout, at most 2 retries, HTML report, serial Kanban journey (its step 1 now registers a generated email with the password from `E2E_USER_PASSWORD`).
+
+### Testing Strategy: V8 additions (Requirements 32.20 to 32.22, 33.13, 33.15, 33.16)
+
+The V5 and V6 strategy stays in force. V8 is frontend only, so there are no pytest changes and no dependency on a migration. Property tests use fast-check, at least 100 runs, one test per property, tagged `Feature: kano, Property <n>: <text>`. Network is mocked in unit tests (R32.9). Credentials in `web/e2e/` come only from `requireCredentials()` (Property 58 still applies to the new specs).
+
+**Unit tests (Vitest and React Testing Library).**
+
+| Area | Tests | Properties |
+|---|---|---|
+| `logoTarget` (32.20) | fast-check over each AuthContext status (`loading`, `authenticated`, `anonymous`) and over random status sequences for `isVisitorAuthenticated(status)` and `logoTarget`; true only for `authenticated`; target never `/login`; the function takes no cookie, token, or user input (V8 refinement; the first V8 test generated user and token values, superseded) | 59 |
+| Header logo (32.20) | Render `Header` inside a test `AuthContext` provider. Assert: anonymous gives `href="/welcome"` with the cookie `kano_welcome_seen` present and absent; anonymous on the `/login` and `/register` pages (mocked `usePathname`) gives `/welcome`; status `authenticated` gives `/`; **V8 refinement (R32.20):** a visitor with only a refresh cookie gets `/welcome` while the status is `loading` or `anonymous` (including a 5xx restore failure that keeps the cookies) and `/` once the restoration succeeds (the test advances the mocked `GET /api/users/me` from pending to 200); in every status the logo target and the navigation (Log in and Register anchors versus My Tasks, bell, and user menu) match the same authentication state; after calling `logout()` the same rendered link changes to `/welcome`; the link name is "Kano" and its `href` is never `/login`; a click calls no `fetch` and no write to `document.cookie` (spy on the cookie setter). (Supersedes the first V8 case "refresh token only gives `/`".) | 59 |
+| One Header and one Footer (32.20) | Render `RootLayout` around stub children for the welcome, login, register, dashboard, board, My Tasks, and profile stand-ins and assert one `banner` and one `contentinfo` role each. A static test reads `app/**/page.tsx` and `components/**` and fails if a file other than `layout.tsx` renders `<Header` or `<Footer`. |  |
+| Welcome_Page (32.21) | Render `WelcomeContent` (and the Header from the layout shell). Assert: the sections appear in the order hero, preview, features, bottom CTA (`compareDocumentPosition`); Header "Log in" is an anchor (`a[href="/login"]`) and "Register" an anchor (`a[href="/register"]`), neither rendered through `BaseButton` (V8 refinement, R38.2: the test checks they are `a` elements and have no `BaseButton` marker class or `button` role), while "Get started", the bottom "Create account", and the bottom "Log in" are `BaseButton`s; hero has the eyebrow, one `h1`, the subheadline, and the "Get started" button to `/register` (click calls `router.push("/register")` and sets the cookie); four feature cards with the exact titles and descriptions of R38.17; bottom "Create account" to `/register` and "Log in" to `/login`; `BoardPreview` content container has `aria-hidden="true"` and `container.querySelectorAll("a[href], button, input, select, textarea, summary, [tabindex]")` is empty; the horizontal scroller is the parent of that container (not inside it) and has `tabindex="-1"`; exactly one element of the preview carries `shadow-overlay` (the dragged Card) and no other element of the page has a `shadow-*` class; `fetch` is never called; no `blockquote`, `q`, `cite`, star character, or element with `role="img"` and a rating label. | 60 |
+| Forbidden claims (32.21, R38.19) | `findForbiddenClaims` over `WELCOME_COPY`, `FEATURES`, `PREVIEW_SAMPLE`, the page `metadata.description`, and over the DOM: all text nodes plus every `aria-label`, `alt`, and `title` attribute, case-insensitive substring matching for every entry except "free", which is a whole-word match (R38.19). A fixed example test shows the false positives of the rule ("operating", "integrating", and "generating" report "rating"; "freedom" does not report "free"). A source-text test also scans `components/welcome/**`, `app/welcome/page.tsx`, and `lib/welcomeContent.ts` for the strings. The forbidden list itself lives in `lib/forbiddenClaims.ts`, outside the scanned files. | 60 |
+| Board separator (32.22) | Render `BoardView` with a `BoardDetail` fixture for roles `admin`, `member`, and `guest` (`apiRequest` mocked). Assert: `getAllByRole("separator")` has length 1; it follows `[data-testid="board-toolbar"]` and precedes `[data-testid="board-content"]` in document order and also with the search-results state shown; the toolbar, the content wrapper, and their parents inside `BoardView` have no class that starts with `border-t` or `border-b` and the toolbar has no `border` class; the separator class list has `h-px` and `bg-line`. The add-column form (V8 refinement, R21.24) is not a descendant of `[data-testid="board-toolbar"]` and is the last item of the Kanban row inside `[data-testid="board-content"]` for admin and member, and absent for guest. Render `BoardAccessMessage` (the 403 and 404 states) and assert zero separators. jsdom has no layout, so overlap and thickness are checked in Playwright. | |
+
+**Playwright (additions to the V6 scenarios; every scenario that is unauthenticated and visits `/` keeps using `setWelcomeSeen`, except the welcome scenario).**
+
+- **Welcome scenario (R33.13, amended).** Fresh context, no cookies. `goto("/")` ends on `/welcome`. Section-scoped locators: Header `page.getByRole("banner")` with links "Log in" and "Register"; hero `page.getByRole("region", { name: "Organize work smoothly, from idea to done" })` with the button "Get started"; bottom `page.getByRole("region", { name: "Ready to bring calm to your project planning?" })` with the buttons "Create account" and "Log in". Click the Header "Log in": URL `/login` and `context.cookies()` contains `kano_welcome_seen`. Then `goto("/")` ends on `/login`. In a second step, `goto("/welcome")` (always served to an anonymous visitor) and click the bottom "Create account": URL `/register`. The scoping avoids the ambiguity of two "Log in" controls.
+- **Logo scenarios (R33.15).** (1) Anonymous: `goto("/login")` (the proxy sets the cookie), click `page.getByRole("banner").getByRole("link", { name: "Kano" })`, `expect(page).toHaveURL(/\/welcome$/)`. (2) The same on `/register`. (3) Logged in with `requireCredentials()`: create a Board through the UI (unique name), open it, click the logo, `expect(page).toHaveURL(/\/$/)`, and assert the URL contains neither `/welcome` nor `/login` and the Dashboard heading is visible.
+- **Layout scenarios (R33.16).** Run at `{ width: 375, height: 812 }` and `{ width: 1920, height: 1080 }` through `page.setViewportSize`. Welcome: `document.documentElement.scrollWidth <= clientWidth` (read with `page.evaluate`, polled with `expect.poll`), and at 375 px `boundingBox()` width and height at least 44 for the logo link, "Log in", "Register", hero "Get started", bottom "Create account", and bottom "Log in". Board page (logged-in user with a Board and two Columns): exactly one visible `getByRole("separator")`; a helper `expectNoOverlap(locators)` checks pairwise that the bounding boxes of the toolbar controls (back link, title, search input, Members, Analytics) do not intersect; the separator box top is at least the largest bottom of the toolbar controls and at most the top of the first Column; the separator height is 1 px (`boundingBox().height` equals 1 within 0.5); and the page `scrollWidth` does not exceed the viewport (the Kanban container may scroll). The guest view is covered by the unit tests, because it needs a second account.
+- **Unchanged.** Auto-waiting only, no `waitForTimeout`, 10 s assertions, 60 s tests, at most 2 retries, HTML report, serial Kanban journey, and the credentials scan (Property 58) over the new spec files. A V8 run must still end with all tests passed (R33.8).
+
+**Not property-tested (examples only).** The look of the Welcome_Page and the toolbar (design-system conformance), icon names, and Tailwind classes. These use the example and Playwright checks above and a manual review at 375 px and 1920 px (task 33.3 style checklist).
 
 ## Part D: Deployment, Guidelines, and Documentation Design
 
@@ -1878,6 +2088,20 @@ Every requirement maps to at least one design element. Part references point to 
 | 31, 32 | Testing Strategy: V6 additions (backend and frontend tables) |
 | 33, 35 | Testing Strategy: V6 Playwright bullets, `.env.test` and `.gitignore` notes (D1), Property 58 |
 
+#### V8 amendments to existing rows
+
+| Req | V8 design coverage |
+|---|---|
+| 17 (criterion 14) | B12 (relation to `proxy.ts` and `decideRoute`, which are unchanged; restore-time `/welcome` then redirect to `/`; 5xx restore failure), B4-V6 V8 note, Property 59 |
+| 18 (criteria 14, 15) | B12 (`logoTarget`, `isVisitorAuthenticated(status)` only, one shared check for logo and navigation, recompute on every status change), B3 V8 note, Property 59, unit tests (Header logo), Playwright logo scenarios |
+| 21 (criteria 24 to 28) | B14 (`BoardToolbar` without the add-column control, one `hr` in `BoardView`, role and state coverage, responsive), unit tests (Board separator and add-column placement), Playwright layout scenarios; Open issue 36 (resolved) |
+| 27 (criterion 10) | B13 layout table (44 px targets, no horizontal scroll), B14 (separator and toolbar widths), Playwright layout scenarios |
+| 32 (criteria 20 to 22) | Testing Strategy: V8 additions (unit tests table), Properties 59 and 60 |
+| 33 (criteria 13, 15, 16) | Testing Strategy: V8 additions (Playwright welcome, logo, and layout scenarios) |
+| 36 (criterion 14) | D3: the README describes the Welcome_Page and board toolbar look in words only and neither this document nor the README names, links, or embeds the visual reference files |
+| 38 (criteria 1, 2, 10, 15 to 21) | B13 (files, sections, copy, preview, design-system use, layout by width), B2 V8 note, B3 (Header anchors), D17, Property 60 (substring and whole-word "free" rule); Open issues 34, 35, 37, 38 (resolved) |
+| 32 (criteria 20 to 22), refined | Unit tests table in Testing Strategy: V8 additions: status-only logo cases (R32.20), anchors versus `BaseButton`, scroller `tabindex="-1"`, single `shadow-overlay` (R32.21), add-column outside the toolbar (R32.22) |
+
 ## Open issues
 
 These are gaps or conflicts found while designing and revising. Items marked "assumption" were chosen by the assistant in V4 and can be overridden.
@@ -1917,3 +2141,18 @@ These are gaps or conflicts found while designing and revising. Items marked "as
 30. **A card can be `DONE` while sitting in any Column, and a Card in the Column named `Done` can be `NOT_STARTED` (Requirements 11.21, 21.23).** The two concepts are independent by design, so the board can show a "Not started" badge in the `Done` Column. The UI does not warn about it.
 31. **The `status` filter is absent (Requirement 25.7).** My Tasks keeps `DONE` cards in the list with a badge and offers no filter. Alternative: a "hide done" toggle, not required.
 32. **Network error or 5xx during the proxy refresh drops `next` (Requirement 17.8).** The redirect goes to `/login?expired=1`, so an invitee whose refresh failed because of an outage must open the invite link again after logging in. Keeping `next` would risk a redirect loop and was not chosen (item 15).
+
+### V8 open issues
+
+33. **The logo link and the Header navigation use different authentication tests (Requirements 18.15, 18.5).** The logo uses "User held, or any token present" (`isVisitorAuthenticated`). The Header navigation (My Tasks, bell, user menu, Log in, Register) keeps `status === "authenticated"`. While the session is restored (`status` is `loading` with a cookie) the logo already points to `/` while the navigation shows the anonymous links. A stale cookie (present but expired, with no valid refresh cookie) also gives the target `/`, which `proxy.ts` then redirects to `/welcome` or `/login`, until the failed session restoration clears the cookies and the target flips to `/welcome`. Alternative: use `isVisitorAuthenticated` for the navigation too, or check the `exp` claim. Not chosen because R18.15 says "present".
+    **Resolved in V8 refinement.** R18.15 now requires one shared check on the AuthContext `status` only, no cookie. The logo and the navigation use `isVisitorAuthenticated(status)` (B12, Property 59). During restoration the logo is `/welcome` and `proxy.ts` redirects to `/` when a valid cookie exists; the stale-cookie case no longer reaches `/` through the logo.
+34. **Header links versus BaseButton (Requirement 38.2 versus 38.16, 32.21, 33.13).** R38.2 says all five actions are rendered through BaseButton, but R38.16, R32.21, and R33.13 call the two Header items links. The design keeps the Header "Log in" and "Register" as `Link` elements (as in V5) and uses `BaseButton` for the three section buttons. Recommendation: reword R38.2 to "the three section actions through BaseButton and the two Header actions as links".
+    **Resolved in V8 refinement.** R38.2 was reworded as recommended. Header "Log in" and "Register" are anchor links, the three section actions are `BaseButton` (B3, B13).
+35. **Preview scroller and keyboard focus (Requirements 38.18, 38.21).** The preview must scroll horizontally below 768 px. Some browsers make a scrollable element a keyboard tab stop. The scroller is therefore outside the `aria-hidden` container, so the container has no focusable element, but a keyboard user may still land on an unlabeled scroll region in those browsers. Alternative: allow `tabindex="-1"` on the scroller or drop the scrolling and shrink the Columns, which conflicts with the 240 px minimum.
+    **Resolved in V8 refinement.** The scroller has `tabindex="-1"` and lies outside the `aria-hidden` container, which has no focusable element (B13).
+36. **Add-column control placement (Requirement 21.24).** R21.24 lists the add-column control in the toolbar, but in the implemented board the add-column form is the last item of the Kanban row. The design keeps that placement (moving it is a behavior change that `improvements2` does not ask for). Recommendation: delete the words "and the add-column control where present" from R21.24.
+    **Resolved in V8 refinement.** R21.24 now keeps the add-column control at the end of the Kanban row, outside the toolbar (B14).
+37. **Shadow on the dragged preview card (Requirement 38.20 versus design system 4.6).** The design system gives a dragged card `shadow-overlay`, while R38.20 forbids a drop shadow on the Welcome_Page. The design omits the shadow on the preview card and uses `rotate-2 border-primary-200` only.
+    **Resolved in V8 refinement.** R38.20 allows `shadow-overlay` on the one dragged preview Card only; everything else stays flat (B13).
+38. **Forbidden string matching (Requirement 38.19).** The list says "compared case-insensitively" and marks only "free" as a whole word. Matching the other entries as substrings means that words such as "operating" or "integrating" (contain "rating") fail the scan, and "14.9" (contains "4.9") too. The design matches substrings except for "free", and the copy of R38.16 and R38.17 has no such word. Recommendation: state in R38.19 that all entries except "free" are substring matches.
+    **Resolved in V8 refinement.** R38.19 states the rule. `findForbiddenClaims` implements it and Property 60 covers it, including the false-positive words (B13).

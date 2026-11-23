@@ -1,6 +1,6 @@
 # Implementation Plan: Kano
 
-**Version:** V7 (V1 to V5 tasks 1 to 22.2 preserved as history; V6 tasks added as 25 onward; V7 narrows task 33.1)
+**Version:** V8 (V1 to V5 tasks 1 to 22.2 preserved as history; V6 tasks added as 25 to 33; V7 narrows task 33.1; V8 frontend-only tasks added as 34 to 39)
 
 ## Overview
 
@@ -18,6 +18,8 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
 **File size rule.** Every Python and TSX file stays at or below 300 lines (Requirement 30.6, 30.7). Where design section "File size and split rule" plans a package split (boards service, cards service, boards schema, cards routes), split as soon as a file nears 300 lines.
 
 **V6 revision (requirements V6, design V6).** Tasks 1 to 22.2 are completed and stay in this file exactly as written, as history documentation of what was built for V1 to V5. They are not renumbered, reworded, unchecked, or deleted. The pending tasks 22.3 to 22.9, 23.1 to 23.8, and 24 keep their numbers and text; V6 only adds `Depends on:` entries and short "V6 note" lines to them. All new V6 work is added as new top-level phases 25 to 33, because 23 and 24 already exist. Their order is backend first, then frontend: 25 backend models, schema, and permissions; 26 manual V6 migration (user-owned, no agent-generated migration script); 27 backend features with pytest and property tests 44 to 58; 28 backend V6 checkpoint; 29 frontend libraries and shared pieces; 30 frontend pages and components; 31 Playwright and `.env.test` work; 32 V6 frontend checkpoint; 33 final repository rules and pre-deployment manual verification. Because nothing is deployed yet, V6 needs only the local and test database migrations (task 26.1); the production schema created in task 22.4 already includes the V6 columns. Task 22.3 and everything after it now depend on the V6 checkpoint and the V6 repository tasks, so nothing is deployed before the V6 features are complete. Where a V6 task changes code or tests produced by an earlier task, it says "Supersedes the V5 behaviour of task X.Y; X.Y stays as history". Every V6 task follows the same rules as before: read `guidelines/backend.md`, `guidelines/database.md`, or `guidelines/frontend.md` before generating code, keep every file at or below 300 lines, and use the `[MANUAL]` prefix for user-owned tasks.
+
+**V8 revision (requirements V8, design V8, frontend only).** V8 changes the Header logo link, the Welcome_Page, and the board toolbar separator, with their tests and Playwright scenarios. There is no backend task, no migration, and no API change. All tasks 1 to 33.5 stay exactly as written. The new tasks 34 to 39 are appended below task 33.5 and are all unchecked: 34 Header logo and shared authentication check, 35 Welcome_Page, 36 board toolbar and separator, 37 V8 tests, Playwright scenarios, and repository checks, 38 V8 frontend checkpoint, 39 manual browser verification. In the dependency graph the V8 waves run before the deployment waves (22.3 onward), whose entries are unchanged and only moved to later wave ids. Every V8 task reads `guidelines/frontend.md` and `guidelines/design-system.md` first (read only, `guidelines/` is never modified).
 
 ## Tasks
 
@@ -1327,6 +1329,173 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - Depends on: 22.5, 33.1
     - _Requirements: 33.1, 33.10, 33.14_
 
+- [ ] 34. Phase 19 (V8): Header logo link and shared authentication check (frontend only)
+  - [ ] 34.1 Create `lib/logoTarget.ts` with the property test
+    - Read `guidelines/frontend.md` and `guidelines/design-system.md` first (read only)
+    - `isVisitorAuthenticated(status)` returns true only for the AuthContext status `authenticated` (no cookie, token, user, or path input); `logoTarget(isAuthenticated)` returns `/` or `/welcome`, never `/login`
+    - fast-check test, at least 100 runs: **Property 59: Logo target depends only on authentication** (all three statuses, random status sequences, never `/login`)
+    - Supersedes the V8-prior behaviour of the fixed `/` brand link of task 17.11; 17.11 stays as history
+    - **Validates: Requirements 18.14, 18.15, 17.14**
+    - _Requirements: 17.14, 18.14, 18.15, 32.20_
+    - _Design: B12, D16, Correctness Property 59_
+    - Depends on: 32
+
+  - [ ] 34.2 Make `AuthProvider` never stay `loading` after a restore failure
+    - Read `guidelines/frontend.md` first. When the session restoration fails with a 5xx or a network error, keep both cookies, leave the User unset, set `status` to `anonymous` (not `loading`), and call `useErrorHandler`; a 401 that survives the refresh flow still clears everything
+    - Add tests: restore 5xx and network error end in `anonymous` with cookies kept; restore success ends in `authenticated`; logout and session expiry end in `anonymous`
+    - Supersedes the V8-prior behaviour of task 17.7 (status after a failed restore); 17.7 stays as history
+    - _Requirements: 17.5, 18.15, 32.20_
+    - _Design: B12 (restore failure with 5xx or network error), B4_
+    - Depends on: 34.1
+
+  - [ ] 34.3 Update `Header.tsx`: logo link and navigation share one check
+    - Read `guidelines/frontend.md` and `guidelines/design-system.md` first. In the Header Client Component compute `isAuth = isVisitorAuthenticated(status)` once and use it for the brand link target (`logoTarget(isAuth)`), "My Tasks", `NotificationBell`, `UserMenu`, "Log in", and "Register"; the Header reads no cookie, token, or `user` object
+    - Brand link: one `Link` with the accessible name "Kano" (mark `aria-hidden="true"`), 44 px target, sets no cookie, sends no request; "Log in" and "Register" are anchor elements, not `BaseButton`; `decideRoute` and `proxy.ts` stay unchanged
+    - Keep the file at or below 300 lines, one component per file
+    - Supersedes the V8-prior behaviour of tasks 17.11, 17.12 (Header) and 30.8; 17.11, 17.12 and 30.8 stay as history
+    - _Requirements: 17.14, 18.13, 18.14, 18.15, 27.10, 38.2_
+    - _Design: B12, B3 (V8 change), D16_
+    - Depends on: 34.1, 34.2
+
+- [ ] 35. Phase 20 (V8): Welcome_Page (frontend only)
+  - [ ] 35.1 Create `lib/welcomeContent.ts` and `lib/forbiddenClaims.ts` with the property test
+    - Read `guidelines/frontend.md` and `guidelines/design-system.md` first (read only)
+    - `welcomeContent.ts`: `WELCOME_COPY` (all texts and link targets exactly as Requirement 38 criteria 16 and 17), `FEATURES` (icon name, title, description of the four cards), `PREVIEW_SAMPLE` (generic sample titles, labels, initials, status chips using only "Not started", "In progress", "Done")
+    - `forbiddenClaims.ts` (outside `components/welcome/`): `FORBIDDEN_CLAIMS` of Requirement 38 criterion 19 and `findForbiddenClaims(text)`: case-insensitive substring match for every entry except "free", which is a whole-word match
+    - fast-check test: **Property 60: Forbidden-claims scan**, plus fixed examples: "operating", "integrating", "generating" report "rating"; "freedom" does not report "free"; "free" as a whole word (also next to punctuation, any case) is reported; `WELCOME_COPY`, `FEATURES`, and `PREVIEW_SAMPLE` return an empty list
+    - Supersedes the V8-prior copy of task 30.6 (1 to 5 sentences and eight capabilities); 30.6 stays as history
+    - **Validates: Requirements 38.16, 38.17, 38.18, 38.19**
+    - _Requirements: 38.1, 38.16, 38.17, 38.18, 38.19, 32.21_
+    - _Design: B13, D17, Correctness Property 60_
+    - Depends on: 32
+
+  - [ ] 35.2 Build the decorative board preview
+    - Read `guidelines/frontend.md` and `guidelines/design-system.md` first. Create `components/welcome/BoardPreview.tsx`, `PreviewColumn.tsx`, `PreviewCard.tsx` (one component per file, Server Components)
+    - Outer wrapper `overflow-x-auto` with `tabIndex={-1}` lies outside the `aria-hidden="true"` container that holds the preview content; no focusable element, link, button, input, `[tabindex]`, `onClick`, or `draggable` inside the container; three Columns with sample Cards, label chips, initials, status chips; one Card shown as dragged (`rotate-2 border-primary-200 shadow-overlay`) next to a dashed placeholder; no other element of the page has a shadow
+    - Complete static Tailwind class strings (lookup objects, no template-built classes); Columns `w-72` below 768 px, three-column grid from 768 px; no ticket ids, counts, metrics, or usage claims
+    - Supersedes the V8-prior behaviour of task 30.6 (no preview); 30.6 stays as history
+    - _Requirements: 38.18, 38.20, 38.21, 27.10_
+    - _Design: B13 (decorative board preview), D17_
+    - Depends on: 35.1
+
+  - [ ] 35.3 Rebuild the Welcome_Page sections and actions
+    - Read `guidelines/frontend.md` and `guidelines/design-system.md` first. Create `WelcomeHero.tsx`, `FeaturesSection.tsx`, `FeatureCard.tsx`, `WelcomeCta.tsx`; rewrite `WelcomeContent.tsx` (order: hero, preview, features, bottom call to action) and `WelcomeActions.tsx` (Client, prop `placement` `hero` or `cta`: "Get started" primary; "Create account" primary and "Log in" secondary, all `BaseButton`, each sets the welcome cookie then navigates); `app/welcome/page.tsx` exports `metadata` and renders no Header or Footer
+    - Exactly one `h1`, the four feature cards with icons from the design-system icon library, no testimonial, quote, rating, metrics bar, or trust note; texts only from `WELCOME_COPY` and `FEATURES`; no API call
+    - Supersedes the V8-prior behaviour of task 30.6 (`WelcomeContent`, `WelcomeActions` with two buttons); 30.6 stays as history
+    - _Requirements: 38.1, 38.2, 38.10, 38.15, 38.16, 38.17, 38.20, 18.13_
+    - _Design: B13 (files, sections, copy), D17, B2 (V8 change)_
+    - Depends on: 35.1, 35.2
+
+  - [ ] 35.4 Design-system and responsive pass for the Welcome_Page
+    - Read `guidelines/frontend.md` and `guidelines/design-system.md` first. Check Inter weights 400, 500, 600 only, tokens only, flat surfaces with 1 px `line` borders, `rounded-md` and `rounded-lg` only, headline in the Display role from 768 px and the H1 role below, one primary button per region, contrast at least 4.5:1, no `shadow-*` except `shadow-overlay` on the dragged preview Card
+    - Below 768 px: single column, hero and bottom buttons full width with at least 44 px height, feature cards stacked, preview Columns at least 240 px inside the scroller; from 768 px: centered hero, feature cards in two columns, bottom buttons side by side; no horizontal page scroll from 375 px to 1920 px
+    - Supersedes the V8-prior responsive note of task 30.10 for `/welcome`; 30.10 stays as history
+    - _Requirements: 38.3, 38.20, 38.21, 27.1, 27.2, 27.9, 27.10_
+    - _Design: B13 (design-system approach, layout by width)_
+    - Depends on: 35.3
+
+- [ ] 36. Phase 21 (V8): Board toolbar and the single separator (frontend only)
+  - [ ] 36.1 Extract `BoardToolbar.tsx`
+    - Read `guidelines/frontend.md` and `guidelines/design-system.md` first. New Client Component with root `data-testid="board-toolbar"`: back link, `h1` title, role `BaseBadge` ("Guest" for a guest), `CardSearchInput`, and for the admin the Members and Analytics `BaseButton`s; no `border-*` class; no add-column prop and no add-column control
+    - Supersedes the V8-prior inline toolbar of tasks 18.4 and 30.1 in `BoardView.tsx`; 18.4 and 30.1 stay as history
+    - _Requirements: 21.12, 21.13, 21.20, 21.24, 21.28_
+    - _Design: B14, D17_
+    - Depends on: 30.1
+
+  - [ ] 36.2 Render the single separator in `BoardView.tsx`
+    - Read `guidelines/frontend.md` and `guidelines/design-system.md` first. Replace the inline toolbar with `<BoardToolbar />`, then exactly one `<hr data-testid="board-separator" className="m-0 h-px w-full border-0 bg-line" />`, then `<div data-testid="board-content" className="pt-6 min-w-0">` holding the search results or the Kanban row; the add-column control stays at the end of the Kanban row, outside the toolbar; the separator shows for admin, member, and guest and in the search-results state, and never in the 403 and 404 states (`BoardAccessMessage`)
+    - Remove any toolbar-side or columns-side border so no second line exists; move the search results list to `SearchResultList.tsx` if `BoardView.tsx` would exceed 300 lines
+    - Supersedes the V8-prior behaviour of tasks 18.4, 18.5, 30.1 and 30.4 (`BoardView` markup); those stay as history
+    - _Requirements: 21.24, 21.25, 21.26, 21.27, 21.28, 27.10, 30.6_
+    - _Design: B14, D17_
+    - Depends on: 36.1
+
+- [ ] 37. Phase 22 (V8): V8 unit tests, Playwright scenarios, and repository checks
+  - [ ] 37.1 Write the Header logo and layout unit tests
+    - Read `guidelines/frontend.md` first. Render `Header` inside a test AuthContext provider and assert: anonymous gives `/welcome` with the welcome cookie present and absent and on the mocked `/login` and `/register` paths; status `authenticated` gives `/`; a visitor with only a refresh cookie gets `/welcome` while the status is `loading` or `anonymous` (including a 5xx restore failure that keeps the cookies) and `/` once the mocked restore succeeds; logo target and navigation (Log in and Register anchors versus My Tasks, bell, user menu) match in every status; the target changes to `/welcome` after `logout()`; the link name is "Kano" and `href` is never `/login`; a click calls no `fetch` and writes no cookie
+    - Assert one `banner` and one `contentinfo` for stand-in pages of the layout and add a static test that fails when a file other than `layout.tsx` renders `<Header` or `<Footer`
+    - Property test: **Property 59** (component use)
+    - Supersedes the V8-prior Header tests of tasks 17.11 and 17.12; those stay as history
+    - **Validates: Requirements 18.13, 18.14, 18.15, 17.14**
+    - _Requirements: 17.14, 18.13, 18.14, 18.15, 32.20_
+    - _Design: B12, Testing Strategy V8 additions, Correctness Property 59_
+    - Depends on: 34.3
+
+  - [ ] 37.2 Write the Welcome_Page unit tests
+    - Read `guidelines/frontend.md` first. Assert: sections in the order hero, preview, features, bottom call to action; Header "Log in" and "Register" are anchors to `/login` and `/register` and not `BaseButton`; hero has the eyebrow, one `h1`, the subheadline, and "Get started" to `/register`; four feature cards with the exact titles and descriptions; bottom "Create account" to `/register` and "Log in" to `/login`; the preview content container has `aria-hidden="true"` and no focusable element (`a[href], button, input, select, textarea, summary, [tabindex]`), its scroller is the parent outside the container with `tabindex="-1"`; exactly one element carries `shadow-overlay` and no other `shadow-*` class; no `fetch`; no `blockquote`, `q`, `cite`, star, or rating element
+    - Scan the rendered text and every `aria-label`, `alt`, and `title` value, the page `metadata.description`, and the source of `components/welcome/**`, `app/welcome/page.tsx`, and `lib/welcomeContent.ts` with `findForbiddenClaims`
+    - Property test: **Property 60** (DOM and source use)
+    - Supersedes the V8-prior tests of task 30.6; 30.6 stays as history
+    - **Validates: Requirements 38.2, 38.15 to 38.20**
+    - _Requirements: 32.21, 38.2, 38.15, 38.16, 38.17, 38.18, 38.19, 38.20_
+    - _Design: B13, Testing Strategy V8 additions, Correctness Property 60_
+    - Depends on: 35.3, 35.4
+
+  - [ ] 37.3 Write the board separator unit tests
+    - Read `guidelines/frontend.md` first. Render `BoardView` for admin, member, and guest with a `BoardDetail` fixture and mocked `apiRequest`: exactly one element with the role `separator`; it follows `[data-testid="board-toolbar"]` and precedes `[data-testid="board-content"]` in document order, also in the search-results state; neither the toolbar nor the content wrapper has `border-t`, `border-b`, or `border` classes; the separator has `h-px` and `bg-line`; the add-column form is not inside the toolbar and is the last item of the Kanban row for admin and member and absent for guest; `BoardAccessMessage` (403 and 404) renders no separator
+    - Supersedes the V8-prior board tests of tasks 18.4 and 30.1; those stay as history
+    - **Validates: Requirements 21.24 to 21.28**
+    - _Requirements: 21.24, 21.25, 21.26, 21.27, 21.28, 32.22_
+    - _Design: B14, Testing Strategy V8 additions_
+    - Depends on: 36.2
+
+  - [ ] 37.4 Update the welcome Playwright scenario (amended R33.13)
+    - Read `guidelines/frontend.md` first. Fresh context: `/` lands on `/welcome`; section-scoped locators (Header `banner`, hero region, bottom region) find Header "Log in" and "Register" links, hero "Get started", bottom "Create account" and "Log in"; the Header "Log in" leads to `/login` and `context.cookies()` contains `kano_welcome_seen`; then `/` lands on `/login`; a visit to `/welcome` and the bottom "Create account" leads to `/register`
+    - Use only `requireCredentials()` and the helpers of task 31.1; no literal credentials, no `waitForTimeout`
+    - Supersedes the V8-prior behaviour of task 31.5 (unscoped "Log in" and "Create account"); 31.5 stays as history
+    - _Requirements: 33.13, 33.6, 33.10, 38.5, 38.6, 38.10_
+    - _Design: Testing Strategy V8 additions (Playwright)_
+    - Depends on: 35.4, 34.3
+
+  - [ ] 37.5 Write the logo Playwright scenarios (R33.15)
+    - Read `guidelines/frontend.md` first. (1) Anonymous: open `/login` (the proxy sets the welcome cookie), click the Header logo, expect `/welcome`; (2) the same from `/register`; (3) logged in through `requireCredentials()`: create a Board with a unique name through the UI, open it, click the logo, expect the Dashboard `/` and neither `/welcome` nor `/login`
+    - No literal credentials, no `waitForTimeout`, web-first assertions only
+    - _Requirements: 33.15, 33.6, 33.10, 18.14_
+    - _Design: Testing Strategy V8 additions (Playwright), B12_
+    - Depends on: 34.3, 31.1
+
+  - [ ] 37.6 Write the layout Playwright scenarios (R33.16)
+    - Read `guidelines/frontend.md` and `guidelines/design-system.md` first. At 375x812 and 1920x1080 (`setViewportSize`): `/welcome` has no horizontal scroll and, at 375 px, the logo link, Header "Log in" and "Register", hero "Get started", bottom "Create account" and "Log in" have bounding boxes of at least 44 by 44 px; on a board page (user from `requireCredentials()` with a Board and two Columns) exactly one visible separator, the toolbar controls do not overlap pairwise, the separator top is at least the largest toolbar control bottom and at most the first Column top, its height is 1 px, and the page `scrollWidth` does not exceed the viewport (the Kanban container may scroll)
+    - No literal credentials, no `waitForTimeout`
+    - _Requirements: 33.16, 33.6, 33.10, 27.10, 21.25, 21.26_
+    - _Design: Testing Strategy V8 additions (Playwright), B13, B14_
+    - Depends on: 35.4, 36.2, 31.1
+
+  - [ ] 37.7 Extend the no-literal-credentials check over the V8 specs
+    - Read `guidelines/frontend.md` first. Confirm the scan of `web/e2e/` (task 31.9, Property 58) covers the new spec files of 37.4 to 37.6 and fails on a literal e-mail address or a literal password passed to a fill; add a test case that lists the V8 spec files and asserts each imports `requireCredentials` or uses no credentials
+    - Supersedes the V8-prior file list of task 31.9; 31.9 stays as history
+    - **Validates: Requirements 33.10, 33.12**
+    - _Requirements: 33.6, 33.10, 33.12, 32.19_
+    - _Design: Correctness Property 58, Testing Strategy V8 additions_
+    - Depends on: 37.4, 37.5, 37.6
+
+  - [ ] 37.8 Add the documentation check for the example HTML files (R36.14)
+    - Read `guidelines/frontend.md` first. Add `web/__tests__/docs-no-example-files.test.ts` (or a script run by the same test): list the example HTML files in the `improvements/` folder at run time (read the names from the folder listing, never hardcode them) and fail when `README.md` or any file in `.kiro/specs/kano/` mentions one of those file names, links to it, or embeds it; the test passes when the folder has no such files
+    - _Requirements: 36.14_
+    - _Design: Traceability (V8 amendments, requirement 36), D3_
+    - Depends on: 32
+
+  - [ ] 37.9 Update the frontend repository-rule tests for the V8 files
+    - Read `guidelines/frontend.md` first. Extend `web/__tests__/repo-rules.test.ts`: no `dangerouslySetInnerHTML`, no native `<button` outside `BaseButton`, one component per file in `components/welcome/` and `BoardToolbar.tsx`, and `scripts/check_file_size.py` over `web/` (300 lines); split any failing file
+    - Supersedes the V8-prior file list of task 30.11; 30.11 stays as history
+    - _Requirements: 28.9, 18.6, 30.6, 30.7_
+    - _Design: B1, File size and split rule_
+    - Depends on: 34.3, 35.4, 36.2
+
+- [ ] 38. V8 frontend checkpoint
+  - Run `npm test` from `web/` (single run, exit code 0, no network and no running API), `npm run build` (exit code 0, zero TypeScript errors), and `scripts/check_file_size.py` over `web/`; no backend test is needed because V8 changes no backend file
+  - Ensure all tests pass, ask the user if questions arise
+  - The V8 manual verification (39) and the deployment tasks (22.3 onward) run only after this checkpoint
+  - Depends on: 34.1, 34.2, 34.3, 35.1, 35.2, 35.3, 35.4, 36.1, 36.2, 37.1, 37.2, 37.3, 37.4, 37.5, 37.6, 37.7, 37.8, 37.9
+  - _Requirements: 32.9, 32.10, 32.11_
+
+- [ ] 39. [MANUAL] Verify the Header logo, the Welcome_Page, and the board separator in the browser
+  - NOT executed by the agent. Run the API with `flask run` and the web app with `npm run dev` against the development database; check at 375 px and at 1920 px (browser device mode)
+  - Check: the logo from `/login` and `/register` (anonymous) lands on `/welcome` and from a board page (logged in) on the Dashboard; the logo and the Header navigation always show the same state, also after logout; `/welcome` shows the sections in order with no horizontal scroll and 44 px targets at 375 px; the preview is decorative and the scroller is not a tab stop; only the dragged preview card has a shadow; a board shows exactly one 1 px line between the toolbar and the columns for admin, member, and guest, with no overlap and no second line; the add-column control stays at the end of the column row
+  - Depends on: 38
+  - _Requirements: 18.14, 18.15, 21.25, 21.26, 21.27, 27.10, 38.15 to 38.21, 33.15, 33.16_
+  - _Design: B12, B13, B14_
+
 ## Notes
 
 - Tasks marked `[MANUAL]` are performed by the user and never by the agent: 4.1, 4.2, 4.3, 15.2, 22.3, 22.4, 22.5, 22.6, 22.7, 22.8, 22.9, 23.4, 23.8, and the V6 manual tasks 26.1 (V6 migration on the development and test databases), 26.2 (optional backfill), 33.3 (browser verification of invite links and the welcome flow), 33.4 (`web/.env.test` and the local E2E account), and 33.5 (E2E account on the production database).
@@ -1342,6 +1511,9 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
 - V6 properties 44 to 58 are tested in: 44 in 25.7 (pure) and 27.4 (database); 45 in 27.4; 46 in 27.6; 47 in 25.9 (`role_allows`) and 27.11 (endpoint matrix); 48 in 27.4; 49 in 27.9; 50 in 25.8 (Python) and 29.3 (TypeScript); 51 in 27.9; 52 in 29.2; 53 in 29.6; 54 in 27.2; 55 in 29.11, 30.1, and 30.2; 56 in 29.3, 29.10, 30.2, and 30.8; 57 in 25.10 (pure) and 27.9 (logs); 58 in 31.9. Older properties updated by V6: 1, 2, 3 in 27.13; 6, 7 in 27.14; 8, 9, 14, 18 in 27.10; 12 in 27.4; 13 in 27.11; 17 in 27.2 and 27.4; 25 in 27.15; 29 in 29.4 and 30.9; 31 and 35 in 29.10 and 30.2; 34 in 30.8; 43 in 27.2. Property 24 and Property 28 are superseded by Properties 46 and 53 (their old tests stay as history in tasks 13.2 and 17.5).
 - V6 requirement coverage (task numbers): R37: 25.2, 25.3, 25.5, 27.7 to 27.9, 27.11, 30.4, 30.5, 31.7 · R38: 29.5 to 29.7, 30.6, 31.5 · amended R2: 25.1, 25.2, 27.12 · R3: 26.1, 26.2 · R4: 27.13 · R7 and R26: 27.1, 27.2, 30.9, 31.8 · R8 to R10, R12: 25.3, 25.4, 27.10, 27.11 · R11: 25.1, 27.3, 27.4 · R13: 27.4 · R14: 27.5, 27.6 · R17 and R19: 29.2, 29.5 to 29.7, 30.7 · R20: 30.8 · R21 to R23: 30.1 to 30.3 · R22: 29.11 · R25: 30.8 · R27: 30.10, 31.4 · R28: 25.5, 25.10, 27.9, 27.14 · R29: 27.15 · R31: 27.2 to 27.15 · R32: 29.x and 30.x tests · R33: 31.1 to 31.9, 33.4, 33.5 · R35: 33.1, 33.2 · R36: 23.3 (V6 note).
 - V6 tests of earlier work: every existing test or code that V6 invalidates is covered by a task that names the task it supersedes: 3.1 and 3.2 by 25.1 and 25.2; 3.3 by 25.3; 3.5 by 25.6; 6.1 and 6.2 by 27.1 and 27.2; 8.3 and 8.4 by 27.10; 11.1 to 11.5 by 27.3 and 27.4; 13.1 and 13.2 by 27.5 and 27.6; 14.1 by 27.11; 14.2 and 14.4 by 27.14; 14.3 by 27.13; 14.5 by 27.15; 17.2, 17.3, 17.4, 17.5, 17.8, 17.14 by 29.1, 29.4, 29.10, 29.5, 29.7, 29.11; 18.1 to 18.12 by 30.1 to 30.10; 19.1 by 30.11; 21.1 to 21.5 by 31.1 to 31.4 and 31.9; 1.1, 2.1, and 17.1 (ignore and `.env.example` files) by 33.1 and 33.2.
+
+- V8 notes: V8 is frontend only, so there is no backend task, migration, or API change. V8 task 39 is a new `[MANUAL]` task (browser verification at 375 px and 1920 px). The deployment tasks 22.3 onward and the documentation tasks 23.x and 24 must run only after the V8 checkpoint (task 38) and the manual task 39; their text is unchanged, and the order is enforced by the waves of the dependency graph (V8 waves 59 to 66, deployment waves moved to 67 to 79). Task 37.8 enforces Requirement 36.14: the README and the spec documents must not name, link, or embed the example HTML files in `improvements/`, so tasks 23.3 and 23.5 must describe the look in words only.
+- V8 properties: 59 in 34.1 (pure) and 37.1 (component); 60 in 35.1 (pure) and 37.2 (DOM and source). V8 requirement coverage (task numbers): R17.14 and R18.14, R18.15: 34.1 to 34.3, 37.1 · R21.24 to R21.28: 36.1, 36.2, 37.3 · R27.10: 34.3, 35.4, 37.6 · R32.20: 37.1 · R32.21: 37.2 · R32.22: 37.3 · R33.13: 37.4 · R33.15: 37.5 · R33.16: 37.6 · R36.14: 37.8 · R38.1 to R38.21: 35.1 to 35.4, 37.2.
 
 ## Task Dependency Graph
 
@@ -1407,19 +1579,27 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     { "id": 56, "tasks": ["32"] },
     { "id": 57, "tasks": ["33.1", "33.3"] },
     { "id": 58, "tasks": ["33.2", "33.4"] },
-    { "id": 59, "tasks": ["22.3"] },
-    { "id": 60, "tasks": ["22.4"] },
-    { "id": 61, "tasks": ["22.5"] },
-    { "id": 62, "tasks": ["22.6", "33.5"] },
-    { "id": 63, "tasks": ["22.7"] },
-    { "id": 64, "tasks": ["22.8"] },
-    { "id": 65, "tasks": ["22.9"] },
-    { "id": 66, "tasks": ["23.1", "23.4", "23.6", "23.7"] },
-    { "id": 67, "tasks": ["23.2"] },
-    { "id": 68, "tasks": ["23.3"] },
-    { "id": 69, "tasks": ["23.5"] },
-    { "id": 70, "tasks": ["23.8"] },
-    { "id": 71, "tasks": ["24"] }
+    { "id": 59, "tasks": ["34.1", "35.1", "36.1", "37.8"] },
+    { "id": 60, "tasks": ["34.2", "35.2", "36.2"] },
+    { "id": 61, "tasks": ["34.3", "35.3"] },
+    { "id": 62, "tasks": ["35.4"] },
+    { "id": 63, "tasks": ["37.1", "37.2", "37.3", "37.4", "37.5", "37.6"] },
+    { "id": 64, "tasks": ["37.7", "37.9"] },
+    { "id": 65, "tasks": ["38"] },
+    { "id": 66, "tasks": ["39"] },
+    { "id": 67, "tasks": ["22.3"] },
+    { "id": 68, "tasks": ["22.4"] },
+    { "id": 69, "tasks": ["22.5"] },
+    { "id": 70, "tasks": ["22.6", "33.5"] },
+    { "id": 71, "tasks": ["22.7"] },
+    { "id": 72, "tasks": ["22.8"] },
+    { "id": 73, "tasks": ["22.9"] },
+    { "id": 74, "tasks": ["23.1", "23.4", "23.6", "23.7"] },
+    { "id": 75, "tasks": ["23.2"] },
+    { "id": 76, "tasks": ["23.3"] },
+    { "id": 77, "tasks": ["23.5"] },
+    { "id": 78, "tasks": ["23.8"] },
+    { "id": 79, "tasks": ["24"] }
 
   ]
 }
