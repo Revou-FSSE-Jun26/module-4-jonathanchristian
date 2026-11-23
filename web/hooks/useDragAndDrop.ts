@@ -19,11 +19,15 @@ import type { Card, Column } from "@/lib/types";
 
 export type TouchDragState = TouchDragTarget;
 
+export interface UseDragAndDropOptions {
+  enabled?: boolean;
+}
+
 export interface UseDragAndDropResult {
-  onDragStart: (e: React.DragEvent, cardId: string) => void;
-  onDragOver: (e: React.DragEvent) => void;
-  onDrop: (e: React.DragEvent, columnId: string, index?: number) => void;
-  onTouchStart: (e: React.TouchEvent, cardId: string) => void;
+  onDragStart: ((e: React.DragEvent, cardId: string) => void) | undefined;
+  onDragOver: ((e: React.DragEvent) => void) | undefined;
+  onDrop: ((e: React.DragEvent, columnId: string, index?: number) => void) | undefined;
+  onTouchStart: ((e: React.TouchEvent, cardId: string) => void) | undefined;
   pendingIds: Set<string>;
   touchDrag: TouchDragState | null;
 }
@@ -31,11 +35,14 @@ export interface UseDragAndDropResult {
 /**
  * Shared mouse (HTML5 drag) and touch (300 ms long-press) drag-and-drop hook.
  * Both input paths converge on `commitDrop` for optimistic updates and rollback.
+ * When `options.enabled` is false (e.g. guest role), all handlers are undefined and drops no-op.
  */
 export function useDragAndDrop(
   columns: Column[],
-  setColumns: React.Dispatch<React.SetStateAction<Column[]>>
+  setColumns: React.Dispatch<React.SetStateAction<Column[]>>,
+  options: UseDragAndDropOptions = {}
 ): UseDragAndDropResult {
+  const enabled = options.enabled ?? true;
   const { handleError } = useErrorHandler();
   const [pendingIds, setPendingIds] = useState<Set<string>>(() => new Set());
   const [touchDrag, setTouchDrag] = useState<TouchDragState | null>(null);
@@ -51,13 +58,22 @@ export function useDragAndDrop(
   const cleanupTouchRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
+    if (!enabled) {
+      cleanupTouchRef.current?.();
+      cleanupTouchRef.current = null;
+      isTouchActiveRef.current = false;
+      setTouchDrag(null);
+    }
     return () => {
       cleanupTouchRef.current?.();
     };
-  }, []);
+  }, [enabled]);
 
   const commitDrop = useCallback(
     async (cardId: string, columnId: string, dropIndex: number) => {
+      if (!enabled) {
+        return;
+      }
       if (pendingRef.current.has(cardId)) {
         return;
       }
@@ -138,7 +154,7 @@ export function useDragAndDrop(
         });
       }
     },
-    [handleError, setColumns]
+    [enabled, handleError, setColumns]
   );
 
   const onDragStart = useCallback((e: React.DragEvent, cardId: string) => {
@@ -203,6 +219,17 @@ export function useDragAndDrop(
     },
     [commitDrop]
   );
+
+  if (!enabled) {
+    return {
+      onDragStart: undefined,
+      onDragOver: undefined,
+      onDrop: undefined,
+      onTouchStart: undefined,
+      pendingIds,
+      touchDrag: null,
+    };
+  }
 
   return {
     onDragStart,
