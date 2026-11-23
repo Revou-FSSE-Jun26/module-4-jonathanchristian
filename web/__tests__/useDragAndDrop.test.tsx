@@ -19,6 +19,8 @@ function makeCard(card_id: string, column_id: string, order: number): Card {
     due_date: null,
     labels: [],
     assignee: null,
+    status: "NOT_STARTED",
+    completed_at: null,
     order,
     created_at: "2026-11-18T00:00:00Z",
     updated_at: "2026-11-18T00:00:00Z",
@@ -44,32 +46,36 @@ function makeInitialColumns(): Column[] {
   ];
 }
 
-function Harness() {
+function Harness({ enabled = true }: { enabled?: boolean }) {
   const [cols, setCols] = useState<Column[]>(makeInitialColumns);
   const { onDragStart, onDragOver, onDrop, onTouchStart, touchDrag } = useDragAndDrop(
     cols,
-    setCols
+    setCols,
+    { enabled }
   );
 
   return (
     <div>
       <span data-testid="touch-phase">{touchDrag ? touchDrag.cardId : "none"}</span>
+      <span data-testid="handlers-defined">
+        {String(Boolean(onDragStart && onDragOver && onDrop && onTouchStart))}
+      </span>
       {cols.map((col) => (
         <div
           key={col.column_id}
           data-testid={col.column_id}
           data-column-id={col.column_id}
           onDragOver={onDragOver}
-          onDrop={(e) => onDrop(e, col.column_id)}
+          onDrop={onDrop ? (e) => onDrop(e, col.column_id) : undefined}
         >
           {col.cards.map((card) => (
             <div
               key={card.card_id}
               data-testid={`card-${card.card_id}`}
               data-card-id={card.card_id}
-              draggable
-              onDragStart={(e) => onDragStart(e, card.card_id)}
-              onTouchStart={(e) => onTouchStart(e, card.card_id)}
+              draggable={enabled}
+              onDragStart={onDragStart ? (e) => onDragStart(e, card.card_id) : undefined}
+              onTouchStart={onTouchStart ? (e) => onTouchStart(e, card.card_id) : undefined}
             >
               {card.title}
             </div>
@@ -141,6 +147,30 @@ describe("hooks/useDragAndDrop", () => {
     fireEvent.dragStart(card, { dataTransfer });
     fireEvent.drop(col1, { dataTransfer });
 
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("Property 55 (hook): returns undefined handlers and starts no drag when enabled is false", () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<Harness enabled={false} />);
+    expect(screen.getByTestId("handlers-defined").textContent).toBe("false");
+    expect(screen.getByTestId("touch-phase").textContent).toBe("none");
+
+    const card = screen.getByTestId("card-c1");
+    const col2 = screen.getByTestId("col-2");
+    fireEvent.dragStart(card);
+    fireEvent.drop(col2);
+    fireEvent.touchStart(card, { touches: [{ clientX: 50, clientY: 50 }] });
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    fireEvent.touchEnd(card);
+
+    expect(screen.getByTestId("touch-phase").textContent).toBe("none");
+    expect(col2.querySelector('[data-card-id="c1"]')).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -220,6 +250,30 @@ describe("hooks/useDragAndDrop", () => {
       document.dispatchEvent(new Event("touchcancel", { bubbles: true }));
     });
     expect(screen.getByTestId("touch-phase")).toHaveTextContent("none");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("Property 55 (hook): returns undefined handlers and starts no drag when enabled is false", () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<Harness enabled={false} />);
+    expect(screen.getByTestId("handlers-defined").textContent).toBe("false");
+    expect(screen.getByTestId("touch-phase").textContent).toBe("none");
+
+    const card = screen.getByTestId("card-c1");
+    const col2 = screen.getByTestId("col-2");
+    fireEvent.dragStart(card);
+    fireEvent.drop(col2);
+    fireEvent.touchStart(card, { touches: [{ clientX: 50, clientY: 50 }] });
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    fireEvent.touchEnd(card);
+
+    expect(screen.getByTestId("touch-phase").textContent).toBe("none");
+    expect(col2.querySelector('[data-card-id="c1"]')).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

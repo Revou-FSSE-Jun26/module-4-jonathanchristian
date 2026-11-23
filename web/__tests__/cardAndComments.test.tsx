@@ -5,7 +5,8 @@ import fc from "fast-check";
 import { CardDetailModal } from "@/components/cards/CardDetailModal";
 import { CommentList } from "@/components/comments/CommentList";
 import { diffCardFields } from "@/lib/format";
-import type { Card, Comment } from "@/lib/types";
+import { CARD_STATUSES } from "@/lib/status";
+import type { Card, CardStatus, Comment } from "@/lib/types";
 
 const handleErrorMock = vi.fn();
 
@@ -30,7 +31,7 @@ vi.mock("react-hot-toast", () => ({
   default: { success: vi.fn(), error: vi.fn(), loading: vi.fn() },
 }));
 
-function makeCard(): Card {
+function makeCard(status: CardStatus = "NOT_STARTED"): Card {
   return {
     card_id: "c1",
     board_id: "b1",
@@ -40,6 +41,8 @@ function makeCard(): Card {
     due_date: "2026-12-01",
     labels: ["docs"],
     assignee: { user_id: "u-current", name: "Current User" },
+    status,
+    completed_at: status === "DONE" ? "2026-11-20T00:00:00Z" : null,
     order: 1,
     created_at: "2026-11-18T00:00:00Z",
     updated_at: "2026-11-18T00:00:00Z",
@@ -68,6 +71,7 @@ describe("CardDetailModal and Comments", () => {
       due_date: fc.option(fc.constant("2026-12-01"), { nil: null }),
       labels: fc.array(fc.string({ minLength: 1, maxLength: 10 }), { maxLength: 4 }),
       assignee_id: fc.option(fc.uuid(), { nil: null }),
+      status: fc.constantFrom(...CARD_STATUSES),
     });
 
     fc.assert(

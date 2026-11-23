@@ -12,9 +12,16 @@ import {
   touchGestureStep,
   type TouchEv,
 } from "@/lib/order";
-import type { Card, Column } from "@/lib/types";
+import { CARD_STATUSES } from "@/lib/status";
+import type { Card, CardStatus, Column } from "@/lib/types";
 
-function makeCard(card_id: string, column_id: string, order: number): Card {
+function makeCard(
+  card_id: string,
+  column_id: string,
+  order: number,
+  status: CardStatus = "NOT_STARTED",
+  completed_at: string | null = null
+): Card {
   return {
     card_id,
     board_id: "b1",
@@ -24,6 +31,8 @@ function makeCard(card_id: string, column_id: string, order: number): Card {
     due_date: null,
     labels: [],
     assignee: null,
+    status,
+    completed_at,
     order,
     created_at: "2026-11-18T00:00:00Z",
     updated_at: "2026-11-18T00:00:00Z",
@@ -105,6 +114,47 @@ describe("lib/order", () => {
 
           const restored = restoreCardInState(moved, snapshot);
           expect(restored).toEqual(initial);
+        }
+      ),
+      { numRuns: 50 }
+    );
+  });
+
+  // Feature: kano, Property 56: Status labels, badges, and moves (move part)
+  it("Property 56 (moves): moveCardInState and restoreCardInState preserve status and completed_at", () => {
+    fc.assert(
+      fc.property(
+        fc.constantFrom(...CARD_STATUSES),
+        fc.option(fc.constant("2026-11-20T12:00:00Z"), { nil: null }),
+        (status, completedAt) => {
+          const initial: Column[] = [
+            {
+              column_id: "col-1",
+              board_id: "b1",
+              name: "To Do",
+              order: 1,
+              cards: [makeCard("c1", "col-1", 1, status, completedAt)],
+            },
+            {
+              column_id: "col-2",
+              board_id: "b1",
+              name: "Done",
+              order: 2,
+              cards: [],
+            },
+          ];
+          const moved = moveCardInState(initial, "c1", "col-2", 1.0);
+          const movedCard = moved[1].cards[0];
+          expect(movedCard.status).toBe(status);
+          expect(movedCard.completed_at).toBe(completedAt);
+
+          const restored = restoreCardInState(moved, {
+            card_id: "c1",
+            column_id: "col-1",
+            order: 1,
+          });
+          expect(restored[0].cards[0].status).toBe(status);
+          expect(restored[0].cards[0].completed_at).toBe(completedAt);
         }
       ),
       { numRuns: 50 }

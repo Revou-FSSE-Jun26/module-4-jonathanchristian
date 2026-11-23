@@ -39,6 +39,7 @@ describe("Dashboard BoardList and CreateBoardModal", () => {
         initialBoards={[
           { board_id: "b1", name: "Roadmap", my_role: "admin", created_at: "2026-11-18T00:00:00Z" },
           { board_id: "b2", name: "Design", my_role: "member", created_at: "2026-11-18T00:00:00Z" },
+          { board_id: "b3", name: "Public", my_role: "guest", created_at: "2026-11-18T00:00:00Z" },
         ]}
       />
     );
@@ -47,6 +48,8 @@ describe("Dashboard BoardList and CreateBoardModal", () => {
     expect(screen.getByText("admin")).toBeInTheDocument();
     expect(screen.getByText("Design").closest("a")).toHaveAttribute("href", "/boards/b2");
     expect(screen.getByText("member")).toBeInTheDocument();
+    expect(screen.getByText("Public").closest("a")).toHaveAttribute("href", "/boards/b3");
+    expect(screen.getByText("guest")).toBeInTheDocument();
   });
 
   it("renders empty state and error panel with retry", async () => {

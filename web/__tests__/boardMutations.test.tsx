@@ -6,6 +6,14 @@ import type { BoardDetail } from "@/lib/types";
 
 const handleErrorMock = vi.fn();
 
+vi.mock("@/hooks/useAuth", () => ({
+  useAuth: () => ({
+    user: { user_id: "u1", name: "Member", email: "m@b.c", created_at: "" },
+    status: "authenticated",
+    logout: vi.fn(),
+  }),
+}));
+
 vi.mock("@/hooks/useErrorHandler", () => ({
   useErrorHandler: () => ({ handleError: handleErrorMock }),
 }));
@@ -86,6 +94,8 @@ describe("BoardView column and card mutations", () => {
                 due_date: null,
                 labels: [],
                 assignee: null,
+                status: "NOT_STARTED",
+                completed_at: null,
                 order: 1,
                 created_at: "2026-11-18T00:00:00Z",
                 updated_at: "2026-11-18T00:00:00Z",
@@ -94,6 +104,9 @@ describe("BoardView column and card mutations", () => {
             { status: 201 }
           )
         );
+      }
+      if (url.endsWith("/comments")) {
+        return Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200 }));
       }
       return Promise.reject(new Error("Unexpected call"));
     });
@@ -137,9 +150,20 @@ describe("BoardView column and card mutations", () => {
     await user.type(screen.getByLabelText("Card title"), "Write tests");
     await user.click(screen.getByRole("button", { name: "Add card" }));
     expect(await screen.findByText("Write tests")).toBeInTheDocument();
+    // New-card flow opens CardDetailModal with the created title and a single Save button
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByLabelText("Title")).toHaveValue("Write tests");
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Delete card" })).not.toBeInTheDocument();
+
+    // Closing without saving keeps the title-only card with status Not started
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByText("Write tests")).toBeInTheDocument();
+    expect(screen.getByText("Not started")).toBeInTheDocument();
   });
 
-  it("keeps state unchanged and calls handleError when mutation fails", async () => {
+  it("keeps state unchanged and calls handleError when mutation fails (opens no modal)", async () => {
     const user = userEvent.setup();
     vi.stubGlobal(
       "fetch",
@@ -148,12 +172,13 @@ describe("BoardView column and card mutations", () => {
 
     render(<BoardView board={makeBoard()} />);
     await user.click(screen.getByRole("button", { name: "Add a card" }));
-    await user.type(screen.getByLabelText("Card title"), "Failing card");
+    await user.type(screen.getByLabelText("Card title"), "Fail card");
     await user.click(screen.getByRole("button", { name: "Add card" }));
 
     await waitFor(() => {
       expect(handleErrorMock).toHaveBeenCalledTimes(1);
     });
-    expect(screen.queryByText("Failing card")).not.toBeInTheDocument();
+    expect(screen.queryByText("Fail card")).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });

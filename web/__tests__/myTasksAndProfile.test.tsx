@@ -5,11 +5,18 @@ import fc from "fast-check";
 import { MyTasksList } from "@/components/cards/MyTasksList";
 import { ProfileForm } from "@/components/users/ProfileForm";
 import { groupByBoard } from "@/lib/format";
+import { CARD_STATUSES } from "@/lib/status";
 import type { CardSearchResult } from "@/lib/types";
 
 const updateUserMock = vi.fn();
 const handleErrorMock = vi.fn();
 const refreshMock = vi.fn();
+const mockUser = {
+  user_id: "u1",
+  name: "Ada Lovelace",
+  email: "ada@example.com",
+  created_at: "2026-11-18T00:00:00Z",
+};
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: refreshMock }),
@@ -17,12 +24,7 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({
-    user: {
-      user_id: "u1",
-      name: "Ada Lovelace",
-      email: "ada@example.com",
-      created_at: "2026-11-18T00:00:00Z",
-    },
+    user: mockUser,
     updateUser: updateUserMock,
   }),
 }));
@@ -64,6 +66,8 @@ describe("MyTasksList and ProfileForm", () => {
       due_date: fc.constant(null),
       labels: fc.constant([] as string[]),
       assignee: fc.constant(null),
+      status: fc.constantFrom(...CARD_STATUSES),
+      completed_at: fc.constant(null),
       order: fc.constant(1),
       created_at: fc.constant("2026-11-18T00:00:00Z"),
       updated_at: fc.constant("2026-11-18T00:00:00Z"),
@@ -81,7 +85,7 @@ describe("MyTasksList and ProfileForm", () => {
     );
   });
 
-  it("MyTasksList renders grouped tasks, empty state, and error panel", () => {
+  it("MyTasksList renders grouped tasks with StatusBadge (including Done), empty state, and error panel", () => {
     const tasks: CardSearchResult[] = [
       {
         card_id: "c1",
@@ -94,16 +98,37 @@ describe("MyTasksList and ProfileForm", () => {
         due_date: null,
         labels: [],
         assignee: null,
+        status: "NOT_STARTED",
+        completed_at: null,
         order: 1,
         created_at: "2026-11-18T00:00:00Z",
         updated_at: "2026-11-18T00:00:00Z",
+      },
+      {
+        card_id: "c2",
+        board_id: "b1",
+        board_name: "Roadmap",
+        column_id: "col-2",
+        column_name: "Shipped",
+        title: "Release V6",
+        description: null,
+        due_date: null,
+        labels: [],
+        assignee: null,
+        status: "DONE",
+        completed_at: "2026-11-20T00:00:00Z",
+        order: 2,
+        created_at: "2026-11-18T00:00:00Z",
+        updated_at: "2026-11-20T00:00:00Z",
       },
     ];
 
     const { rerender } = render(<MyTasksList initialCards={tasks} />);
     expect(screen.getByText("Roadmap")).toBeInTheDocument();
     expect(screen.getByText("Write docs")).toBeInTheDocument();
-    expect(screen.getByText("No due date")).toBeInTheDocument();
+    expect(screen.getByText("Not started")).toBeInTheDocument();
+    expect(screen.getByText("Release V6")).toBeInTheDocument();
+    expect(screen.getByText("Done")).toBeInTheDocument();
 
     rerender(<MyTasksList initialCards={[]} />);
     expect(screen.getByText("No tasks assigned")).toBeInTheDocument();
@@ -112,12 +137,28 @@ describe("MyTasksList and ProfileForm", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Load failed");
   });
 
-  it("ProfileForm pre-fills values, has no password field, handles 200 and 409", async () => {
+  it("ProfileForm renders fixed email as text, validates name and password section, and handles 200 and 400 current_password", async () => {
     const user = userEvent.setup();
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ error: "Email in use" }), { status: 409 })
+        new Response(
+          JSON.stringify({
+            data: {
+              user_id: "u1",
+              name: "Ada King",
+              email: "ada@example.com",
+              created_at: "2026-11-18T00:00:00Z",
+            },
+          }),
+          { status: 200 }
+        )
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ error: "current_password: does not match" }),
+          { status: 400 }
+        )
       )
       .mockResolvedValueOnce(
         new Response(
@@ -135,23 +176,63 @@ describe("MyTasksList and ProfileForm", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     render(<ProfileForm />);
-    expect(screen.queryByLabelText(/password/i)).not.toBeInTheDocument();
+    expect(screen.getByText("ada@example.com")).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Email" })).not.toBeInTheDocument();
     expect(screen.getByLabelText("Name")).toHaveValue("Ada Lovelace");
-    expect(screen.getByLabelText("Email")).toHaveValue("ada@example.com");
 
-    await user.click(screen.getByRole("button", { name: "Save profile" }));
-    expect(await screen.findByText("This email is already in use.")).toBeInTheDocument();
-    expect(updateUserMock).not.toHaveBeenCalled();
-
+    // Name 0 and 101 validation
     const nameInput = screen.getByLabelText("Name");
+    await user.clear(nameInput);
+    await user.click(screen.getByRole("button", { name: "Save profile" }));
+    expect(screen.getByText("Name is required")).toBeInTheDocument();
+
+    await user.type(nameInput, "a".repeat(101));
+    await user.click(screen.getByRole("button", { name: "Save profile" }));
+    expect(screen.getByText("Name must be at most 100 characters")).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    // Valid name only -> body has only { name }, no email, no password
     await user.clear(nameInput);
     await user.type(nameInput, "Ada King");
     await user.click(screen.getByRole("button", { name: "Save profile" }));
-
     await waitFor(() => {
-      expect(updateUserMock).toHaveBeenCalledWith(
-        expect.objectContaining({ name: "Ada King" })
-      );
+      expect(updateUserMock).toHaveBeenCalledTimes(1);
+    });
+    expect(JSON.parse(fetchMock.mock.calls[0][1]!.body as string)).toEqual({ name: "Ada King" });
+
+    // One-filled password section error
+    const curPw = screen.getByLabelText("Current password");
+    const newPw = screen.getByLabelText("New password");
+    await user.type(curPw, "oldpass1");
+    await user.click(screen.getByRole("button", { name: "Save profile" }));
+    expect(screen.getByText("New password is required")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // 7-char new password error
+    await user.type(newPw, "1234567");
+    await user.click(screen.getByRole("button", { name: "Save profile" }));
+    expect(screen.getByText("Password must be at least 8 characters")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    // 8-char new password -> 400 naming current_password keeps name and sets field error
+    await user.type(newPw, "8");
+    await user.click(screen.getByRole("button", { name: "Save profile" }));
+    expect(await screen.findByText("current_password: does not match")).toBeInTheDocument();
+    expect(nameInput).toHaveValue("Ada King");
+    expect(updateUserMock).toHaveBeenCalledTimes(1);
+    expect(handleErrorMock).not.toHaveBeenCalled();
+
+    // Retry with valid current_password -> 200 clears password inputs
+    await user.click(screen.getByRole("button", { name: "Save profile" }));
+    await waitFor(() => {
+      expect(updateUserMock).toHaveBeenCalledTimes(2);
+    });
+    expect(curPw).toHaveValue("");
+    expect(newPw).toHaveValue("");
+    expect(JSON.parse(fetchMock.mock.calls[2][1]!.body as string)).toEqual({
+      name: "Ada King",
+      password: "12345678",
+      current_password: "oldpass1",
     });
   });
 });

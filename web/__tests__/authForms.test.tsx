@@ -151,4 +151,82 @@ describe("RegisterForm and LoginForm", () => {
       expect(pushMock).toHaveBeenCalledWith("/");
     });
   });
+
+  it("LoginForm and RegisterForm honor valid invite `next` and ignore invalid `next`", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((url: string) => {
+        if (url.endsWith("/register")) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                data: {
+                  user_id: "u1",
+                  name: "Ada",
+                  email: "ada@example.com",
+                  created_at: "2026-11-18T00:00:00Z",
+                },
+              }),
+              { status: 201 }
+            )
+          );
+        }
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              data: {
+                access_token: "acc",
+                refresh_token: "ref",
+                token_type: "Bearer",
+                expires_in: 3600,
+                refresh_expires_in: 604800,
+                user: {
+                  user_id: "u1",
+                  name: "Ada",
+                  email: "ada@example.com",
+                  created_at: "2026-11-18T00:00:00Z",
+                },
+              },
+            }),
+            { status: 200 }
+          )
+        );
+      })
+    );
+
+    const { rerender } = render(<RegisterForm next="/invite/tok_abc" />);
+    expect(screen.getByRole("link", { name: "Log in" })).toHaveAttribute(
+      "href",
+      "/login?next=%2Finvite%2Ftok_abc"
+    );
+    await user.type(screen.getByLabelText("Name"), "Ada");
+    await user.type(screen.getByLabelText("Email"), "ada@example.com");
+    await user.type(screen.getByLabelText("Password"), "12345678");
+    await user.click(screen.getByRole("button", { name: "Create account" }));
+    await waitFor(() => {
+      expect(pushMock).toHaveBeenCalledWith("/login?next=%2Finvite%2Ftok_abc");
+    });
+
+    pushMock.mockReset();
+    rerender(<LoginForm next="/invite/tok_abc" />);
+    expect(screen.getByRole("link", { name: "Register" })).toHaveAttribute(
+      "href",
+      "/register?next=%2Finvite%2Ftok_abc"
+    );
+    await user.type(screen.getByLabelText("Email"), "ada@example.com");
+    await user.type(screen.getByLabelText("Password"), "correctpass");
+    await user.click(screen.getByRole("button", { name: "Log in" }));
+    await waitFor(() => {
+      expect(pushMock).toHaveBeenCalledWith("/invite/tok_abc");
+    });
+
+    // Invalid next (absolute URL and non-invite path) falls back to /
+    pushMock.mockReset();
+    rerender(<LoginForm next="https://evil.test/steal" />);
+    await user.click(screen.getByRole("button", { name: "Log in" }));
+    await waitFor(() => {
+      expect(pushMock).toHaveBeenCalledWith("/");
+    });
+  });
 });

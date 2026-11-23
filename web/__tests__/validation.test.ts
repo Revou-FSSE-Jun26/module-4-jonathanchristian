@@ -5,9 +5,12 @@ import {
   validateCardTitle,
   validateColumnName,
   validateCommentText,
+  validateCurrentPassword,
   validateEmail,
   validateName,
+  validateNewPassword,
   validatePassword,
+  validatePasswordSection,
   validateProfileFields,
 } from "@/lib/validation";
 
@@ -53,6 +56,24 @@ describe("lib/validation", () => {
       name: null,
       email: null,
     });
+
+    expect(validateCurrentPassword("")).not.toBeNull();
+    expect(validateCurrentPassword("x")).toBeNull();
+    expect(validateNewPassword("1234567")).not.toBeNull();
+    expect(validateNewPassword("12345678")).toBeNull();
+    expect(validateNewPassword("a".repeat(128))).toBeNull();
+    expect(validateNewPassword("a".repeat(129))).not.toBeNull();
+
+    expect(validatePasswordSection("", "")).toEqual({
+      currentPassword: null,
+      newPassword: null,
+    });
+    expect(validatePasswordSection("oldpass1", "").newPassword).not.toBeNull();
+    expect(validatePasswordSection("", "newpass1").currentPassword).not.toBeNull();
+    expect(validatePasswordSection("oldpass1", "newpass1")).toEqual({
+      currentPassword: null,
+      newPassword: null,
+    });
   });
 
   // Feature: kano, Property 29: Client validators mirror server rules
@@ -66,6 +87,22 @@ describe("lib/validation", () => {
         expect(validateCommentText(input) === null).toBe(serverAcceptsTrimmed(input, 2000));
         expect(validateEmail(input) === null).toBe(serverAcceptsEmail(input));
         expect(validatePassword(input) === null).toBe(serverAcceptsPassword(input));
+        expect(validateNewPassword(input) === null).toBe(serverAcceptsPassword(input));
+        expect(validateCurrentPassword(input) === null).toBe(input.length > 0);
+      }),
+      { numRuns: 200 }
+    );
+  });
+
+  it("Property 29 (password section): mirrors server rules over arbitrary pairs", () => {
+    fc.assert(
+      fc.property(fc.string({ maxLength: 140 }), fc.string({ maxLength: 140 }), (cur, next) => {
+        const res = validatePasswordSection(cur, next);
+        const accepted = res.currentPassword === null && res.newPassword === null;
+        const serverAccepts =
+          (cur.length === 0 && next.length === 0) ||
+          (cur.length > 0 && serverAcceptsPassword(next));
+        expect(accepted).toBe(serverAccepts);
       }),
       { numRuns: 200 }
     );

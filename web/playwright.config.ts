@@ -1,10 +1,14 @@
+import path from "node:path";
+import dotenv from "dotenv";
 import { defineConfig, devices } from "@playwright/test";
+
+dotenv.config({ path: path.resolve(__dirname, ".env.test"), override: false });
 
 function resolveE2EBaseUrl(): string {
   const raw = process.env.E2E_BASE_URL?.trim();
   if (!raw) {
     throw new Error(
-      "E2E_BASE_URL is required (e.g. E2E_BASE_URL=http://localhost:3000) and must be an absolute http or https URL."
+      "Missing required environment variable: E2E_BASE_URL (must be an absolute http or https URL)."
     );
   }
   let parsed: URL;

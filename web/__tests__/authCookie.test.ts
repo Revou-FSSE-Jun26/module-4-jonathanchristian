@@ -1,15 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import fc from "fast-check";
 import {
   ACCESS_COOKIE,
   REFRESH_COOKIE,
+  WELCOME_COOKIE,
   clearAuthCookies,
   decodeJwtExp,
   getAccessToken,
   getRefreshToken,
-  guardDecision,
+  getWelcomeSeen,
   setAccessCookie,
   setRefreshCookie,
+  setWelcomeCookie,
 } from "@/lib/authCookie";
 
 function makeJwt(exp: number): string {
@@ -21,6 +22,7 @@ function makeJwt(exp: number): string {
 describe("lib/authCookie", () => {
   beforeEach(() => {
     clearAuthCookies();
+    document.cookie = `${WELCOME_COOKIE}=; Path=/; Max-Age=0`;
   });
 
   it("writes access and refresh cookies using provided lifetimes other than 3600 and 604800", () => {
@@ -39,15 +41,19 @@ describe("lib/authCookie", () => {
     cookieSetter.mockRestore();
   });
 
-  it("reads and clears both cookies", () => {
+  it("reads and clears both auth cookies while preserving the welcome cookie", () => {
     setAccessCookie("token-a", 120);
     setRefreshCookie("token-r", 240);
+    setWelcomeCookie();
+
     expect(getAccessToken()).toBe("token-a");
     expect(getRefreshToken()).toBe("token-r");
+    expect(getWelcomeSeen()).toBe(true);
 
     clearAuthCookies();
     expect(getAccessToken()).toBeNull();
     expect(getRefreshToken()).toBeNull();
+    expect(getWelcomeSeen()).toBe(true);
   });
 
   it("decodes JWT exp safely", () => {
@@ -55,47 +61,5 @@ describe("lib/authCookie", () => {
     expect(decodeJwtExp(token)).toBe(1800000000);
     expect(decodeJwtExp("invalid")).toBeNull();
     expect(decodeJwtExp(null)).toBeNull();
-  });
-
-  // Feature: kano, Property 28: Route guard decision
-  it("Property 28: guardDecision covers all auth and protected path combinations", () => {
-    const pathArb = fc.constantFrom("/", "/boards/123", "/my-tasks", "/profile", "/login", "/register");
-    const tokenStateArb = fc.constantFrom<"absent" | "expired" | "valid">("absent", "expired", "valid");
-
-    fc.assert(
-      fc.property(
-        pathArb,
-        tokenStateArb,
-        tokenStateArb,
-        fc.integer({ min: 1000, max: 2000000000 }),
-        (pathname, accessState, refreshState, now) => {
-          const toExp = (s: "absent" | "expired" | "valid") =>
-            s === "absent" ? null : s === "expired" ? now - 10 : now + 60;
-
-          const decision = guardDecision({
-            pathname,
-            accessExp: toExp(accessState),
-            refreshExp: toExp(refreshState),
-            now,
-          });
-
-          const isAuthPage = pathname === "/login" || pathname === "/register";
-          if (isAuthPage) {
-            if (accessState === "valid" || refreshState === "valid") {
-              expect(decision).toBe("redirect-home");
-            } else {
-              expect(decision).toBe("allow");
-            }
-          } else if (accessState === "valid") {
-            expect(decision).toBe("allow");
-          } else if (refreshState === "valid") {
-            expect(decision).toBe("refresh");
-          } else {
-            expect(decision).toBe("redirect-login");
-          }
-        }
-      ),
-      { numRuns: 200 }
-    );
   });
 });

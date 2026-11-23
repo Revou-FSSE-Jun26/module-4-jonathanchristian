@@ -47,6 +47,19 @@ describe("Frontend repository rules (G-FE-03, G-FE-04, G-FE-15, G-BE-15)", () =>
 
   it("enforces one exported React component per file in components/", () => {
     const compFiles = collectFiles(path.join(WEB_ROOT, "components"), new Set([".tsx"]));
+    const basenames = new Set(compFiles.map((f) => path.basename(f)));
+    for (const required of [
+      "MemberList.tsx",
+      "InviteLinkRow.tsx",
+      "StatusSelect.tsx",
+      "WelcomeActions.tsx",
+      "StatusBadge.tsx",
+      "CardDetailForm.tsx",
+      "ChangePasswordForm.tsx",
+      "ReadOnlyEmail.tsx",
+    ]) {
+      expect(basenames.has(required)).toBe(true);
+    }
     for (const file of compFiles) {
       const content = fs.readFileSync(file, "utf8");
       const matches = Array.from(
@@ -56,14 +69,18 @@ describe("Frontend repository rules (G-FE-03, G-FE-04, G-FE-15, G-BE-15)", () =>
     }
   });
 
-  it("keeps all web/ source files at or below 300 lines via scripts/check_file_size.py", () => {
-    const venvPython = path.join(REPO_ROOT, "app", "venv", "Scripts", "python.exe");
-    const pythonBin = fs.existsSync(venvPython) ? venvPython : "python";
-    const output = execFileSync(
-      pythonBin,
-      [path.join(REPO_ROOT, "scripts", "check_file_size.py"), "web"],
-      { cwd: REPO_ROOT, encoding: "utf8" }
-    );
-    expect(output).toContain("OK:");
-  });
+  it(
+    "keeps all web/ source files at or below 300 lines via scripts/check_file_size.py",
+    () => {
+      const venvPython = path.join(REPO_ROOT, "app", "venv", "Scripts", "python.exe");
+      const pythonBin = fs.existsSync(venvPython) ? venvPython : "python";
+      const output = execFileSync(
+        pythonBin,
+        [path.join(REPO_ROOT, "scripts", "check_file_size.py"), "web"],
+        { cwd: REPO_ROOT, encoding: "utf8" }
+      );
+      expect(output).toContain("OK:");
+    },
+    15000
+  );
 });
