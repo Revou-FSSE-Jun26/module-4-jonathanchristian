@@ -1,6 +1,6 @@
 # Implementation Plan: Kano
 
-**Version:** V6 (V1 to V5 tasks 1 to 22.2 preserved as history; V6 tasks added as 25 onward)
+**Version:** V7 (V1 to V5 tasks 1 to 22.2 preserved as history; V6 tasks added as 25 onward; V7 narrows task 33.1)
 
 ## Overview
 
@@ -1047,8 +1047,8 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
   - Depends on: 25.7, 25.8, 25.9, 25.10, 27.2, 27.4, 27.6, 27.9, 27.10, 27.11, 27.12, 27.13, 27.14, 27.15
   - _Requirements: 31.8, 30.6, 30.7_
 
-- [ ] 29. Phase 15 (V6): Frontend libraries and shared pieces
-  - [ ] 29.1 Add the V6 types and the pure libraries `status.ts`, `roles.ts`, `inviteRoles.ts`, and `nextParam.ts`
+- [x] 29. Phase 15 (V6): Frontend libraries and shared pieces
+  - [x] 29.1 Add the V6 types and the pure libraries `status.ts`, `roles.ts`, `inviteRoles.ts`, and `nextParam.ts`
     - `lib/types.ts`: `Role` includes `guest`, `CardStatus`, `Card` gains `status` and `completed_at`, plus `InviteLink`, `InviteLinks`, `InviteInfo`, `AcceptResult`, `ProfileUpdate` (never `email`)
     - `lib/status.ts` (`CARD_STATUSES`, `STATUS_LABEL`, `STATUS_VARIANT`, `isCardStatus`), `lib/roles.ts` (`canEdit`, `isAdmin`, `isGuest`, `ROLE_VARIANT`), `lib/inviteRoles.ts` (`acceptOutcome`, the twin of `resolve_accept`), `lib/nextParam.ts` (`safeNext`, `withNext`)
     - Supersedes the V5 types of task 17.2; 17.2 stays as history
@@ -1056,20 +1056,20 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B10 (V6 additions), B7-V6 (`lib/status.ts`), B6-V6 (`lib/roles.ts`), B4-V6 (`safeNext`)_
     - Depends on: 28
 
-  - [ ] 29.2 Write property test for `safeNext`
+  - [x] 29.2 Write property test for `safeNext`
     - **Property 52: Safe `next` parameter**
     - fast-check: valid `/invite/<1 to 128 URL-safe characters>` accepted; absolute and protocol-relative URLs, backslashes, extra slashes, query strings, fragments, percent sequences, whitespace, and other paths return null; the post-login target is `safeNext(next) ?? "/"`
     - **Validates: Requirements 19.8, 19.11, 28.15**
     - _Requirements: 19.8, 19.11, 28.15, 32.19_
     - Depends on: 29.1
 
-  - [ ] 29.3 Write tests for `status.ts`, `roles.ts`, and `inviteRoles.ts`
+  - [x] 29.3 Write tests for `status.ts`, `roles.ts`, and `inviteRoles.ts`
     - **Property 50** (TypeScript twin): `acceptOutcome` equals the Python `resolve_accept` table over all role pairs; **Property 56: Status labels, badges, and moves** (label and variant part): the three labels "Not started", "In progress", "Done" and the three variants are pairwise distinct; `canEdit`, `isAdmin`, `isGuest` over all roles
     - **Validates: Requirements 21.22, 23.17, 37.12, 37.19**
     - _Requirements: 21.22, 23.17, 25.2, 37.12, 37.19, 32.19_
     - Depends on: 29.1
 
-  - [ ] 29.4 Update `lib/validation.ts` for the profile and re-run the validator property test
+  - [x] 29.4 Update `lib/validation.ts` for the profile and re-run the validator property test
     - Add `validateNewPassword` (8 to 128), `validateCurrentPassword` (non-empty), and `validatePasswordSection(cur, next)` (both empty ok; exactly one filled errors on the empty one; both filled validate each); the email validator stays for register and login and is no longer used by the profile page
     - Supersedes the V5 behaviour of task 17.3 (profile email validator); 17.3 stays as history
     - Property test: **Property 29: Client validators mirror server rules** (updated with the new validators)
@@ -1078,7 +1078,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B11, Correctness Property 29_
     - Depends on: 28
 
-  - [ ] 29.5 Replace `guardDecision` with `decideRoute` and add the welcome cookie helpers
+  - [x] 29.5 Replace `guardDecision` with `decideRoute` and add the welcome cookie helpers
     - `lib/decideRoute.ts`: `classifyPath`, `INVITE_PATH_RE`, and the pure `decideRoute({ pathname, auth, welcomeSeen })` with the table of design B4-V6; `lib/authCookie.ts`: add `WELCOME_COOKIE`, `getWelcomeSeen`, `setWelcomeCookie` (`kano_welcome_seen=1`, Max-Age 31536000, path `/`, `SameSite=Lax`, not httpOnly); `clearAuthCookies` never touches the welcome cookie
     - Delete `guardDecision` from `lib/authCookie.ts` and move its test cases to `decideRoute`, so only one decision function exists
     - Supersedes the V5 behaviour of task 17.5 (`guardDecision`, Property 28); 17.5 stays as history
@@ -1086,14 +1086,14 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B4-V6, D15, Open issue 28_
     - Depends on: 28
 
-  - [ ] 29.6 Write property test for `decideRoute`
+  - [x] 29.6 Write property test for `decideRoute`
     - **Property 53: Route decision with welcome cookie and invite paths**
     - fast-check over every combination of path class (`/`, `/welcome`, `/login`, `/register`, `/invite/<token>` with generated tokens, malformed invite path, other protected path), auth state, and cookie flag; plus tests that logout keeps the welcome cookie
     - **Validates: Requirements 17.7, 17.8, 17.9, 17.12, 17.13, 37.20, 38.5 to 38.12**
     - _Requirements: 17.12, 17.13, 37.20, 38.5, 38.6, 38.7, 38.8, 38.9, 38.10, 38.11, 38.12, 38.13, 32.19_
     - Depends on: 29.5
 
-  - [ ] 29.7 Update the proxy (`web/proxy.ts`) to use `decideRoute`
+  - [x] 29.7 Update the proxy (`web/proxy.ts`) to use `decideRoute`
     - Compute `auth` from the cookies, call `decideRoute`, perform `refresh-then-continue` (forward the new access cookie on the request and the response), re-evaluate with `auth: "unauthenticated"` after a 401 refresh (delete both auth cookies, invite paths keep `next`, `/` goes to `/welcome` or `/login` by the cookie), network error or 5xx still goes to `/login?expired=1`, and set `kano_welcome_seen` when `setWelcomeCookie` is true; `/login?expired=1` keeps the loop guard
     - Update the proxy tests with a mocked fetch for every decision branch including the invite path with an expired access cookie and a valid refresh cookie
     - Supersedes the V5 behaviour of task 17.8; 17.8 stays as history
@@ -1101,20 +1101,20 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B4-V6, Open issue 32_
     - Depends on: 29.5
 
-  - [ ] 29.8 Add the invite page headers in `next.config.ts` with a test
+  - [x] 29.8 Add the invite page headers in `next.config.ts` with a test
     - `headers()` sets `Referrer-Policy: no-referrer` and `Cache-Control: no-store` for `/invite/:path*`; a unit test reads the exported config and asserts both headers for that source
     - _Requirements: 28.13, 37.18_
     - _Design: B1 (`next.config.ts`), Open issue 22_
     - Depends on: 28
 
-  - [ ] 29.9 Create the shared `StatusBadge` component with a test
+  - [x] 29.9 Create the shared `StatusBadge` component with a test
     - `components/shared/StatusBadge.tsx` renders `BaseBadge` with `STATUS_LABEL` and `STATUS_VARIANT`; it is the only place a status becomes text
     - RTL test: each of the three statuses renders its label and a distinct variant class
     - _Requirements: 21.22, 25.2, 18.4_
     - _Design: B3 (`StatusBadge`), B7-V6_
     - Depends on: 29.1
 
-  - [ ] 29.10 Update `diffCardFields` and the order reducers for status
+  - [x] 29.10 Update `diffCardFields` and the order reducers for status
     - `lib/format.ts`: `diffCardFields` also compares `status`, so a status-only change produces exactly `{ status }`; `lib/order.ts`: `moveCardInState` and `restoreCardInState` copy every field except `column_id` and `order` unchanged
     - Supersedes the V5 behaviour of tasks 17.2 (`diffCardFields`) and 17.4 (reducers); 17.2 and 17.4 stay as history
     - Property tests: **Property 35: Changed-fields diff** (updated), **Property 56: Status labels, badges, and moves** (move part), **Property 31** re-run
@@ -1123,7 +1123,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B6-V6, B7-V6, Correctness Properties 31, 35, 56_
     - Depends on: 29.1
 
-  - [ ] 29.11 Add `enabled` to `useDragAndDrop` and test the guest case
+  - [x] 29.11 Add `enabled` to `useDragAndDrop` and test the guest case
     - `useDragAndDrop({ enabled })`: when false return the same shape with every handler undefined and `touchDrag = null`, and `commitDrop` returns early, so no drag starts, no state changes, and no request is sent for any mouse or touch sequence; when true behave as before and send only `column_id` and `order`
     - Supersedes the V5 behaviour of task 17.14; 17.14 stays as history
     - Property test: **Property 55: Guest UI has no edit controls and starts no drag** (hook part)
@@ -1132,8 +1132,8 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B6-V6, Correctness Property 55_
     - Depends on: 29.10
 
-- [ ] 30. Phase 16 (V6): Frontend pages and components
-  - [ ] 30.1 Add `BoardRoleContext` and role gating to the board components
+- [x] 30. Phase 16 (V6): Frontend pages and components
+  - [x] 30.1 Add `BoardRoleContext` and role gating to the board components
     - `components/boards/BoardRoleContext.tsx` provides `{ role, canEdit, isAdmin }` from `my_role`; `BoardView`, `KanbanColumn`, `ColumnHeader`, `AddColumnForm`, `AddCardForm`, `CardSearchInput`, and `CardItem` read it; a guest sees the "Guest" `BaseBadge`, no add-column, add-card, rename, delete, or drag controls (no `draggable`, no touch handler), keeps the search input, and `CardItem` shows `StatusBadge`
     - Pass `enabled = canEdit` to `useDragAndDrop`
     - RTL tests: admin and member see the controls, guest does not, drag of a card changes no badge
@@ -1144,7 +1144,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B6-V6, B2, Correctness Property 55_
     - Depends on: 29.9, 29.11, 29.1
 
-  - [ ] 30.2 Rebuild `CardDetailModal` with the status control and the guest read-only view
+  - [x] 30.2 Rebuild `CardDetailModal` with the status control and the guest read-only view
     - Split into `CardDetailModal.tsx` (shell and save logic), `CardDetailForm.tsx`, and `StatusSelect.tsx` (native select with exactly "Not started", "In progress", "Done", preselected); the PATCH sends only changed fields including `status`; on 200 call `onCardUpdated(card)` so the board badge updates; on error keep the modal open, the entered values, and the previous status
     - Assignee options are `members.filter(m => m.role !== "guest")`; when `canEdit` is false every field and the status select are disabled and the save, delete, comment form, and comment edit and delete controls are hidden (`CommentList readOnly`) while comments still load; support `isNew` with a single Save button and an empty diff closing without a request
     - RTL tests: three options with the current status preselected, status-only PATCH body, badge update, failing PATCH keeps the previous status, guest view
@@ -1155,7 +1155,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B7-V6, Correctness Properties 35, 55, 56_
     - Depends on: 30.1, 29.9, 29.10
 
-  - [ ] 30.3 Implement the new-card flow
+  - [x] 30.3 Implement the new-card flow
     - `AddCardForm` still asks only for the title and returns the created Card to `BoardView`, which appends it to its column and opens `CardDetailModal` with `isNew`; a failed creation opens no modal and shows no card; closing the modal without saving keeps the title-only card with status `NOT_STARTED`
     - RTL tests for the three states of the diagram in design B6-V6
     - Supersedes the V5 add-card behaviour of task 18.5 (no modal after creation); 18.5 stays as history
@@ -1163,7 +1163,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B6-V6 (new-card flow state diagram)_
     - Depends on: 30.2
 
-  - [ ] 30.4 Rebuild the member panel with the invitation links
+  - [x] 30.4 Rebuild the member panel with the invitation links
     - Split `MemberPanel.tsx` into `MemberPanel.tsx` (shell), `MemberList.tsx` (role `BaseBadge` per row and remove control for every non-admin row including guests), `AddMemberForm.tsx`, `InviteLinksPanel.tsx`, and `InviteLinkRow.tsx`; the panel renders only for the admin
     - `InviteLinksPanel` calls GET `/api/boards/<id>/invite-links` on mount and shows "Member link: can edit" and "Guest link: view only" with the full URL in a read-only selectable field, a copy `BaseButton` (`navigator.clipboard.writeText` in `try/catch`: success toast, failure error toast with the URL still visible), and a regenerate `BaseButton` that opens `ConfirmDialog` and replaces the token only after a 200 (error: old link stays, `handleError`)
     - RTL tests: panel and links only for the admin, copy success and failure, regenerate confirm and error, guest rows removable
@@ -1172,21 +1172,21 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B6-V6 (member panel and invitation links), B1_
     - Depends on: 30.1, 29.1
 
-  - [ ] 30.5 Build the `/invite/[token]` page
+  - [x] 30.5 Build the `/invite/[token]` page
     - `app/invite/[token]/page.tsx` (Server: reject a token that fails the token format with the not-found message, else fetch GET `/api/invites/<token>` with the server token; 401 calls `redirect("/login?expired=1")`) and `components/boards/InviteJoinCard.tsx` (Client): board name, "Member: can edit" or "Guest: view only", a Join `BaseButton` disabled while POST accept runs, redirect to `/boards/<board_id>` with a success toast on 200; when `acceptOutcome` is `none` and `current_role` is set show the current role and an open-board link instead; a 404 shows the not-found message with a link to `/` and no Join button
     - RTL tests for each branch
     - _Requirements: 37.18, 37.19, 27.9, 32.18_
     - _Design: B2 (`/invite/[token]`), B6-V6 (invite page)_
     - Depends on: 29.1, 29.5
 
-  - [ ] 30.6 Build the `/welcome` page
+  - [x] 30.6 Build the `/welcome` page
     - `app/welcome/page.tsx` (public Server Component, no API call), `components/welcome/WelcomeContent.tsx` (1 to 5 sentences and the eight listed capabilities), `components/welcome/WelcomeActions.tsx` (Client: "Log in" and "Create account" `BaseButton`s that call `setWelcomeCookie` and navigate); one Header and one Footer from the layout; single-column responsive layout `mx-auto w-full max-w-xl px-4`
     - RTL tests: both buttons present, the cookie is set on click, navigation targets `/login` and `/register`
     - _Requirements: 38.1, 38.2, 38.3, 38.10, 27.9_
     - _Design: B2 (`/welcome`), B4-V6, B9 (V6 responsive note)_
     - Depends on: 29.5
 
-  - [ ] 30.7 Make the login and register forms honor `next`
+  - [x] 30.7 Make the login and register forms honor `next`
     - `LoginForm` redirects with `router.push(safeNext(next) ?? "/")`; `RegisterForm` redirects to `withNext("/login", safeNext(next))` after the 201; the two pages link to each other with `withNext`; invalid `next` values are ignored
     - RTL tests: valid invite `next` followed after login and kept through register, absolute URL and other-path `next` ignored
     - Supersedes the V5 redirect behaviour of tasks 18.1 and 18.2; 18.1 and 18.2 stay as history
@@ -1194,7 +1194,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B4-V6 (`safeNext`, `withNext`)_
     - Depends on: 29.1, 29.2
 
-  - [ ] 30.8 Show guest role badges on the Dashboard and status badges in My Tasks
+  - [x] 30.8 Show guest role badges on the Dashboard and status badges in My Tasks
     - `BoardList` role badge uses `ROLE_VARIANT` for `admin`, `member`, and `guest`; `MyTasksList` renders `StatusBadge` after the Column name, keeps `DONE` cards with the "Done" badge, and adds no status filter
     - Update the Dashboard and My Tasks RTL tests accordingly
     - Supersedes the V5 behaviour of tasks 18.3 and 18.10; 18.3 and 18.10 stay as history
@@ -1204,7 +1204,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B2 (V6 other pages), B7-V6 (badges)_
     - Depends on: 29.9, 29.1
 
-  - [ ] 30.9 Rebuild the Profile page (fixed email, change password)
+  - [x] 30.9 Rebuild the Profile page (fixed email, change password)
     - `components/users/ProfileForm.tsx` (name input pre-filled), `ReadOnlyEmail.tsx` (email as text, no input), `ChangePasswordForm.tsx` (masked current and new password inputs, `autoComplete` values, never pre-populated); the body never contains `email` and contains `password` and `current_password` only when both are filled and valid; on 200 call `updateUser`, show a success toast, and clear both password inputs; a 400 that names `current_password` (`errorNamesField`) shows the field error and keeps the name; other errors use `useErrorHandler`
     - RTL tests: no email input exists, name 0 and 101 error, one-filled password section error, 7 characters error and 8 characters submitted with `current_password`, the `current_password` error branch, the request body check
     - Supersedes the V5 behaviour of task 18.11 (editable email, no password); 18.11 stays as history
@@ -1214,22 +1214,22 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B11, B2 (`/profile` V6 change)_
     - Depends on: 29.4
 
-  - [ ] 30.10 Responsive pass for the V6 pages and guest view
+  - [x] 30.10 Responsive pass for the V6 pages and guest view
     - Review `/welcome`, `/invite/[token]`, `InviteLinksPanel` (URL field, copy, and regenerate stacked below `md`, `break-all`), the guest badge (`flex-wrap`), and `ConfirmDialog` at 375 px against design B9; 44 px tap targets for Join, Log in, and Create account; add class-based RTL assertions where practical
     - Supersedes the V5 coverage of task 18.12 for the new pages; 18.12 stays as history
     - _Requirements: 27.1, 27.2, 27.6, 27.9, 22.17_
     - _Design: B9 (V6 responsive note)_
     - Depends on: 30.1, 30.2, 30.3, 30.4, 30.5, 30.6
 
-  - [ ] 30.11 Update the frontend repository-rule tests for the V6 files
+  - [x] 30.11 Update the frontend repository-rule tests for the V6 files
     - Supersedes the V5 coverage of task 19.1 for the new and split files; 19.1 stays as history
     - `web/__tests__/repo-rules.test.ts`: no `dangerouslySetInnerHTML`, no native `<button` outside `BaseButton`, one component per file in `components/` (including `MemberList`, `InviteLinkRow`, `StatusSelect`, `WelcomeActions`), and `scripts/check_file_size.py` over `web/` (300 lines); split any failing file
     - _Requirements: 28.9, 18.6, 30.6, 30.7_
     - _Design: B1, File size and split rule_
     - Depends on: 30.10
 
-- [ ] 31. Phase 17 (V6): Playwright and `.env.test` work
-  - [ ] 31.1 Update `playwright.config.ts` and add the credential and welcome helpers
+- [x] 31. Phase 17 (V6): Playwright and `.env.test` work
+  - [x] 31.1 Update `playwright.config.ts` and add the credential and welcome helpers
     - Load `web/.env.test` with dotenv (`override: false`, so process variables win) before reading any variable; validate `E2E_BASE_URL` (absolute http or https URL, error names the variable) before any test starts; create `web/.env.test.example` with placeholders for `E2E_BASE_URL`, `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`
     - `web/e2e/support/credentials.ts`: `requireCredentials()` throws `Missing required environment variable: <NAME>` (never a value), builds the wrong password at run time (`password + "-wrong-" + Date.now()`), and builds the unique registration email by plus-addressing the local part of `E2E_USER_EMAIL`; `web/e2e/support/welcome.ts`: `setWelcomeSeen(context, baseURL)` adds the `kano_welcome_seen` cookie
     - Unit tests: missing variable named in the error, no value printed, dotenv does not override an existing variable
@@ -1238,47 +1238,47 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Testing Strategy V6 additions (Playwright), D1 (V6 credentials note)_
     - Depends on: 30.11
 
-  - [ ] 31.2 Update the auth E2E scenarios (no literal credentials, welcome cookie)
+  - [x] 31.2 Update the auth E2E scenarios (no literal credentials, welcome cookie)
     - Supersedes the V5 specs of task 21.2; 21.2 stays as history
     - Four scenarios: login with `requireCredentials()` redirects to `/`; the wrong password built at run time shows the invalid-credentials error and stays on `/login`; an unauthenticated visit to `/` (after `setWelcomeSeen`) redirects to `/login`; logout redirects to `/login` and a following visit to `/` redirects again
     - _Requirements: 33.3, 33.6, 33.10, 33.11, 33.14_
     - _Design: Testing Strategy V6 additions (Playwright)_
     - Depends on: 31.1
 
-  - [ ] 31.3 Update the Kanban journey E2E (generated email, password from the environment)
+  - [x] 31.3 Update the Kanban journey E2E (generated email, password from the environment)
     - Supersedes the V5 spec of task 21.3; 21.3 stays as history
     - Step 1 registers a unique generated email with the password from `E2E_USER_PASSWORD` through the helper; the 8 steps, serial mode, and mouse `dragTo` stay
     - _Requirements: 33.4, 33.5, 33.6, 33.10_
     - Depends on: 31.1
 
-  - [ ] 31.4 Update the mobile viewport E2E checks (375 px) for the new pages
+  - [x] 31.4 Update the mobile viewport E2E checks (375 px) for the new pages
     - Supersedes the V5 specs of task 21.4; 21.4 stays as history
     - Remove hardcoded credentials (use the helper), set the welcome cookie before visiting `/`, and add `/welcome` and an invite page to the overflow, overlap, and 44 px checks
     - _Requirements: 27.1, 27.2, 27.6, 27.9, 33.10_
     - _Design: B9, Testing Strategy V6 additions_
     - Depends on: 31.1
 
-  - [ ] 31.5 Write the welcome E2E scenario
+  - [x] 31.5 Write the welcome E2E scenario
     - Fresh browser context: a visit to `/` lands on `/welcome`; the page shows "Log in" and "Create account"; "Log in" leads to `/login` and `context.cookies()` contains `kano_welcome_seen`; "Create account" leads to `/register`; a second visit to `/` lands on `/login`
     - _Requirements: 33.13, 38.5, 38.6, 38.10, 38.14_
     - Depends on: 31.1
 
-  - [ ] 31.6 Write the status and new-card E2E scenarios
+  - [x] 31.6 Write the status and new-card E2E scenarios
     - Status: open a card, choose "In progress", save, see the badge on the board; set "Done" and see "Done" in `/my-tasks`. New card: add a card by title, the Card Detail Modal opens with the title, fill the description, save
     - _Requirements: 21.17, 21.22, 23.17, 23.18, 25.2, 33.3_
     - Depends on: 31.1
 
-  - [ ] 31.7 Write the invite-join E2E scenario
+  - [x] 31.7 Write the invite-join E2E scenario
     - The pre-existing user creates a Board and reads the member and guest links in the member panel; a second browser context registers a generated user and joins through the member link and sees edit controls; a third context joins through the guest link and sees the "Guest" badge and no add-column control
     - _Requirements: 37.15, 37.18, 37.20, 21.20, 33.14_
     - Depends on: 31.1
 
-  - [ ] 31.8 Write the profile E2E scenario
+  - [x] 31.8 Write the profile E2E scenario
     - `/profile` shows the email as text equal to `E2E_USER_EMAIL` (read through the helper) and has no email input
     - _Requirements: 26.1, 33.10_
     - Depends on: 31.1
 
-  - [ ] 31.9 Extend the E2E checks with the no-literal-credentials scan
+  - [x] 31.9 Extend the E2E checks with the no-literal-credentials scan
     - `web/scripts/scanCredentials.ts` exports the pure `findCredentialLiterals(source)` (reports an e-mail address string literal or a string literal passed to a password or email input fill); extend `web/__tests__/no-wait-for-timeout.test.ts` (task 21.5) so it also fails on any finding in `web/e2e/`
     - Supersedes the V5 check of task 21.5 (only `waitForTimeout`); 21.5 stays as history
     - Property test: **Property 58: E2E sources contain no literal credentials** (generated sources, plus the real files under `web/e2e/`)
@@ -1287,7 +1287,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Correctness Property 58, Testing Strategy V6 additions_
     - Depends on: 31.2, 31.3, 31.4, 31.5, 31.6, 31.7, 31.8
 
-- [ ] 32. V6 frontend checkpoint
+- [x] 32. V6 frontend checkpoint
   - Run `npm test` from `web/` (single run, exit code 0, no network and no running API), `npm run build` (exit code 0, zero TypeScript errors), `pytest -v` from `app/`, and `scripts/check_file_size.py` over `app/` and `web/`
   - Ensure all tests pass, ask the user if questions arise
   - Final repository and verification tasks (33) and the deployment tasks (22.3 onward) depend on this checkpoint
@@ -1295,15 +1295,16 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
   - _Requirements: 32.9, 32.10, 32.11, 31.8_
 
 - [ ] 33. Phase 18 (V6): Final repository rules and pre-deployment verification
-  - [ ] 33.1 Update `.gitignore` for `.env.test` and `.env.test.example`
+  - [x] 33.1 Update `.gitignore` for `.env.test` and `.env.test.example`
     - Keep ignoring `.env`, `.env.local`, and every other `.env*`; add `.env.test` to the ignored files and keep `.env.example` and `.env.test.example` tracked with the exceptions placed after the `.env*` rule (`!.env.example`, `!.env.test.example`)
-    - Add a test or script that runs `git check-ignore web/.env.test` (must be ignored) and `git check-ignore web/.env.test.example` and `git check-ignore app/.env.example` (must not be)
+    - ~~Add a test or script that runs `git check-ignore web/.env.test` (must be ignored) and `git check-ignore web/.env.test.example` and `git check-ignore app/.env.example` (must not be)~~ V7: removed at the user's request. The `git check-ignore` results were checked once by hand; the automated check stays in task 23.7
+    - V7 note: `web/.gitignore` also has its own `.env*` rule, so it gets the `!.env.test.example` exception too
     - Supersedes the V5 rules of task 1.1; 1.1 stays as history
     - _Requirements: 35.1, 35.2, 35.7_
     - _Design: D1 (V6 credentials note), Testing Strategy V6 additions (Files)_
     - Depends on: 32
 
-  - [ ] 33.2 Check the ignore files and the `.env.example` files for V6
+  - [x] 33.2 Check the ignore files and the `.env.example` files for V6
     - Confirm `.vercelignore` still excludes `web/`, `app/venv/`, and `.kiro/` and that `web/.env.test` is never part of an upload; add a test that each `.env.example` lists every variable read by its project (V6 adds no environment variable) and that `web/.env.test.example` lists exactly `E2E_BASE_URL`, `E2E_USER_EMAIL`, and `E2E_USER_PASSWORD` with placeholder values
     - Supersedes the V5 coverage of `.vercelignore` and the `.env.example` files in tasks 1.1, 2.1, and 17.1; those stay as history
     - _Requirements: 35.2, 1.14, 15.5_

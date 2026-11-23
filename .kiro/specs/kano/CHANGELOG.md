@@ -258,3 +258,25 @@ Tasks 1 to 22.2 are completed history and were not edited (same numbering, text,
 - **Tasks:** `tasks.md` is now V6. New tasks 25 to 33 cover every V6 requirement amendment and requirements 37 and 38, and the Correctness Properties 44 to 58 each have a test task. Pending V5 tasks 22.3 to 22.9, 23.1 to 23.8, and 24 keep their text and are re-ordered behind the V6 checkpoint through `Depends on` lines and later waves.
 - **Order:** the V6 migration (26.1) blocks every V6 task that uses the new columns. The production schema (22.4) includes V6, so no production-only V6 migration exists.
 - **Open points for the user:** hand-adding the two check constraints in the migration (26.1), deciding on the optional backfill (26.2), creating the E2E accounts and `web/.env.test` (33.4, 33.5), and the design open issues 22, 24, and 25.
+
+#### Implementation change (after tasks 25 to 28): Postman collection "Kano" synced with pp/openapi.yaml 2.0.0
+- Classification: implementation change (test tooling). No specification or design change, so the version stays V6.
+- Postman collection "Kano" (My Workspace) updated: description now v2.0.0 with roles; new folder Invitations (7 requests: get invite links, regenerate member and guest token, invite info and accept for each token); new requests Change password, Update current user (email rejected), Create card (status rejected), Update card status (IN_PROGRESS, DONE, invalid).
+- Existing requests: descriptions updated for the guest role, status and completed_at, and the new analytics definition; Create card test now checks NOT_STARTED and completed_at null.
+- New collection variables: 
+ew_password, member_invite_token, guest_invite_token.
+- Not run against a live server yet.
+
+## V7 - 2026-11-21
+### Changes
+- **Task change (33.1).** The sub-step "add a test or script that runs `git check-ignore`" is removed at the user's request. The `git check-ignore` results were checked once by hand: `web/.env.test` is ignored, and `web/.env.test.example`, `web/.env.example`, and `app/.env.example` are not. The automated check stays in pending task 23.7 (repository hygiene script).
+- **Design change (Testing Strategy V6 additions, Files).** A V7 note says the check is not automated in 33.1 and that task 23.7 covers it later. No V6 text was removed.
+- **Implementation change (33.1).** Root `.gitignore` adds `.env.test` and `!.env.test.example` after the `.env*` rule. `web/.gitignore` adds `!.env.test.example`, because its own `.env*` rule was ignoring `web/.env.test.example`.
+- **Implementation change (33.2).** New `web/__tests__/env-files.test.ts`. It checks that `.vercelignore` still excludes `web/`, `app/venv/`, and `.kiro/`. It also checks that `app/.env.example` and `web/.env.example` list every variable their code reads, and that `web/.env.test.example` lists exactly `E2E_BASE_URL`, `E2E_USER_EMAIL`, and `E2E_USER_PASSWORD` with placeholder values. `VERCEL` is set by the platform and is excluded from the check.
+- Requirements: no change. The version marker is V7 only to keep the documents consistent.
+### Reason
+- The user asked to run tasks 33.1 and 33.2 without the `git check-ignore` test or script.
+### Impact
+- Requirements 35.1, 35.2, 35.7, 1.14, 15.5: behaviour unchanged.
+- Design: Testing Strategy V6 additions (Files), with a V7 note.
+- Tasks: 33.1 and 33.2 done. Task 23.7 still includes the `git check-ignore` check. Tasks 33.3 to 33.5 are not affected.

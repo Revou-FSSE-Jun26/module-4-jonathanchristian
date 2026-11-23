@@ -1,6 +1,6 @@
 # Requirements Document
 
-**Version:** V6
+**Version:** V7 (no requirement change from V6)
 
 ## Introduction
 
