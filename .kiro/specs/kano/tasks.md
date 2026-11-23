@@ -1329,8 +1329,8 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - Depends on: 22.5, 33.1
     - _Requirements: 33.1, 33.10, 33.14_
 
-- [ ] 34. Phase 19 (V8): Header logo link and shared authentication check (frontend only)
-  - [ ] 34.1 Create `lib/logoTarget.ts` with the property test
+- [x] 34. Phase 19 (V8): Header logo link and shared authentication check (frontend only)
+  - [x] 34.1 Create `lib/logoTarget.ts` with the property test
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first (read only)
     - `isVisitorAuthenticated(status)` returns true only for the AuthContext status `authenticated` (no cookie, token, user, or path input); `logoTarget(isAuthenticated)` returns `/` or `/welcome`, never `/login`
     - fast-check test, at least 100 runs: **Property 59: Logo target depends only on authentication** (all three statuses, random status sequences, never `/login`)
@@ -1340,7 +1340,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B12, D16, Correctness Property 59_
     - Depends on: 32
 
-  - [ ] 34.2 Make `AuthProvider` never stay `loading` after a restore failure
+  - [x] 34.2 Make `AuthProvider` never stay `loading` after a restore failure
     - Read `guidelines/frontend.md` first. When the session restoration fails with a 5xx or a network error, keep both cookies, leave the User unset, set `status` to `anonymous` (not `loading`), and call `useErrorHandler`; a 401 that survives the refresh flow still clears everything
     - Add tests: restore 5xx and network error end in `anonymous` with cookies kept; restore success ends in `authenticated`; logout and session expiry end in `anonymous`
     - Supersedes the V8-prior behaviour of task 17.7 (status after a failed restore); 17.7 stays as history
@@ -1348,7 +1348,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B12 (restore failure with 5xx or network error), B4_
     - Depends on: 34.1
 
-  - [ ] 34.3 Update `Header.tsx`: logo link and navigation share one check
+  - [x] 34.3 Update `Header.tsx`: logo link and navigation share one check
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first. In the Header Client Component compute `isAuth = isVisitorAuthenticated(status)` once and use it for the brand link target (`logoTarget(isAuth)`), "My Tasks", `NotificationBell`, `UserMenu`, "Log in", and "Register"; the Header reads no cookie, token, or `user` object
     - Brand link: one `Link` with the accessible name "Kano" (mark `aria-hidden="true"`), 44 px target, sets no cookie, sends no request; "Log in" and "Register" are anchor elements, not `BaseButton`; `decideRoute` and `proxy.ts` stay unchanged
     - Keep the file at or below 300 lines, one component per file
@@ -1357,8 +1357,8 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B12, B3 (V8 change), D16_
     - Depends on: 34.1, 34.2
 
-- [ ] 35. Phase 20 (V8): Welcome_Page (frontend only)
-  - [ ] 35.1 Create `lib/welcomeContent.ts` and `lib/forbiddenClaims.ts` with the property test
+- [x] 35. Phase 20 (V8): Welcome_Page (frontend only)
+  - [x] 35.1 Create `lib/welcomeContent.ts` and `lib/forbiddenClaims.ts` with the property test
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first (read only)
     - `welcomeContent.ts`: `WELCOME_COPY` (all texts and link targets exactly as Requirement 38 criteria 16 and 17), `FEATURES` (icon name, title, description of the four cards), `PREVIEW_SAMPLE` (generic sample titles, labels, initials, status chips using only "Not started", "In progress", "Done")
     - `forbiddenClaims.ts` (outside `components/welcome/`): `FORBIDDEN_CLAIMS` of Requirement 38 criterion 19 and `findForbiddenClaims(text)`: case-insensitive substring match for every entry except "free", which is a whole-word match
@@ -1369,7 +1369,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B13, D17, Correctness Property 60_
     - Depends on: 32
 
-  - [ ] 35.2 Build the decorative board preview
+  - [x] 35.2 Build the decorative board preview
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first. Create `components/welcome/BoardPreview.tsx`, `PreviewColumn.tsx`, `PreviewCard.tsx` (one component per file, Server Components)
     - Outer wrapper `overflow-x-auto` with `tabIndex={-1}` lies outside the `aria-hidden="true"` container that holds the preview content; no focusable element, link, button, input, `[tabindex]`, `onClick`, or `draggable` inside the container; three Columns with sample Cards, label chips, initials, status chips; one Card shown as dragged (`rotate-2 border-primary-200 shadow-overlay`) next to a dashed placeholder; no other element of the page has a shadow
     - Complete static Tailwind class strings (lookup objects, no template-built classes); Columns `w-72` below 768 px, three-column grid from 768 px; no ticket ids, counts, metrics, or usage claims
@@ -1378,7 +1378,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B13 (decorative board preview), D17_
     - Depends on: 35.1
 
-  - [ ] 35.3 Rebuild the Welcome_Page sections and actions
+  - [x] 35.3 Rebuild the Welcome_Page sections and actions
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first. Create `WelcomeHero.tsx`, `FeaturesSection.tsx`, `FeatureCard.tsx`, `WelcomeCta.tsx`; rewrite `WelcomeContent.tsx` (order: hero, preview, features, bottom call to action) and `WelcomeActions.tsx` (Client, prop `placement` `hero` or `cta`: "Get started" primary; "Create account" primary and "Log in" secondary, all `BaseButton`, each sets the welcome cookie then navigates); `app/welcome/page.tsx` exports `metadata` and renders no Header or Footer
     - Exactly one `h1`, the four feature cards with icons from the design-system icon library, no testimonial, quote, rating, metrics bar, or trust note; texts only from `WELCOME_COPY` and `FEATURES`; no API call
     - Supersedes the V8-prior behaviour of task 30.6 (`WelcomeContent`, `WelcomeActions` with two buttons); 30.6 stays as history
@@ -1386,7 +1386,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B13 (files, sections, copy), D17, B2 (V8 change)_
     - Depends on: 35.1, 35.2
 
-  - [ ] 35.4 Design-system and responsive pass for the Welcome_Page
+  - [x] 35.4 Design-system and responsive pass for the Welcome_Page
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first. Check Inter weights 400, 500, 600 only, tokens only, flat surfaces with 1 px `line` borders, `rounded-md` and `rounded-lg` only, headline in the Display role from 768 px and the H1 role below, one primary button per region, contrast at least 4.5:1, no `shadow-*` except `shadow-overlay` on the dragged preview Card
     - Below 768 px: single column, hero and bottom buttons full width with at least 44 px height, feature cards stacked, preview Columns at least 240 px inside the scroller; from 768 px: centered hero, feature cards in two columns, bottom buttons side by side; no horizontal page scroll from 375 px to 1920 px
     - Supersedes the V8-prior responsive note of task 30.10 for `/welcome`; 30.10 stays as history
@@ -1394,15 +1394,15 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B13 (design-system approach, layout by width)_
     - Depends on: 35.3
 
-- [ ] 36. Phase 21 (V8): Board toolbar and the single separator (frontend only)
-  - [ ] 36.1 Extract `BoardToolbar.tsx`
+- [x] 36. Phase 21 (V8): Board toolbar and the single separator (frontend only)
+  - [x] 36.1 Extract `BoardToolbar.tsx`
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first. New Client Component with root `data-testid="board-toolbar"`: back link, `h1` title, role `BaseBadge` ("Guest" for a guest), `CardSearchInput`, and for the admin the Members and Analytics `BaseButton`s; no `border-*` class; no add-column prop and no add-column control
     - Supersedes the V8-prior inline toolbar of tasks 18.4 and 30.1 in `BoardView.tsx`; 18.4 and 30.1 stay as history
     - _Requirements: 21.12, 21.13, 21.20, 21.24, 21.28_
     - _Design: B14, D17_
     - Depends on: 30.1
 
-  - [ ] 36.2 Render the single separator in `BoardView.tsx`
+  - [x] 36.2 Render the single separator in `BoardView.tsx`
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first. Replace the inline toolbar with `<BoardToolbar />`, then exactly one `<hr data-testid="board-separator" className="m-0 h-px w-full border-0 bg-line" />`, then `<div data-testid="board-content" className="pt-6 min-w-0">` holding the search results or the Kanban row; the add-column control stays at the end of the Kanban row, outside the toolbar; the separator shows for admin, member, and guest and in the search-results state, and never in the 403 and 404 states (`BoardAccessMessage`)
     - Remove any toolbar-side or columns-side border so no second line exists; move the search results list to `SearchResultList.tsx` if `BoardView.tsx` would exceed 300 lines
     - Supersedes the V8-prior behaviour of tasks 18.4, 18.5, 30.1 and 30.4 (`BoardView` markup); those stay as history
@@ -1410,8 +1410,8 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B14, D17_
     - Depends on: 36.1
 
-- [ ] 37. Phase 22 (V8): V8 unit tests, Playwright scenarios, and repository checks
-  - [ ] 37.1 Write the Header logo and layout unit tests
+- [x] 37. Phase 22 (V8): V8 unit tests, Playwright scenarios, and repository checks
+  - [x] 37.1 Write the Header logo and layout unit tests
     - Read `guidelines/frontend.md` first. Render `Header` inside a test AuthContext provider and assert: anonymous gives `/welcome` with the welcome cookie present and absent and on the mocked `/login` and `/register` paths; status `authenticated` gives `/`; a visitor with only a refresh cookie gets `/welcome` while the status is `loading` or `anonymous` (including a 5xx restore failure that keeps the cookies) and `/` once the mocked restore succeeds; logo target and navigation (Log in and Register anchors versus My Tasks, bell, user menu) match in every status; the target changes to `/welcome` after `logout()`; the link name is "Kano" and `href` is never `/login`; a click calls no `fetch` and writes no cookie
     - Assert one `banner` and one `contentinfo` for stand-in pages of the layout and add a static test that fails when a file other than `layout.tsx` renders `<Header` or `<Footer`
     - Property test: **Property 59** (component use)
@@ -1421,7 +1421,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B12, Testing Strategy V8 additions, Correctness Property 59_
     - Depends on: 34.3
 
-  - [ ] 37.2 Write the Welcome_Page unit tests
+  - [x] 37.2 Write the Welcome_Page unit tests
     - Read `guidelines/frontend.md` first. Assert: sections in the order hero, preview, features, bottom call to action; Header "Log in" and "Register" are anchors to `/login` and `/register` and not `BaseButton`; hero has the eyebrow, one `h1`, the subheadline, and "Get started" to `/register`; four feature cards with the exact titles and descriptions; bottom "Create account" to `/register` and "Log in" to `/login`; the preview content container has `aria-hidden="true"` and no focusable element (`a[href], button, input, select, textarea, summary, [tabindex]`), its scroller is the parent outside the container with `tabindex="-1"`; exactly one element carries `shadow-overlay` and no other `shadow-*` class; no `fetch`; no `blockquote`, `q`, `cite`, star, or rating element
     - Scan the rendered text and every `aria-label`, `alt`, and `title` value, the page `metadata.description`, and the source of `components/welcome/**`, `app/welcome/page.tsx`, and `lib/welcomeContent.ts` with `findForbiddenClaims`
     - Property test: **Property 60** (DOM and source use)
@@ -1431,7 +1431,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B13, Testing Strategy V8 additions, Correctness Property 60_
     - Depends on: 35.3, 35.4
 
-  - [ ] 37.3 Write the board separator unit tests
+  - [x] 37.3 Write the board separator unit tests
     - Read `guidelines/frontend.md` first. Render `BoardView` for admin, member, and guest with a `BoardDetail` fixture and mocked `apiRequest`: exactly one element with the role `separator`; it follows `[data-testid="board-toolbar"]` and precedes `[data-testid="board-content"]` in document order, also in the search-results state; neither the toolbar nor the content wrapper has `border-t`, `border-b`, or `border` classes; the separator has `h-px` and `bg-line`; the add-column form is not inside the toolbar and is the last item of the Kanban row for admin and member and absent for guest; `BoardAccessMessage` (403 and 404) renders no separator
     - Supersedes the V8-prior board tests of tasks 18.4 and 30.1; those stay as history
     - **Validates: Requirements 21.24 to 21.28**
@@ -1439,7 +1439,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B14, Testing Strategy V8 additions_
     - Depends on: 36.2
 
-  - [ ] 37.4 Update the welcome Playwright scenario (amended R33.13)
+  - [x] 37.4 Update the welcome Playwright scenario (amended R33.13)
     - Read `guidelines/frontend.md` first. Fresh context: `/` lands on `/welcome`; section-scoped locators (Header `banner`, hero region, bottom region) find Header "Log in" and "Register" links, hero "Get started", bottom "Create account" and "Log in"; the Header "Log in" leads to `/login` and `context.cookies()` contains `kano_welcome_seen`; then `/` lands on `/login`; a visit to `/welcome` and the bottom "Create account" leads to `/register`
     - Use only `requireCredentials()` and the helpers of task 31.1; no literal credentials, no `waitForTimeout`
     - Supersedes the V8-prior behaviour of task 31.5 (unscoped "Log in" and "Create account"); 31.5 stays as history
@@ -1447,21 +1447,21 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Testing Strategy V8 additions (Playwright)_
     - Depends on: 35.4, 34.3
 
-  - [ ] 37.5 Write the logo Playwright scenarios (R33.15)
+  - [x] 37.5 Write the logo Playwright scenarios (R33.15)
     - Read `guidelines/frontend.md` first. (1) Anonymous: open `/login` (the proxy sets the welcome cookie), click the Header logo, expect `/welcome`; (2) the same from `/register`; (3) logged in through `requireCredentials()`: create a Board with a unique name through the UI, open it, click the logo, expect the Dashboard `/` and neither `/welcome` nor `/login`
     - No literal credentials, no `waitForTimeout`, web-first assertions only
     - _Requirements: 33.15, 33.6, 33.10, 18.14_
     - _Design: Testing Strategy V8 additions (Playwright), B12_
     - Depends on: 34.3, 31.1
 
-  - [ ] 37.6 Write the layout Playwright scenarios (R33.16)
+  - [x] 37.6 Write the layout Playwright scenarios (R33.16)
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first. At 375x812 and 1920x1080 (`setViewportSize`): `/welcome` has no horizontal scroll and, at 375 px, the logo link, Header "Log in" and "Register", hero "Get started", bottom "Create account" and "Log in" have bounding boxes of at least 44 by 44 px; on a board page (user from `requireCredentials()` with a Board and two Columns) exactly one visible separator, the toolbar controls do not overlap pairwise, the separator top is at least the largest toolbar control bottom and at most the first Column top, its height is 1 px, and the page `scrollWidth` does not exceed the viewport (the Kanban container may scroll)
     - No literal credentials, no `waitForTimeout`
     - _Requirements: 33.16, 33.6, 33.10, 27.10, 21.25, 21.26_
     - _Design: Testing Strategy V8 additions (Playwright), B13, B14_
     - Depends on: 35.4, 36.2, 31.1
 
-  - [ ] 37.7 Extend the no-literal-credentials check over the V8 specs
+  - [x] 37.7 Extend the no-literal-credentials check over the V8 specs
     - Read `guidelines/frontend.md` first. Confirm the scan of `web/e2e/` (task 31.9, Property 58) covers the new spec files of 37.4 to 37.6 and fails on a literal e-mail address or a literal password passed to a fill; add a test case that lists the V8 spec files and asserts each imports `requireCredentials` or uses no credentials
     - Supersedes the V8-prior file list of task 31.9; 31.9 stays as history
     - **Validates: Requirements 33.10, 33.12**
@@ -1469,20 +1469,20 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Correctness Property 58, Testing Strategy V8 additions_
     - Depends on: 37.4, 37.5, 37.6
 
-  - [ ] 37.8 Add the documentation check for the example HTML files (R36.14)
+  - [x] 37.8 Add the documentation check for the example HTML files (R36.14)
     - Read `guidelines/frontend.md` first. Add `web/__tests__/docs-no-example-files.test.ts` (or a script run by the same test): list the example HTML files in the `improvements/` folder at run time (read the names from the folder listing, never hardcode them) and fail when `README.md` or any file in `.kiro/specs/kano/` mentions one of those file names, links to it, or embeds it; the test passes when the folder has no such files
     - _Requirements: 36.14_
     - _Design: Traceability (V8 amendments, requirement 36), D3_
     - Depends on: 32
 
-  - [ ] 37.9 Update the frontend repository-rule tests for the V8 files
+  - [x] 37.9 Update the frontend repository-rule tests for the V8 files
     - Read `guidelines/frontend.md` first. Extend `web/__tests__/repo-rules.test.ts`: no `dangerouslySetInnerHTML`, no native `<button` outside `BaseButton`, one component per file in `components/welcome/` and `BoardToolbar.tsx`, and `scripts/check_file_size.py` over `web/` (300 lines); split any failing file
     - Supersedes the V8-prior file list of task 30.11; 30.11 stays as history
     - _Requirements: 28.9, 18.6, 30.6, 30.7_
     - _Design: B1, File size and split rule_
     - Depends on: 34.3, 35.4, 36.2
 
-- [ ] 38. V8 frontend checkpoint
+- [x] 38. V8 frontend checkpoint
   - Run `npm test` from `web/` (single run, exit code 0, no network and no running API), `npm run build` (exit code 0, zero TypeScript errors), and `scripts/check_file_size.py` over `web/`; no backend test is needed because V8 changes no backend file
   - Ensure all tests pass, ask the user if questions arise
   - The V8 manual verification (39) and the deployment tasks (22.3 onward) run only after this checkpoint
