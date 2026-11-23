@@ -8,17 +8,23 @@ import { useAuth } from "@/hooks/useAuth";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
 import { apiRequest } from "@/lib/apiClient";
 import { ApiError } from "@/lib/errors";
+import { safeNext, withNext } from "@/lib/nextParam";
 import type { LoginResult } from "@/lib/types";
 import { validateEmail } from "@/lib/validation";
+
+export interface LoginFormProps {
+  next?: string | null;
+}
 
 const INPUT_CLASSES =
   "w-full min-h-[44px] rounded-md border border-field bg-surface px-3 text-sm text-ink placeholder:text-ink-subtle focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-primary-500 focus-visible:border-primary-500";
 
 /** Controlled login form with client validation and generic 401 feedback. */
-export function LoginForm() {
+export function LoginForm({ next = null }: LoginFormProps) {
   const router = useRouter();
   const { login } = useAuth();
   const { handleError } = useErrorHandler();
+  const validatedNext = safeNext(next);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<{
@@ -52,7 +58,7 @@ export function LoginForm() {
         },
       });
       login(result);
-      router.push("/");
+      router.push(validatedNext ?? "/");
     } catch (err) {
       if (err instanceof ApiError && err.statusCode === 401) {
         setPassword("");
@@ -130,7 +136,10 @@ export function LoginForm() {
 
       <p className="text-sm text-ink-muted text-center">
         Need an account?{" "}
-        <Link href="/register" className="text-primary-600 hover:text-primary-700 hover:underline">
+        <Link
+          href={withNext("/register", validatedNext)}
+          className="text-primary-600 hover:text-primary-700 hover:underline"
+        >
           Register
         </Link>
       </p>

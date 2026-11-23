@@ -1,7 +1,9 @@
 "use client";
 
 import { Calendar, User as UserIcon } from "lucide-react";
+import { useBoardRole } from "@/components/boards/BoardRoleContext";
 import { BaseBadge } from "@/components/shared/BaseBadge";
+import { StatusBadge } from "@/components/shared/StatusBadge";
 import { cn } from "@/lib/cn";
 import type { Card } from "@/lib/types";
 
@@ -23,13 +25,15 @@ export function CardItem({
   onDragStart,
   onTouchStart,
 }: CardItemProps) {
+  const { canEdit } = useBoardRole();
+
   return (
     <li
       data-card-id={card.card_id}
       data-column-id={card.column_id}
-      draggable={!isPending}
-      onDragStart={(e) => onDragStart?.(e, card.card_id)}
-      onTouchStart={(e) => onTouchStart?.(e, card.card_id)}
+      draggable={canEdit ? !isPending : undefined}
+      onDragStart={canEdit && onDragStart ? (e) => onDragStart(e, card.card_id) : undefined}
+      onTouchStart={canEdit && onTouchStart ? (e) => onTouchStart(e, card.card_id) : undefined}
       onContextMenu={(e) => {
         if (isTouchDragging) {
           e.preventDefault();
@@ -50,18 +54,17 @@ export function CardItem({
         isPending && "opacity-60"
       )}
     >
-      {card.labels.length > 0 ? (
-        <div className="flex flex-wrap gap-1">
-          {card.labels.slice(0, 3).map((label) => (
-            <BaseBadge key={label} variant="blue">
-              {label}
-            </BaseBadge>
-          ))}
-          {card.labels.length > 3 ? (
-            <BaseBadge variant="gray">+{card.labels.length - 3}</BaseBadge>
-          ) : null}
-        </div>
-      ) : null}
+      <div className="flex flex-wrap items-center gap-1">
+        <StatusBadge status={card.status} />
+        {card.labels.slice(0, 3).map((label) => (
+          <BaseBadge key={label} variant="blue">
+            {label}
+          </BaseBadge>
+        ))}
+        {card.labels.length > 3 ? (
+          <BaseBadge variant="gray">+{card.labels.length - 3}</BaseBadge>
+        ) : null}
+      </div>
 
       <p className="text-sm font-medium text-ink line-clamp-3 break-words">
         {card.title}

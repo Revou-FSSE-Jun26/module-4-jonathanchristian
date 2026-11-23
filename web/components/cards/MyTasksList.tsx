@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Calendar, CheckSquare } from "lucide-react";
 import { BaseBadge } from "@/components/shared/BaseBadge";
 import { ErrorPanel } from "@/components/shared/ErrorPanel";
+import { StatusBadge } from "@/components/shared/StatusBadge";
 import { groupByBoard } from "@/lib/format";
 import { showError } from "@/lib/toast";
 import type { CardSearchResult } from "@/lib/types";
@@ -81,6 +82,7 @@ export function MyTasksList({ initialCards, initialError = null }: MyTasksListPr
                       </Link>
                       <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-ink-muted">
                         <BaseBadge variant="gray">{card.column_name}</BaseBadge>
+                        <StatusBadge status={card.status} />
                         <span className="inline-flex items-center gap-1">
                           <Calendar className="size-3.5" aria-hidden="true" />
                           <span>

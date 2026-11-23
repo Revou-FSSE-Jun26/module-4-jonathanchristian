@@ -7,17 +7,23 @@ import { BaseButton } from "@/components/shared/BaseButton";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
 import { apiRequest } from "@/lib/apiClient";
 import { ApiError } from "@/lib/errors";
+import { safeNext, withNext } from "@/lib/nextParam";
 import { showSuccess } from "@/lib/toast";
 import type { User } from "@/lib/types";
 import { validateEmail, validateName, validatePassword } from "@/lib/validation";
+
+export interface RegisterFormProps {
+  next?: string | null;
+}
 
 const INPUT_CLASSES =
   "w-full min-h-[44px] rounded-md border border-field bg-surface px-3 text-sm text-ink placeholder:text-ink-subtle focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-primary-500 focus-visible:border-primary-500";
 
 /** Controlled registration form with client validation and 409 email-in-use handling. */
-export function RegisterForm() {
+export function RegisterForm({ next = null }: RegisterFormProps) {
   const router = useRouter();
   const { handleError } = useErrorHandler();
+  const validatedNext = safeNext(next);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -55,7 +61,7 @@ export function RegisterForm() {
         },
       });
       showSuccess("Account created. Please log in.");
-      router.push("/login");
+      router.push(withNext("/login", validatedNext));
     } catch (err) {
       if (err instanceof ApiError && err.statusCode === 409) {
         setErrors({ email: "This email is already registered." });
@@ -146,7 +152,10 @@ export function RegisterForm() {
 
       <p className="text-sm text-ink-muted text-center">
         Already have an account?{" "}
-        <Link href="/login" className="text-primary-600 hover:text-primary-700 hover:underline">
+        <Link
+          href={withNext("/login", validatedNext)}
+          className="text-primary-600 hover:text-primary-700 hover:underline"
+        >
           Log in
         </Link>
       </p>

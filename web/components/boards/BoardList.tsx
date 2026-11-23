@@ -8,6 +8,7 @@ import { BaseBadge } from "@/components/shared/BaseBadge";
 import { BaseButton } from "@/components/shared/BaseButton";
 import { ErrorPanel } from "@/components/shared/ErrorPanel";
 import { CreateBoardModal } from "@/components/boards/CreateBoardModal";
+import { ROLE_VARIANT } from "@/lib/roles";
 import type { BoardSummary } from "@/lib/types";
 
 export interface BoardListProps {
@@ -61,7 +62,7 @@ export function BoardList({ initialBoards, initialError = null }: BoardListProps
                   <span className="text-base font-semibold text-ink break-words min-w-0">
                     {board.name}
                   </span>
-                  <BaseBadge variant={board.my_role === "admin" ? "blue" : "gray"}>
+                  <BaseBadge variant={ROLE_VARIANT[board.my_role]}>
                     {board.my_role}
                   </BaseBadge>
                 </div>

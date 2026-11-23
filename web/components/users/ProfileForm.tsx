@@ -2,42 +2,58 @@
 
 import { useEffect, useState } from "react";
 import { BaseButton } from "@/components/shared/BaseButton";
+import { ChangePasswordForm } from "@/components/users/ChangePasswordForm";
+import { ReadOnlyEmail } from "@/components/users/ReadOnlyEmail";
 import { useAuth } from "@/hooks/useAuth";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
 import { apiRequest } from "@/lib/apiClient";
 import { ApiError } from "@/lib/errors";
 import { showSuccess } from "@/lib/toast";
-import type { User } from "@/lib/types";
-import { validateProfileFields } from "@/lib/validation";
+import type { ProfileUpdate, User } from "@/lib/types";
+import { validateName, validatePasswordSection } from "@/lib/validation";
 
 const INPUT_CLASSES =
   "w-full min-h-[44px] rounded-md border border-field bg-surface px-3 text-sm text-ink placeholder:text-ink-subtle";
 
-/** Profile settings form for updating name and email without a password field. */
+/** Profile settings form for updating name and optionally changing password (fixed email). */
 export function ProfileForm() {
   const { user, updateUser } = useAuth();
   const { handleError } = useErrorHandler();
   const [name, setName] = useState(user?.name ?? "");
-  const [email, setEmail] = useState(user?.email ?? "");
-  const [errors, setErrors] = useState<{ name?: string; email?: string }>({});
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [errors, setErrors] = useState<{
+    name?: string;
+    currentPassword?: string;
+    newPassword?: string;
+  }>({});
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (user) {
       setName(user.name);
-      setEmail(user.email);
     }
   }, [user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const validation = validateProfileFields({ name, email });
-    if (validation.name || validation.email) {
+    const nameErr = validateName(name);
+    const pwErrs = validatePasswordSection(currentPassword, newPassword);
+
+    if (nameErr || pwErrs.currentPassword || pwErrs.newPassword) {
       setErrors({
-        name: validation.name ?? undefined,
-        email: validation.email ?? undefined,
+        name: nameErr ?? undefined,
+        currentPassword: pwErrs.currentPassword ?? undefined,
+        newPassword: pwErrs.newPassword ?? undefined,
       });
       return;
+    }
+
+    const body: ProfileUpdate = { name: name.trim() };
+    const changingPassword = currentPassword.length > 0 && newPassword.length > 0;
+    if (changingPassword) {
+      body.password = newPassword;
+      body.current_password = currentPassword;
     }
 
     setErrors({});
@@ -45,16 +61,21 @@ export function ProfileForm() {
     try {
       const updated = await apiRequest<User>("/api/users/me", {
         method: "PATCH",
-        body: {
-          name: name.trim(),
-          email: email.trim(),
-        },
+        body,
       });
       updateUser(updated);
+      if (changingPassword) {
+        setCurrentPassword("");
+        setNewPassword("");
+      }
       showSuccess("Profile updated.");
     } catch (err) {
-      if (err instanceof ApiError && err.statusCode === 409) {
-        setErrors({ email: "This email is already in use." });
+      if (
+        err instanceof ApiError &&
+        err.statusCode === 400 &&
+        err.message.includes("current_password")
+      ) {
+        setErrors({ currentPassword: err.message });
       } else {
         handleError(err);
       }
@@ -73,8 +94,12 @@ export function ProfileForm() {
     >
       <div>
         <h1 className="text-xl font-semibold text-ink">Profile</h1>
-        <p className="text-sm text-ink-muted mt-1">Update your name and email address.</p>
+        <p className="text-sm text-ink-muted mt-1">
+          Update your display name or change your password.
+        </p>
       </div>
+
+      <ReadOnlyEmail email={user?.email ?? ""} />
 
       <div>
         <label htmlFor="profile-name" className="block text-sm font-medium text-ink mb-1">
@@ -96,25 +121,14 @@ export function ProfileForm() {
         ) : null}
       </div>
 
-      <div>
-        <label htmlFor="profile-email" className="block text-sm font-medium text-ink mb-1">
-          Email
-        </label>
-        <input
-          id="profile-email"
-          name="email"
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          aria-invalid={errors.email ? "true" : undefined}
-          className={INPUT_CLASSES}
-        />
-        {errors.email ? (
-          <p role="alert" className="text-xs text-danger-ink mt-1">
-            {errors.email}
-          </p>
-        ) : null}
-      </div>
+      <ChangePasswordForm
+        currentPassword={currentPassword}
+        newPassword={newPassword}
+        onCurrentPasswordChange={setCurrentPassword}
+        onNewPasswordChange={setNewPassword}
+        currentPasswordError={errors.currentPassword}
+        newPasswordError={errors.newPassword}
+      />
 
       <div className="flex justify-end">
         <BaseButton type="submit" disabled={busy}>

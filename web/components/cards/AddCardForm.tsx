@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Plus } from "lucide-react";
+import { useBoardRole } from "@/components/boards/BoardRoleContext";
 import { BaseButton } from "@/components/shared/BaseButton";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
 import { apiRequest } from "@/lib/apiClient";
@@ -15,11 +16,16 @@ export interface AddCardFormProps {
 
 /** Inline form in a column footer for creating a new card. */
 export function AddCardForm({ columnId, onAdded }: AddCardFormProps) {
+  const { canEdit } = useBoardRole();
   const { handleError } = useErrorHandler();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  if (!canEdit) {
+    return null;
+  }
 
   if (!open) {
     return (

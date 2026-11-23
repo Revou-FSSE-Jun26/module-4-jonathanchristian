@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Pencil, Trash2 } from "lucide-react";
+import { useBoardRole } from "@/components/boards/BoardRoleContext";
 import { BaseButton } from "@/components/shared/BaseButton";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { validateColumnName } from "@/lib/validation";
@@ -15,6 +16,7 @@ export interface ColumnHeaderProps {
 
 /** Column header showing name, card count, and inline rename / delete controls. */
 export function ColumnHeader({ column, onRename, onDelete }: ColumnHeaderProps) {
+  const { canEdit } = useBoardRole();
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState(column.name);
   const [error, setError] = useState<string | null>(null);
@@ -99,7 +101,7 @@ export function ColumnHeader({ column, onRename, onDelete }: ColumnHeaderProps) 
               {column.cards.length}
             </span>
           </div>
-          {onRename || onDelete ? (
+          {canEdit && (onRename || onDelete) ? (
             <div className="flex items-center gap-1 shrink-0">
               {onRename ? (
                 <BaseButton

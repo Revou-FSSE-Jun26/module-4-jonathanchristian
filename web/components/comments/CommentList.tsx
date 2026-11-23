@@ -11,10 +11,11 @@ import type { Comment } from "@/lib/types";
 
 export interface CommentListProps {
   cardId: string;
+  readOnly?: boolean;
 }
 
 /** Loads and manages comments for a card in the CardDetailModal. */
-export function CommentList({ cardId }: CommentListProps) {
+export function CommentList({ cardId, readOnly = false }: CommentListProps) {
   const { user } = useAuth();
   const { handleError } = useErrorHandler();
   const [comments, setComments] = useState<Comment[]>([]);
@@ -55,7 +56,7 @@ export function CommentList({ cardId }: CommentListProps) {
             <CommentItem
               key={comment.comment_id}
               comment={comment}
-              isOwner={Boolean(user && user.user_id === comment.author.user_id)}
+              isOwner={!readOnly && Boolean(user && user.user_id === comment.author.user_id)}
               onUpdated={(updated) =>
                 setComments((prev) =>
                   prev.map((c) => (c.comment_id === updated.comment_id ? updated : c))
@@ -69,10 +70,12 @@ export function CommentList({ cardId }: CommentListProps) {
         </ul>
       )}
 
-      <CommentForm
-        cardId={cardId}
-        onAdded={(created) => setComments((prev) => [...prev, created])}
-      />
+      {!readOnly ? (
+        <CommentForm
+          cardId={cardId}
+          onAdded={(created) => setComments((prev) => [...prev, created])}
+        />
+      ) : null}
     </section>
   );
 }

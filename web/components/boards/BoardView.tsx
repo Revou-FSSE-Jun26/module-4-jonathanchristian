@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, BarChart3, Users } from "lucide-react";
 import { AddColumnForm } from "@/components/boards/AddColumnForm";
 import { AnalyticsView } from "@/components/boards/AnalyticsView";
+import { BoardRoleProvider } from "@/components/boards/BoardRoleContext";
 import { CardSearchInput } from "@/components/boards/CardSearchInput";
 import { KanbanColumn } from "@/components/boards/KanbanColumn";
 import { MemberPanel } from "@/components/boards/MemberPanel";
@@ -15,6 +16,7 @@ import { BaseButton } from "@/components/shared/BaseButton";
 import { useDragAndDrop } from "@/hooks/useDragAndDrop";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
 import { apiRequest } from "@/lib/apiClient";
+import { canEdit, isAdmin as roleIsAdmin, isGuest, ROLE_VARIANT } from "@/lib/roles";
 import type { BoardDetail, Card, CardSearchResult, Column, Member } from "@/lib/types";
 
 export interface BoardViewProps {
@@ -37,11 +39,16 @@ export function BoardView({ board }: BoardViewProps) {
   const [members, setMembers] = useState<Member[]>([]);
   const [searchResults, setSearchResults] = useState<CardSearchResult[] | null>(null);
   const [selectedCard, setSelectedCard] = useState<Card | null>(null);
+  const [selectedCardIsNew, setSelectedCardIsNew] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
 
+  const userCanEdit = canEdit(board.my_role);
+  const isAdmin = roleIsAdmin(board.my_role);
+  const userIsGuest = isGuest(board.my_role);
+
   const { onDragStart, onDragOver, onDrop, onTouchStart, pendingIds, touchDrag } =
-    useDragAndDrop(columns, setColumns);
+    useDragAndDrop(columns, setColumns, { enabled: userCanEdit });
 
   useEffect(() => {
     let cancelled = false;
@@ -102,6 +109,8 @@ export function BoardView({ board }: BoardViewProps) {
           : col
       )
     );
+    setSelectedCard(card);
+    setSelectedCardIsNew(true);
   }, []);
 
   const handleCardUpdated = useCallback((updated: Card) => {
@@ -130,22 +139,23 @@ export function BoardView({ board }: BoardViewProps) {
     setSearchResults(null);
   }, []);
 
-  const isAdmin = board.my_role === "admin";
-
   return (
-    <div className="px-4 sm:px-6 py-6 min-w-0">
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-        <div className="flex flex-wrap items-center gap-3 min-w-0">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1 min-h-[44px] min-w-[44px] px-2 rounded-md text-sm text-ink-muted hover:bg-sunken hover:text-ink"
-          >
-            <ArrowLeft className="size-4" aria-hidden="true" />
-            <span>Boards</span>
-          </Link>
-          <h1 className="text-xl font-semibold text-ink break-words">{board.name}</h1>
-          <BaseBadge variant={isAdmin ? "blue" : "gray"}>{board.my_role}</BaseBadge>
-        </div>
+    <BoardRoleProvider role={board.my_role}>
+      <div className="px-4 sm:px-6 py-6 min-w-0">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+          <div className="flex flex-wrap items-center gap-3 min-w-0">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1 min-h-[44px] min-w-[44px] px-2 rounded-md text-sm text-ink-muted hover:bg-sunken hover:text-ink"
+            >
+              <ArrowLeft className="size-4" aria-hidden="true" />
+              <span>Boards</span>
+            </Link>
+            <h1 className="text-xl font-semibold text-ink break-words">{board.name}</h1>
+            <BaseBadge variant={ROLE_VARIANT[board.my_role]}>
+              {userIsGuest ? "Guest" : board.my_role}
+            </BaseBadge>
+          </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto min-w-0">
           <CardSearchInput
@@ -184,7 +194,10 @@ export function BoardView({ board }: BoardViewProps) {
                 <p className="text-sm font-medium text-ink">{card.title}</p>
                 <BaseButton
                   variant="secondary"
-                  onClick={() => setSelectedCard(card)}
+                  onClick={() => {
+                    setSelectedCard(card);
+                    setSelectedCardIsNew(false);
+                  }}
                   className="self-start"
                 >
                   Open card
@@ -202,25 +215,32 @@ export function BoardView({ board }: BoardViewProps) {
               isDragTarget={touchDrag?.targetColumnId === column.column_id}
               touchDraggingCardId={touchDrag?.cardId ?? null}
               pendingIds={pendingIds}
-              onSelectCard={(card) => setSelectedCard(card)}
+              onSelectCard={(card) => {
+                setSelectedCard(card);
+                setSelectedCardIsNew(false);
+              }}
               onDragStart={onDragStart}
               onDragOver={onDragOver}
               onDrop={onDrop}
               onTouchStart={onTouchStart}
-              onRenameColumn={handleRenameColumn}
-              onDeleteColumn={handleDeleteColumn}
+              onRenameColumn={userCanEdit ? handleRenameColumn : undefined}
+              onDeleteColumn={userCanEdit ? handleDeleteColumn : undefined}
               footer={
-                <AddCardForm
-                  columnId={column.column_id}
-                  onAdded={(card) => handleCardAdded(column.column_id, card)}
-                />
+                userCanEdit ? (
+                  <AddCardForm
+                    columnId={column.column_id}
+                    onAdded={(card) => handleCardAdded(column.column_id, card)}
+                  />
+                ) : null
               }
             />
           ))}
-          <AddColumnForm
-            boardId={board.board_id}
-            onAdded={(col) => setColumns((prev) => sortColumns([...prev, col]))}
-          />
+          {userCanEdit ? (
+            <AddColumnForm
+              boardId={board.board_id}
+              onAdded={(col) => setColumns((prev) => sortColumns([...prev, col]))}
+            />
+          ) : null}
         </div>
       )}
 
@@ -229,7 +249,11 @@ export function BoardView({ board }: BoardViewProps) {
           key={selectedCard.card_id}
           card={selectedCard}
           members={members}
-          onClose={() => setSelectedCard(null)}
+          isNew={selectedCardIsNew}
+          onClose={() => {
+            setSelectedCard(null);
+            setSelectedCardIsNew(false);
+          }}
           onUpdated={handleCardUpdated}
           onDeleted={handleCardDeleted}
         />
@@ -251,6 +275,7 @@ export function BoardView({ board }: BoardViewProps) {
           />
         </>
       ) : null}
-    </div>
+      </div>
+    </BoardRoleProvider>
   );
 }
