@@ -1,10 +1,11 @@
 import { expect, test } from "@playwright/test";
+import { buildUniqueEmail, requireCredentials } from "./support/credentials";
 
 test.describe.configure({ mode: "serial" });
 
 test("Kanban full journey (8 steps)", async ({ page }) => {
-  const email = `e2e+${Date.now()}@example.com`;
-  const password = "password123";
+  const { email: baseEmail, password } = requireCredentials();
+  const email = buildUniqueEmail(baseEmail, "kanban");
   const boardName = `Board ${Date.now()}`;
   const cardTitle = "Launch checklist";
 
@@ -50,6 +51,8 @@ test("Kanban full journey (8 steps)", async ({ page }) => {
     await todoColumn.getByRole("button", { name: "Add a card" }).click();
     await todoColumn.getByLabel("Card title").fill(cardTitle);
     await todoColumn.getByRole("button", { name: "Add card" }).click();
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await page.getByRole("button", { name: "Cancel" }).click();
     await expect(todoColumn.getByText(cardTitle)).toBeVisible();
   });
 

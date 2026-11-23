@@ -1,4 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
+import { buildUniqueEmail, requireCredentials } from "./support/credentials";
+import { setWelcomeSeen } from "./support/welcome";
 
 async function assertNoHorizontalOverflow(page: Page) {
   const hasOverflow = await page.evaluate(
@@ -23,9 +25,14 @@ async function assertTapTargets(page: Page) {
 }
 
 test.describe("Mobile viewport (375 px) checks", () => {
-  test("Register and Login have no horizontal overflow and meet 44px tap targets", async ({
+  test("Welcome, Register, and Login have no horizontal overflow and meet 44px tap targets", async ({
     page,
   }) => {
+    await page.goto("/welcome");
+    await expect(page.getByRole("heading", { name: "Welcome to Kano" })).toBeVisible();
+    await assertNoHorizontalOverflow(page);
+    await assertTapTargets(page);
+
     await page.goto("/register");
     await expect(page.getByRole("heading", { name: "Create your account" })).toBeVisible();
     await assertNoHorizontalOverflow(page);
@@ -37,11 +44,15 @@ test.describe("Mobile viewport (375 px) checks", () => {
     await assertTapTargets(page);
   });
 
-  test("Authenticated pages have no page-level overflow and modals fit viewport", async ({
+  test("Authenticated pages and invite page have no overflow and modals fit viewport", async ({
     page,
+    context,
+    baseURL,
   }) => {
-    const email = `e2e+mobile-${Date.now()}@example.com`;
-    const password = "password123";
+    const { email: baseEmail, password } = requireCredentials();
+    const email = buildUniqueEmail(baseEmail, "mobile");
+
+    await setWelcomeSeen(context, baseURL!);
 
     await page.goto("/register");
     await page.getByLabel("Name").fill("Mobile User");
@@ -81,6 +92,12 @@ test.describe("Mobile viewport (375 px) checks", () => {
     // Profile
     await page.goto("/profile");
     await expect(page.getByRole("heading", { name: "Profile" })).toBeVisible();
+    await assertNoHorizontalOverflow(page);
+    await assertTapTargets(page);
+
+    // Invite page
+    await page.goto("/invite/invalid-mobile-token");
+    await expect(page.getByRole("heading", { name: "Invitation not found" })).toBeVisible();
     await assertNoHorizontalOverflow(page);
     await assertTapTargets(page);
   });
