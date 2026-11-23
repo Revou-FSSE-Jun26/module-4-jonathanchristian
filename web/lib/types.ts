@@ -1,4 +1,6 @@
-export type Role = "admin" | "member";
+export type Role = "admin" | "member" | "guest";
+
+export type CardStatus = "NOT_STARTED" | "IN_PROGRESS" | "DONE";
 
 export interface User {
   user_id: string;
@@ -50,6 +52,8 @@ export interface Card {
   due_date: string | null;
   labels: string[];
   assignee: CardAssignee | null;
+  status: CardStatus;
+  completed_at: string | null;
   order: number;
   created_at: string;
   updated_at: string;
@@ -132,4 +136,32 @@ export interface Analytics {
     assigned_cards: number;
     comments: number;
   }[];
+}
+
+export interface InviteLink {
+  role: "member" | "guest";
+  token: string;
+}
+
+export interface InviteLinks {
+  member: InviteLink;
+  guest: InviteLink;
+}
+
+export interface InviteInfo {
+  board_id: string;
+  board_name: string;
+  role: "member" | "guest";
+  current_role: Role | null;
+}
+
+export interface AcceptResult {
+  board_id: string;
+  role: Role;
+}
+
+export interface ProfileUpdate {
+  name?: string;
+  password?: string;
+  current_password?: string;
 }

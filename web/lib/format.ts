@@ -1,4 +1,4 @@
-import type { CardSearchResult } from "./types";
+import type { CardSearchResult, CardStatus } from "./types";
 
 export interface BoardCardGroup {
   board_id: string;
@@ -12,6 +12,7 @@ export interface CardEditableFields {
   due_date: string | null;
   labels: string[];
   assignee_id: string | null;
+  status: CardStatus;
 }
 
 /**
@@ -74,6 +75,9 @@ export function diffCardFields(
   }
   if (edited.assignee_id !== original.assignee_id) {
     diff.assignee_id = edited.assignee_id;
+  }
+  if (edited.status !== original.status) {
+    diff.status = edited.status;
   }
   return diff;
 }

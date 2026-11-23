@@ -46,6 +46,49 @@ export function validatePassword(password: string): ValidationResult {
   return null;
 }
 
+/** Validate a new password for profile change (8 to 128 characters). */
+export function validateNewPassword(password: string): ValidationResult {
+  return validatePassword(password);
+}
+
+/** Validate current password (non-empty). */
+export function validateCurrentPassword(password: string): ValidationResult {
+  if (password.length === 0) {
+    return "Current password is required";
+  }
+  return null;
+}
+
+/**
+ * Validate the optional change-password section on the profile page.
+ * Both empty is valid (section unused); one filled errors on the empty one;
+ * both filled validates each field.
+ */
+export function validatePasswordSection(
+  currentPassword: string,
+  newPassword: string
+): { currentPassword: ValidationResult; newPassword: ValidationResult } {
+  if (currentPassword.length === 0 && newPassword.length === 0) {
+    return { currentPassword: null, newPassword: null };
+  }
+  if (currentPassword.length === 0) {
+    return {
+      currentPassword: "Current password is required",
+      newPassword: validateNewPassword(newPassword),
+    };
+  }
+  if (newPassword.length === 0) {
+    return {
+      currentPassword: validateCurrentPassword(currentPassword),
+      newPassword: "New password is required",
+    };
+  }
+  return {
+    currentPassword: validateCurrentPassword(currentPassword),
+    newPassword: validateNewPassword(newPassword),
+  };
+}
+
 /** Validate a board name (1 to 100 chars after trim). */
 export function validateBoardName(name: string): ValidationResult {
   return validateTrimmedLength(name, "Board name", 1, 100);

@@ -1,14 +1,7 @@
 export const ACCESS_COOKIE = "kano_access";
 export const REFRESH_COOKIE = "kano_refresh";
-
-export type GuardDecision = "allow" | "refresh" | "redirect-login" | "redirect-home";
-
-export interface GuardInput {
-  pathname: string;
-  accessExp: number | null;
-  refreshExp: number | null;
-  now: number;
-}
+export const WELCOME_COOKIE = "kano_welcome_seen";
+export const WELCOME_COOKIE_MAX_AGE = 31536000;
 
 function writeCookie(name: string, value: string, maxAgeSeconds: number): void {
   if (typeof document === "undefined") {
@@ -55,10 +48,20 @@ export function getRefreshToken(): string | null {
   return readCookie(REFRESH_COOKIE);
 }
 
-/** Clear both auth cookies in the browser. */
+/** Clear both auth cookies in the browser (never touches the welcome cookie). */
 export function clearAuthCookies(): void {
   writeCookie(ACCESS_COOKIE, "", 0);
   writeCookie(REFRESH_COOKIE, "", 0);
+}
+
+/** Return true iff the welcome cookie is set in `document.cookie` (browser only). */
+export function getWelcomeSeen(): boolean {
+  return readCookie(WELCOME_COOKIE) === "1";
+}
+
+/** Set the welcome cookie so subsequent `/` visits go to `/login` instead of `/welcome`. */
+export function setWelcomeCookie(): void {
+  writeCookie(WELCOME_COOKIE, "1", WELCOME_COOKIE_MAX_AGE);
 }
 
 /** Decode a JWT's `exp` claim (Unix seconds) without verifying signature. */
@@ -79,27 +82,4 @@ export function decodeJwtExp(token: string | null | undefined): number | null {
   } catch {
     return null;
   }
-}
-
-/** Pure route guard decision used by the Next.js middleware/proxy. */
-export function guardDecision({
-  pathname,
-  accessExp,
-  refreshExp,
-  now,
-}: GuardInput): GuardDecision {
-  const accessValid = accessExp !== null && accessExp > now;
-  const refreshValid = refreshExp !== null && refreshExp > now;
-  const isAuthPage = pathname === "/login" || pathname === "/register";
-
-  if (isAuthPage) {
-    return accessValid || refreshValid ? "redirect-home" : "allow";
-  }
-  if (accessValid) {
-    return "allow";
-  }
-  if (refreshValid) {
-    return "refresh";
-  }
-  return "redirect-login";
 }
