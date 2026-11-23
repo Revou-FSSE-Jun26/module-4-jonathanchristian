@@ -1,22 +1,19 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, BarChart3, Users } from "lucide-react";
 import { AddColumnForm } from "@/components/boards/AddColumnForm";
 import { AnalyticsView } from "@/components/boards/AnalyticsView";
 import { BoardRoleProvider } from "@/components/boards/BoardRoleContext";
-import { CardSearchInput } from "@/components/boards/CardSearchInput";
+import { BoardToolbar } from "@/components/boards/BoardToolbar";
 import { KanbanColumn } from "@/components/boards/KanbanColumn";
 import { MemberPanel } from "@/components/boards/MemberPanel";
 import { AddCardForm } from "@/components/cards/AddCardForm";
 import { CardDetailModal } from "@/components/cards/CardDetailModal";
-import { BaseBadge } from "@/components/shared/BaseBadge";
 import { BaseButton } from "@/components/shared/BaseButton";
 import { useDragAndDrop } from "@/hooks/useDragAndDrop";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
 import { apiRequest } from "@/lib/apiClient";
-import { canEdit, isAdmin as roleIsAdmin, isGuest, ROLE_VARIANT } from "@/lib/roles";
+import { canEdit, isAdmin as roleIsAdmin } from "@/lib/roles";
 import type { BoardDetail, Card, CardSearchResult, Column, Member } from "@/lib/types";
 
 export interface BoardViewProps {
@@ -45,7 +42,6 @@ export function BoardView({ board }: BoardViewProps) {
 
   const userCanEdit = canEdit(board.my_role);
   const isAdmin = roleIsAdmin(board.my_role);
-  const userIsGuest = isGuest(board.my_role);
 
   const { onDragStart, onDragOver, onDrop, onTouchStart, pendingIds, touchDrag } =
     useDragAndDrop(columns, setColumns, { enabled: userCanEdit });
@@ -142,107 +138,83 @@ export function BoardView({ board }: BoardViewProps) {
   return (
     <BoardRoleProvider role={board.my_role}>
       <div className="px-4 sm:px-6 py-6 min-w-0">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-          <div className="flex flex-wrap items-center gap-3 min-w-0">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-1 min-h-[44px] min-w-[44px] px-2 rounded-md text-sm text-ink-muted hover:bg-sunken hover:text-ink"
-            >
-              <ArrowLeft className="size-4" aria-hidden="true" />
-              <span>Boards</span>
-            </Link>
-            <h1 className="text-xl font-semibold text-ink break-words">{board.name}</h1>
-            <BaseBadge variant={ROLE_VARIANT[board.my_role]}>
-              {userIsGuest ? "Guest" : board.my_role}
-            </BaseBadge>
-          </div>
-
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto min-w-0">
-          <CardSearchInput
-            boardId={board.board_id}
-            onResults={handleSearchResults}
-            onClear={handleSearchClear}
-          />
-          {isAdmin ? (
-            <>
-              <BaseButton variant="secondary" onClick={() => setMembersOpen(true)}>
-                <Users className="size-4" aria-hidden="true" />
-                <span>Members</span>
-              </BaseButton>
-              <BaseButton variant="secondary" onClick={() => setAnalyticsOpen(true)}>
-                <BarChart3 className="size-4" aria-hidden="true" />
-                <span>Analytics</span>
-              </BaseButton>
-            </>
-          ) : null}
-        </div>
-      </div>
-
-      {searchResults !== null ? (
-        searchResults.length === 0 ? (
-          <div className="bg-surface border border-line rounded-lg p-8 text-center text-sm text-ink-muted">
-            No matching cards found.
-          </div>
-        ) : (
-          <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {searchResults.map((card) => (
-              <li
-                key={card.card_id}
-                className="bg-surface border border-line rounded-md p-4 flex flex-col gap-2"
-              >
-                <p className="text-xs text-ink-muted">{card.column_name}</p>
-                <p className="text-sm font-medium text-ink">{card.title}</p>
-                <BaseButton
-                  variant="secondary"
-                  onClick={() => {
+        <BoardToolbar
+          boardName={board.name}
+          role={board.my_role}
+          boardId={board.board_id}
+          onSearchResults={handleSearchResults}
+          onSearchClear={handleSearchClear}
+          onOpenMembers={() => setMembersOpen(true)}
+          onOpenAnalytics={() => setAnalyticsOpen(true)}
+        />
+        <hr data-testid="board-separator" className="m-0 h-px w-full border-0 bg-line" />
+        <div data-testid="board-content" className="pt-6 min-w-0">
+          {searchResults !== null ? (
+            searchResults.length === 0 ? (
+              <div className="bg-surface border border-line rounded-lg p-8 text-center text-sm text-ink-muted">
+                No matching cards found.
+              </div>
+            ) : (
+              <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {searchResults.map((card) => (
+                  <li
+                    key={card.card_id}
+                    className="bg-surface border border-line rounded-md p-4 flex flex-col gap-2"
+                  >
+                    <p className="text-xs text-ink-muted">{card.column_name}</p>
+                    <p className="text-sm font-medium text-ink">{card.title}</p>
+                    <BaseButton
+                      variant="secondary"
+                      onClick={() => {
+                        setSelectedCard(card);
+                        setSelectedCardIsNew(false);
+                      }}
+                      className="self-start"
+                    >
+                      Open card
+                    </BaseButton>
+                  </li>
+                ))}
+              </ul>
+            )
+          ) : (
+            <div className="flex gap-4 overflow-x-auto pb-4 items-start">
+              {columns.map((column) => (
+                <KanbanColumn
+                  key={column.column_id}
+                  column={column}
+                  isDragTarget={touchDrag?.targetColumnId === column.column_id}
+                  touchDraggingCardId={touchDrag?.cardId ?? null}
+                  pendingIds={pendingIds}
+                  onSelectCard={(card) => {
                     setSelectedCard(card);
                     setSelectedCardIsNew(false);
                   }}
-                  className="self-start"
-                >
-                  Open card
-                </BaseButton>
-              </li>
-            ))}
-          </ul>
-        )
-      ) : (
-        <div className="flex gap-4 overflow-x-auto pb-4 items-start">
-          {columns.map((column) => (
-            <KanbanColumn
-              key={column.column_id}
-              column={column}
-              isDragTarget={touchDrag?.targetColumnId === column.column_id}
-              touchDraggingCardId={touchDrag?.cardId ?? null}
-              pendingIds={pendingIds}
-              onSelectCard={(card) => {
-                setSelectedCard(card);
-                setSelectedCardIsNew(false);
-              }}
-              onDragStart={onDragStart}
-              onDragOver={onDragOver}
-              onDrop={onDrop}
-              onTouchStart={onTouchStart}
-              onRenameColumn={userCanEdit ? handleRenameColumn : undefined}
-              onDeleteColumn={userCanEdit ? handleDeleteColumn : undefined}
-              footer={
-                userCanEdit ? (
-                  <AddCardForm
-                    columnId={column.column_id}
-                    onAdded={(card) => handleCardAdded(column.column_id, card)}
-                  />
-                ) : null
-              }
-            />
-          ))}
-          {userCanEdit ? (
-            <AddColumnForm
-              boardId={board.board_id}
-              onAdded={(col) => setColumns((prev) => sortColumns([...prev, col]))}
-            />
-          ) : null}
+                  onDragStart={onDragStart}
+                  onDragOver={onDragOver}
+                  onDrop={onDrop}
+                  onTouchStart={onTouchStart}
+                  onRenameColumn={userCanEdit ? handleRenameColumn : undefined}
+                  onDeleteColumn={userCanEdit ? handleDeleteColumn : undefined}
+                  footer={
+                    userCanEdit ? (
+                      <AddCardForm
+                        columnId={column.column_id}
+                        onAdded={(card) => handleCardAdded(column.column_id, card)}
+                      />
+                    ) : null
+                  }
+                />
+              ))}
+              {userCanEdit ? (
+                <AddColumnForm
+                  boardId={board.board_id}
+                  onAdded={(col) => setColumns((prev) => sortColumns([...prev, col]))}
+                />
+              ) : null}
+            </div>
+          )}
         </div>
-      )}
 
       {selectedCard ? (
         <CardDetailModal
