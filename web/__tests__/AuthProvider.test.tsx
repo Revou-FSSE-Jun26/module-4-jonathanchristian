@@ -206,4 +206,72 @@ describe("AuthProvider", () => {
     expect(getRefreshToken()).toBe("ref-1");
     expect(pushMock).not.toHaveBeenCalled();
   });
+
+  it("sets status to anonymous and keeps cookies on network restore failure", async () => {
+    setAccessCookie("acc-net", 600);
+    setRefreshCookie("ref-net", 3600);
+    const fetchMock = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AuthProvider initialAccessToken="acc-net" initialRefreshToken="ref-net">
+        <TestConsumer />
+      </AuthProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("status")).toHaveTextContent("anonymous");
+    });
+    expect(screen.getByTestId("user")).toHaveTextContent("none");
+    expect(getAccessToken()).toBe("acc-net");
+    expect(getRefreshToken()).toBe("ref-net");
+    expect(pushMock).not.toHaveBeenCalled();
+  });
+
+  it("sets status to anonymous on session expiry", async () => {
+    setAccessCookie("acc-exp", 600);
+    setRefreshCookie("ref-exp", 3600);
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: {
+              user_id: "u1",
+              name: "Ada",
+              email: "ada@example.com",
+              created_at: "2026-11-18T00:00:00Z",
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        )
+      )
+      // Subsequent refresh or API 401 triggers session expiry
+      .mockResolvedValue(
+        new Response(JSON.stringify({ error: "Expired" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json" },
+        })
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AuthProvider initialAccessToken="acc-exp" initialRefreshToken="ref-exp">
+        <TestConsumer />
+      </AuthProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("status")).toHaveTextContent("authenticated");
+    });
+
+    const { sessionExpired } = await import("@/lib/refreshSession");
+    act(() => {
+      sessionExpired();
+    });
+
+    expect(screen.getByTestId("status")).toHaveTextContent("anonymous");
+    expect(screen.getByTestId("user")).toHaveTextContent("none");
+    expect(pushMock).toHaveBeenCalledWith("/login");
+  });
 });

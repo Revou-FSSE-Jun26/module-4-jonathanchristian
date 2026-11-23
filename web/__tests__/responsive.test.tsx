@@ -47,15 +47,20 @@ describe("Responsive classes at 375 px (design B9)", () => {
     expect(dialog.className).toContain("overflow-y-auto");
   });
 
-  it("enforces V6 responsive classes on /welcome, InviteJoinCard, and InviteLinkRow", () => {
+  it("enforces V8 responsive classes on /welcome and V6 responsive classes on InviteJoinCard and InviteLinkRow", () => {
     const { container, unmount } = render(<WelcomePage />);
-    expect(container.firstElementChild?.className).toContain("max-w-xl");
+    const getStartedBtn = screen.getByRole("button", { name: "Get started" });
+    const createAccountBtn = screen.getByRole("button", { name: "Create account" });
     const loginBtn = screen.getByRole("button", { name: "Log in" });
-    const registerBtn = screen.getByRole("button", { name: "Create account" });
+    expect(getStartedBtn.className).toContain("min-h-[44px]");
+    expect(getStartedBtn.className).toContain("w-full");
+    expect(getStartedBtn.className).toContain("md:w-auto");
+    expect(createAccountBtn.className).toContain("min-h-[44px]");
     expect(loginBtn.className).toContain("min-h-[44px]");
-    expect(registerBtn.className).toContain("min-h-[44px]");
     expect(loginBtn.parentElement?.className).toContain("flex-col");
-    expect(loginBtn.parentElement?.className).toContain("sm:flex-row");
+    expect(loginBtn.parentElement?.className).toContain("md:flex-row");
+    expect(container.querySelector(".overflow-x-auto")).toBeTruthy();
+    expect(container.querySelector(".w-72")).toBeTruthy();
     unmount();
 
     const invite = render(

@@ -58,4 +58,17 @@ describe("Playwright E2E conventions (G-FE-17, Property 58)", () => {
       { numRuns: 100 }
     );
   });
+
+  it("ensures V8 spec files either import requireCredentials or use no credentials", () => {
+    const v8Specs = ["welcome.spec.ts", "logo.spec.ts", "layout.spec.ts"];
+    for (const specName of v8Specs) {
+      const fullPath = path.join(E2E_DIR, specName);
+      expect(fs.existsSync(fullPath)).toBe(true);
+      const source = fs.readFileSync(fullPath, "utf8");
+      expect(findCredentialLiterals(source)).toEqual([]);
+      if (specName === "logo.spec.ts" || specName === "layout.spec.ts") {
+        expect(source).toContain("requireCredentials");
+      }
+    }
+  });
 });
