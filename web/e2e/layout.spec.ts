@@ -61,7 +61,7 @@ test.describe("V8 responsive layout E2E (R33.16)", () => {
         });
 
         const targets = [
-          banner.getByRole("link", { name: "Kano" }),
+          banner.getByRole("link", { name: "Kano", exact: true }),
           banner.getByRole("link", { name: "Log in" }),
           banner.getByRole("link", { name: "Register" }),
           hero.getByRole("button", { name: "Get started" }),
