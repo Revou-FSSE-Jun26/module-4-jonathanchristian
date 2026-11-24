@@ -21,7 +21,7 @@ Every new entry must keep the Rule / Rationale / Kano Example structure.
 - **Kano Example:** `CardItem.tsx` exports only `CardItem`; `AddCardForm.tsx` exports only `AddCardForm`.
 
 ### G-FE-04: Shared components only
-- **Rule:** Render every button with `BaseButton`, status labels with `BaseBadge`, and every form inside `BaseModal`, all from `web/components/shared/`, and never use a raw `<button>` elsewhere.
+- **Rule:** Render every button with `BaseButton`, status labels with `BaseBadge`, and every dialog form inside `BaseModal`, all from `web/components/shared/`, and never use a raw `<button>` elsewhere; page forms and inline board forms are exempt from `BaseModal`.
 - **Rationale:** Shared components give one look, one disabled behavior, and one place to fix bugs.
 - **Kano Example:** `<BaseButton variant="destructive">` in `ConfirmDialog.tsx`; `CreateBoardModal.tsx` wraps its form in `BaseModal`.
 
@@ -92,7 +92,7 @@ Every new entry must keep the Rule / Rationale / Kano Example structure.
 
 ## Quick checklist
 - [ ] Page that fetches is a Server Component; interactive parts are `'use client'`.
-- [ ] One component per file; buttons are `BaseButton`; forms are inside `BaseModal`.
+- [ ] One component per file; buttons are `BaseButton`; dialog forms are inside `BaseModal` (page forms and inline board forms are exempt).
 - [ ] All requests use `apiRequest`; errors go through `useErrorHandler`.
 - [ ] No cookie writes or refresh calls in server code.
 - [ ] Tailwind classes work at 375 px; tap targets are at least 44 px.
