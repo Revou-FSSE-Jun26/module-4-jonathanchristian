@@ -66,6 +66,10 @@ describe("Frontend repository rules (G-FE-03, G-FE-04, G-FE-15, G-BE-15)", () =>
       "CardDetailForm.tsx",
       "ChangePasswordForm.tsx",
       "ReadOnlyEmail.tsx",
+      "KanoMark.tsx",
+      "GithubIcon.tsx",
+      "LinkedinIcon.tsx",
+      "Footer.tsx",
     ]) {
       expect(basenames.has(required)).toBe(true);
     }
@@ -92,4 +96,10 @@ describe("Frontend repository rules (G-FE-03, G-FE-04, G-FE-15, G-BE-15)", () =>
     },
     15000
   );
+
+  it("keeps Footer.tsx as a Server Component without 'use client'", () => {
+    const footerPath = path.join(WEB_ROOT, "components", "Footer.tsx");
+    const content = fs.readFileSync(footerPath, "utf8");
+    expect(content).not.toMatch(/["']use client["']/);
+  });
 });
