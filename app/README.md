@@ -241,3 +241,8 @@ The backend is meant to run on Vercel (Python runtime) with `app/` as the projec
 - `openapi.yaml` - request and response reference for every endpoint
 - `../guidelines/backend.md`, `../guidelines/database.md` - coding and data rules
 - `../.kiro/specs/kano/` - requirements, design, and task plan
+
+## Postman Collection
+
+Full API documentation with request/response examples can be seen through this link:
+`https://documenter.getpostman.com/view/57333016/2sBYPv4D23`
