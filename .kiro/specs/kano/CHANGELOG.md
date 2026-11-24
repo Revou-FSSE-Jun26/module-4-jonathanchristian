@@ -380,3 +380,126 @@ Classification: design changes, frontend only. Only `design.md` and this file ch
 - **B13, Property 60.** `findForbiddenClaims` uses case-insensitive substring matching, with "free" as a whole word. False-positive words such as "operating", "integrating", and "generating" (contain "rating") are documented and covered by a test.
 - **Testing Strategy (R32.20 to R32.22), Traceability.** Test rows updated for the status-only logo cases (including the refresh-cookie-only case), anchors versus `BaseButton`, scroller `tabindex`, single `shadow-overlay`, and add-column placement. Traceability rows 17, 18, 21, 32, and 38 updated.
 - **Open issues 33 to 38.** Text kept, each marked "Resolved in V8 refinement".
+
+## V9 - 2026-11-24
+Source: `improvements/improvements3.md` and the reference image `improvements/footer-improved.png` (frontend only, no backend change). Only `requirements.md` is changed in this step (now V9). `design.md` and `tasks.md` stay at V8 and will be updated to V9 in the following steps.
+
+### Changes
+Classification: **specification change, frontend only**. No design change, implementation change, bug fix, or breaking change is made in this step. No API, model, migration, or backend test is affected.
+
+1. **Footer content (new Requirement 18 criteria 16 to 21).** The shared Footer becomes a single row inside a `max-w-7xl` container. Left: the brand mark (small rounded square in the primary color with a white "K"), the wordmark "Kano" in ink with weight 500 or 600, a separator dot, and the muted text "Portfolio project built in 2026 by JC" with "JC" in the stronger ink color ("2026" and "JC" are fixed text). Right: two icon links, GitHub (`https://github.com`) and LinkedIn (`https://www.linkedin.com`), both placeholders, opened in a new tab with `target="_blank"` and `rel="noopener noreferrer"`. Accessible names "Kano on GitHub" and "Kano on LinkedIn", decorative `aria-hidden` icons, hover effect (icon from `ink-muted` to `ink`, `sunken` background, 150 ms transition), `focus-visible` ring, design-system tokens only. No request, cookie, or environment variable.
+2. **Responsive (Requirement 27 criteria 11 and 12 appended).** No horizontal overflow from 375 px to 1920 px, wrapping onto two lines without overlap, and a tap target of at least 44 px by 44 px for each footer link below 768 px.
+3. **Tests (Requirement 32 criterion 23 and Requirement 33 criterion 17 appended).** React Testing Library tests for the Footer and a Playwright footer scenario at 375 px and 1920 px (no click-through to external sites).
+4. **Version marker** set to V9. Glossary unchanged (no new term). Requirement 36 unchanged (the README needs no new mention).
+
+#### Before / After
+- Version marker before: "V8 (frontend-only changes to the Header logo, the Welcome_Page, and the board toolbar; V7 had no requirement change from V6)". After: "V9 (frontend-only change to the shared Footer: brand, portfolio text, and GitHub and LinkedIn links; V8 changed the Header logo, the Welcome_Page, and the board toolbar; no backend change)".
+- Footer before (implementation, `web/components/Footer.tsx`): one centered line of `text-xs` muted text "Kano Task Management" with a top border, and no requirement text beyond R18.13 ("exactly one Header and one Footer").
+- Footer after (R18.16 to R18.21): single row, brand group left, two external icon links right, as described under Changes.
+- R18.13, R18.14, R18.15: unchanged. R27.1 to R27.10, R32.1 to R32.22, R33.1 to R33.16: unchanged. New criteria without Before text: R18.16 to R18.21, R27.11, R27.12, R32.23, R33.17.
+
+#### Consistency check (requirements only)
+- R18.13 (one Footer per page) and R38.15 part (f) (the Welcome_Page ends with the Footer): consistent, the Welcome_Page keeps the shared Footer.
+- R38.19 (forbidden strings) applies to the Welcome_Page, which includes the shared Footer. The footer text "Portfolio project built in 2026 by JC" and the labels "Kano on GitHub" and "Kano on LinkedIn" contain none of the listed strings (checked by hand: no "rating", "free", "kan-", "uptime", "real time", and so on). R32.23 also asserts this in a test.
+- R38.20 (design system): the footer uses Inter 400/500/600, tokens, flat surfaces, and no shadow, so it does not break the rule that only the dragged preview Card carries `shadow-overlay`. The footer hover uses a background color and no shadow.
+- R38.2 and R33.13 name five navigation actions of the Welcome_Page. The two footer links are external and are not among those actions. The Welcome_Page now holds two extra links, which does not change R38.2, R38.10 (the footer links do not set the Welcome_Cookie), or R33.13 (its locators are scoped per section).
+- R18.14 gives the Header brand the accessible name "Kano". The footer wordmark is plain text and not a link, so there is one link named "Kano" per page. Tests that locate the logo by role link and name "Kano" must use an exact match, because "Kano on GitHub" and "Kano on LinkedIn" contain that string. This is a test-writing note and not a contradiction.
+- R27.2 (no overlapping interactive elements) and R27.6 (44 px tap targets): extended to the footer links by R27.11 and R27.12.
+- R36.14 (no mention of the HTML example files): not affected. The PNG is cited only as a source in this changelog entry, and `requirements.md` and `design.md` do not name it.
+- No contradiction found.
+
+### Reason
+- improvements3: the project is a portfolio project, so the Footer shows the author line and links to GitHub and LinkedIn. The URLs are placeholders for now.
+
+### Impact
+- **Requirements:** 18 (criteria 16 to 21 appended), 27 (criteria 11 and 12 appended), 32 (criterion 23 appended), 33 (criterion 17 appended), version marker V9.
+- **Design (to be updated in the next step):** B3 (Footer component structure and classes), the brand mark, and the icon components. **Open point for the design step:** the installed `lucide-react` version may not include brand icons (GitHub, LinkedIn), because newer versions deprecate or remove them. The design step must check the installed version and, if the icons are absent, use inline SVG components (one component per file, `aria-hidden`), which is a design decision and not a requirement. Also decide whether the brand mark reuses the Header mark component. Testing Strategy (R32.23, R33.17) and the Traceability rows for 18, 27, 32, and 33 need V9 notes.
+- **Tasks (to be updated):** Footer implementation task, icon components, unit tests, Playwright footer scenario, and a mention in the pending manual browser verification task 33.3.
+- **Implementation:** none in this step. `web/components/Footer.tsx` changes in a later step.
+- **No backend change.**
+
+#### Design edits (step 2: `design.md` V8 to V9, classification: design changes, frontend only; no implementation change)
+No V1 to V8 design text was deleted. Where V9 supersedes older text (the plain one-line footer), the old text stays and a "V9 change" note names the replacement.
+- Version marker set to V9 with a V9 change summary and section index.
+- New decision D18 (Footer stays a Server Component, text in `lib/footerContent.ts`, classes as static strings in `components/`, inline SVG brand icons, shared `KanoMark`, brand group never a link).
+- New section B15 (Footer): files, markup, token-only classes, layout by width, contrast, security (`target="_blank"` with `rel="noopener noreferrer"`, no tracking, no cookie), interaction with the Header logo test and with the forbidden-claims rule.
+- Icon check recorded: installed `lucide-react` is 1.75.0 and has no GitHub or LinkedIn icon, so `components/shared/icons/GithubIcon.tsx` and `LinkedinIcon.tsx` (inline SVG, `aria-hidden`) are designed. No dependency is added.
+- V9 notes added to B1 (file tree) and B3 (Header mark replaced by `KanoMark`, Footer redesigned).
+- Testing Strategy: V9 additions (RTL tests for R32.23, Playwright footer scenario for R33.17, exact link names). No new Correctness Property (example-based; a future one would be Property 61).
+- Traceability: V9 amendments table (Requirements 18, 27, 32, 33, 38.19). Open issues 39 to 44.
+
+##### Before / After (design)
+- Footer before: one centered `text-xs` line "Kano Task Management" with `border-t border-line`, no links. After: single row with brand mark, wordmark, separator dot, portfolio text, and two external icon links (B15).
+- Header brand mark before: inline "K" `span`. After: shared `KanoMark` with the same classes (look unchanged).
+
+##### Consistency check (requirements V9 versus design V9)
+- No requirement is without design coverage: 18.16 to 18.21, 27.11, 27.12, 32.23, and 33.17 map to B15 and the V9 testing section.
+- Wording gaps found, not changed in `requirements.md` (see Open issues 40, 42, 44): R18.20 and R32.23 say "focus ring" while the design system defines an outline; R18.16 says "single row" while R27.11 requires wrapping (reconciled with `flex-wrap`); Playwright locators by name "Kano" match the footer links as a substring unless scoped or exact.
+- `tasks.md` is still at V8 and needs V9 tasks (Footer, `KanoMark`, icons, `footerContent.ts`, RTL test, Playwright footer spec, README check, and a line in the manual browser verification task 33.3).
+
+#### Refinements after consistency check (V9, no version bump)
+Classification: specification refinements, frontend only. Only `requirements.md` and this file changed. No numbering changed. `design.md` was not edited (see "Remaining").
+
+1. **R18.20 and R32.23 (focus indicator).**
+   - Before (R18.20): "... WHEN a Footer link receives keyboard focus through `:focus-visible`, THE Footer SHALL show the design-system focus ring on that link."
+   - After (R18.20): "... THE Footer SHALL show the visible focus-visible outline as defined in the design system (2 px outline) on that link." The hover wording is unchanged.
+   - Before (R32.23): "... and the `focus-visible` ring class; ..."
+   - After (R32.23): "... and the `focus-visible` outline classes of the design system (2 px outline); ..."
+2. **R18.16 and R27.11 (one row versus wrapping).**
+   - Before (R18.16): "THE Footer SHALL render its content in a single row inside a container of the width of `max-w-7xl`, with the brand group (criterion 17) on the left and the link group (criterion 18) on the right, because ..."
+   - After (R18.16): "... inside a container of the width of `max-w-7xl`, in one row from 768 px upward with the brand group (criterion 17) on the left and the two icon links of the link group (criterion 18) on the right, and below 768 px the content may wrap onto two lines (Requirement 27 criterion 11), because ..."
+   - Before (R27.11): "... and WHEN the brand group and the link group do not fit in one line, THE Footer SHALL wrap them onto two lines without overlap and without adding horizontal scrolling to the page."
+   - After (R27.11): "... and WHILE the viewport width is 768 px or more, THE Footer SHALL show the brand group and the link group in one row, and WHILE the viewport width is below 768 px, THE Footer MAY wrap them onto two lines without overlap and without adding horizontal scrolling to the page (Requirement 18 criterion 16)."
+3. **R32.23 and R33.17 (substring name matching).**
+   - Before (R32.23): the criterion ended with "... each page renders exactly one Footer (Requirement 18 criterion 13), including the Welcome_Page."
+   - After (R32.23): adds "The tests SHALL locate the two links inside the Footer (the `contentinfo` role) or with exact name matching, because name matching is substring-based and "Kano on GitHub" and "Kano on LinkedIn" contain "Kano", the accessible name of the Header logo link."
+   - Before (R33.17): ended with "THE E2E_Suite SHALL NOT click through to the external sites."
+   - After (R33.17): adds "THE E2E_Suite SHALL scope the locators of the two links to the footer (the `contentinfo` role) or use exact name matching, ..., and the logo scenarios of criterion 15 SHALL scope the logo locator to the `banner` role or use exact name matching." R33.15 and R32.20 were not edited, as requested.
+4. **R18.19 and R27.12 (tap target).**
+   - Before (R18.19): ended with "... so that each icon is decorative and each link is announced once." (no size rule).
+   - After (R18.19): adds "THE Footer SHALL give each of the two links a tap target of at least 44 px by 44 px at every viewport width, and 44 px is the tap-target exception to the 4 px spacing scale step, as for the `lg` button."
+   - Before (R27.12): "WHILE the viewport width is below 768 px, THE Kano_Web SHALL render the GitHub link and the LinkedIn link each with a tap target of at least 44 px by 44 px, as required by criterion 6."
+   - After (R27.12): "WHILE the viewport width is below 768 px, THE Footer SHALL render the GitHub link and the LinkedIn link each with a tap target of at least 44 px by 44 px, as required by criterion 6 and by Requirement 18 criterion 19, which applies the same 44 px at every width as the tap-target exception to the 4 px spacing scale step."
+
+##### Reason
+- The user approved four wording fixes from the V9 consistency check (focus indicator, one row versus wrap, substring locators, tap-target size).
+
+##### Impact
+- Requirements: 18 (16, 19, 20), 27 (11, 12), 32 (23), 33 (17).
+- Design (not edited here), checked against `design.md` V9. Already consistent: B15 uses `size-11` (44 px) at all widths, the outline classes `focus-visible:outline-2 ... outline-primary-500`, `flex-wrap` with `justify-between`, and the Testing Strategy row uses exact link names. Must change:
+  - V9 change summary, D18, and B15: replace "single row" with "one row from 768 px upward, may wrap below 768 px".
+  - B15 interaction row: replace "focus ring" with the "visible focus-visible outline (2 px)" wording, and mark Open issue 40 resolved. Open issues 42 (one row versus wrap) and 44 (substring locators) are also resolved by this refinement.
+  - B15 tap-target row: state that `size-11` (44 px) is the tap-target exception to the 4 px scale step, as for the `lg` button, at every width.
+  - B15 layout table, 375 px to 767 px row: "may wrap" instead of a description that implies wrapping is required; the 768 px row stays.
+  - Testing Strategy V9 (Playwright footer scenario and RTL Footer test): scope the footer link locators to `getByRole("contentinfo")` or exact names, and scope the logo scenarios (R33.15) to `getByRole("banner")` or `exact: true`. The Header logo RTL test (R32.20) already needs an exact name.
+  - Traceability V9 table: rows for 18, 27, 32, and 33 need the new wording.
+- Tasks (not yet updated): the Footer tests and the Playwright footer and logo specs need the scoped locators.
+- No new inconsistency was found between `requirements.md` V9 and `design.md` V9 beyond the wording items above.
+
+#### Design refinements (V9, no version bump)
+Classification: design changes, frontend only. Only `design.md` and this file changed. Superseded text is kept and marked.
+- **Layout wording.** V9 change summary, D18, and B15 now say "one row from 768 px upward, may wrap onto two lines below 768 px" (before: "single row"). The B15 layout row for 375 px to 767 px says "may wrap".
+- **Focus indicator.** B15 describes the 2 px focus-visible outline of the design system (before: "focus ring"). Open issue 40 resolved.
+- **Tap target.** B15 states that 44 px (`size-11`) is the tap-target exception to the 4 px scale at every viewport width (R18.19, R27.12).
+- **Tests.** The Footer RTL test and the Playwright footer spec locate links inside the `contentinfo` role or by exact name. The V8 logo scenarios use the `banner` scope with `exact: true`, and the Header logo RTL test notes the banner scope. Open issues 42 (locator part) and 44 resolved.
+- **Traceability.** V9 rows for Requirements 18, 27, 32, and 33 use the refined wording.
+
+#### Task edits (tasks.md V8 to V9)
+Classification: specification and task planning change, frontend only. Only `tasks.md` and this file are changed in this step. No implementation change yet.
+- Tasks 1 to 39 are unchanged and stay as history (same numbering, text, and checkboxes).
+- New Footer phase, task 40, with sub-tasks 40.1 to 40.6:
+  - 40.1 `lib/footerContent.ts` (footer text, link labels, placeholder URLs).
+  - 40.2 shared `KanoMark` component, reused by the Header.
+  - 40.3 inline SVG icon components `GithubIcon` and `LinkedinIcon` (`aria-hidden`, no new dependency).
+  - 40.4 Footer rewrite (R18.16 to R18.21, R27.11, R27.12).
+  - 40.5 React Testing Library tests for the Footer (R32.23), with links located inside the `contentinfo` role or by exact name.
+  - 40.6 repository-rule tests (forbidden-claims scan of the Welcome_Page including the Footer, one Footer per page).
+- New task 41: Playwright footer spec at 375 px and 1920 px (R33.17) and scoped logo locators (`banner` role or exact name). It supersedes the locator part of task 37.5 (R33.15); 37.5 stays as history.
+- New task 42: V9 checkpoint.
+- New task 43: manual verification of the Footer in the browser and replacement of the placeholder GitHub and LinkedIn URLs with the real profile URLs.
+- Dependency graph: waves 80 to 85 appended for tasks 40 to 43. Earlier waves are unchanged.
+
+### Impact (tasks, added in step 3)
+- **Tasks:** `tasks.md` is now V9. Tasks 1 to 39 are unchanged as history. New tasks 40.1 to 40.6, 41, 42, and 43 cover Requirements 18.16 to 18.21, 27.11, 27.12, 32.23, and 33.17. Dependency graph waves 80 to 85 are appended.
+- **Classification:** specification and task planning change. No implementation change yet.
+- **No backend, migration, or guidelines change.**

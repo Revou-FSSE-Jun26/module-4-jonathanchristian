@@ -1,6 +1,8 @@
 # Design Document
 
-**Version:** V8 (revised against requirements V8, frontend only; requirements V6 and V7 text unchanged by this step; initial design was V3)
+**Version:** V9 (revised against requirements V9, frontend only: the shared Footer; V8 covered the Header logo, the Welcome_Page, and the board toolbar; initial design was V3)
+
+> **V9 change summary.** V9 is a frontend-only revision (no endpoint, model, migration, or backend test changes). It redesigns the shared `Footer` (B15): a Server Component with one row from 768 px upward that may wrap onto two lines below 768 px (V9 refinement; the first V9 text said "a single row", superseded), the brand group on the left (brand mark, wordmark, separator dot, portfolio text) and two external icon links (GitHub, LinkedIn) on the right, built only from design-system tokens. It adds a content module `lib/footerContent.ts`, one inline-SVG icon component per brand (the installed `lucide-react` 1.75.0 has no GitHub or LinkedIn icon), and a shared `KanoMark` so the Header and the Footer show the same "K" badge. No new Correctness Property is added (example-based, see the Testing Strategy V9 additions). `proxy.ts`, `decideRoute`, `Header` behavior, and every API are unchanged. Where V9 supersedes older text (the plain one-line footer), the old text stays and a "V9 change" note names the replacement. Index of V9 sections: D18 (decision), B1 and B3 V9 notes, B15, Testing Strategy (V9 additions), Traceability (V9 table), Open issues 39 to 44.
 
 > **V8 change summary.** V8 is a frontend-only revision (no endpoint, model, migration, or backend test changes). It adds (1) the Header logo link target `logoTarget` (B12), (2) the redesigned Welcome_Page structure, copy, and decorative preview (B13), (3) the single 1 px separator between the board toolbar and the board content (B14), plus the V8 testing strategy, Correctness Properties 59 and 60, traceability rows, and Open issues 33 to 38. Where V8 supersedes V6 text (the B2 `/welcome` row, the B7-V6 welcome responsive note, the `WelcomeActions` row of B1, and the single-toolbar markup of `BoardView`), the V6 text stays and a "V8 change" note names the replacement. `proxy.ts` and `decideRoute` are unchanged. Index of V8 sections: D16 and D17 (decisions), B12, B13, B14, Correctness Properties 59 and 60, Testing Strategy (V8 additions), Traceability (V8 table), Open issues 33 to 38.
 
@@ -38,6 +40,12 @@ Key design decisions:
 |---|----------|-----------|
 | D16 | **V8.** The Header logo target comes from one pure function `logoTarget(isAuthenticated)` in `lib/logoTarget.ts`, with the input computed by a second pure function `isVisitorAuthenticated(status)` (**V8 refinement:** AuthContext `status` only, no cookie and no token; the first V8 form `isVisitorAuthenticated({ user, accessToken, refreshToken })` is superseded, see B12). The target is `/welcome` or `/`, never `/login`. `decideRoute`, `proxy.ts`, and the Welcome_Cookie logic are not touched. | Requirements 18.14, 18.15, 17.14. A pure function makes "never `/login`" property-testable, and leaving `decideRoute` alone keeps Properties 52 and 53 valid. |
 | D17 | **V8.** The Welcome_Page is a Server Component tree of small presentational components (one per file, each at most 300 lines), with one Client Component for the call-to-action buttons. All copy and link targets live in one constants module `lib/welcomeContent.ts`, and a pure function `findForbiddenClaims(text)` scans that copy. The board preview is decorative (`aria-hidden`, no focusable element). The separator on the board page is a single element in a new `BoardToolbar` boundary, so no second border can appear (V8 refinement: the add-column control is not part of that toolbar, and the forbidden-claims scan is a case-insensitive substring match with "free" as a whole word). | Requirements 38.15 to 38.21, 21.24 to 21.28. One copy module makes the forbidden-claims check (R38.19) testable over exactly what is rendered, and `BoardView.tsx` is already near the 300-line limit (Requirement 30.6). |
+
+**V9 decision (frontend only).**
+
+| # | Decision | Rationale |
+|---|----------|-----------|
+| D18 | **V9.** The Footer stays a Server Component with no state and no handlers. Hover and focus come from Tailwind classes only. Its text, the two placeholder URLs, and the two `aria-label` values live in `lib/footerContent.ts`, its Tailwind classes stay in `components/` as complete static strings (the Tailwind scanner covers `components/` and `hooks/`, not `lib/`). GitHub and LinkedIn marks are inline SVG components in `components/shared/icons/`, because the installed `lucide-react` has no brand icons. The "K" badge is one shared `KanoMark` used by the Header and the Footer. The brand group is plain text and never a link. | Requirements 18.16 to 18.21, 27.11, 27.12. A Server Component keeps the footer out of the client bundle. Keeping classes in `components/` avoids classes that are never generated. One `KanoMark` keeps both badges identical. A text-only brand group leaves exactly one link named "Kano" per page (R18.14). V9 refinement: the layout is one row from 768 px upward and may wrap onto two lines below 768 px (the first V9 text said "single row", superseded). |
 
 Pure logic (ordering, validation boundaries, recipient computation, pagination, week boundaries, optimistic-move reducers, route-guard decisions, badge formatting) is isolated in side-effect-free functions so it can be tested with property-based tests. See Correctness Properties.
 
@@ -594,6 +602,8 @@ web/
 
 Directories under `components/` follow API resources (auth, boards, cards, comments, notifications, users) per Requirement 15.4. Column and analytics UI sit in `components/boards/` because there is no separate resource directory for them in the requirement (see Open issues). Each file defines exactly one component or module.
 
+> **V9 change, file tree.** The tree line `components/Header.tsx  Footer.tsx  NotificationBell.tsx` stays valid. V9 rewrites `Footer.tsx` (the V5 file was one centered line of muted text "Kano Task Management") and adds `components/shared/KanoMark.tsx`, `components/shared/icons/GithubIcon.tsx`, `components/shared/icons/LinkedinIcon.tsx`, and `lib/footerContent.ts`. See B15.
+
 ### B2. Pages: Server versus Client split
 
 | Route | Component type | Data | Notes |
@@ -625,6 +635,8 @@ Unauthenticated access to protected pages is blocked in `middleware.ts` before r
 | `StatusBadge` (V6) | `status: CardStatus` | Renders `BaseBadge` with `STATUS_LABEL[status]` and `STATUS_VARIANT[status]` from `lib/status.ts`; the only place a status becomes text, so board, modal, and My Tasks always agree |
 
 **V8 change, Header.** The brand link (logo mark and wordmark) no longer has the fixed target `/`. Its `href` is `logoTarget(isVisitorAuthenticated(auth))` (B12). The Header links "Log in" and "Register" for anonymous visitors stay plain `Link`s with the V5 classes (see Open issue 34). **V8 refinement:** this is now the rule (Requirement 38.2): the two Header actions are anchor elements, never `BaseButton`. The logo link and every authentication-dependent part of the Header (the Log in and Register links, "My Tasks", `NotificationBell`, `UserMenu`) read one shared check, `isVisitorAuthenticated(status)` (B12), so they cannot disagree.
+
+**V9 change, Footer and Header mark.** The shared `Footer` is no longer the V5 plain text line. Its V9 design is B15. The Header brand link keeps its V8 behavior and markup, except that the inline "K" `span` is replaced by `<KanoMark />` (B15), so the Header and Footer badges cannot drift apart. The Header link text and accessible name stay exactly "Kano".
 
 Every button in pages and feature components uses `BaseButton` (Requirement 18.6). `Header` contains the app link, `NotificationBell`, `UserMenu` (profile link, logout) and links to `/my-tasks`; it shows only login and register links for anonymous visitors.
 
@@ -1222,6 +1234,89 @@ BoardRoleProvider
 ```
 
 **Role and state coverage (R21.27).** `BoardToolbar` and the `hr` render for admin, member, and guest. In the 403 and 404 states the board page renders `BoardAccessMessage` instead of `BoardView`, so no toolbar, no separator, and no Column exist. The add-column control stays at the end of the Kanban row inside the Kanban columns area, outside `BoardToolbar` (V8 refinement, R21.24: `BoardToolbar` has no add-column prop and renders no add-column form; Open issue 36 resolved). The `Header`'s own `border-b` belongs to the shared Header, not to the board toolbar.
+
+### B15. V9: Footer (Requirements 18.13, 18.16 to 18.21, 27.11, 27.12, 38.19)
+
+**V9 change.** Supersedes the V5 footer (one centered `text-xs` line "Kano Task Management", `border-t border-line`, no links). The V5 text stays as history. `layout.tsx` still renders exactly one `Header` and one `Footer` around `children` (R18.13), so the Welcome_Page, the invite page, and every other page get the new Footer without a page change. No backend file is involved.
+
+**Icon source check (recorded result).** Installed `lucide-react` is 1.75.0 (`web/package.json` `^1.75.0`, `node_modules` version 1.75.0). `dist/lucide-react.d.ts` has no `Github` or `Linkedin` export, and `dist/esm/icons/` has no GitHub or LinkedIn file (only generic `git-*` icons such as `git-branch`). Brand icons are therefore not available from lucide, and the design uses two inline SVG components. No new dependency is added (an icon package would break the YAGNI rule for two icons).
+
+**Files (one component or module per file, each far below 300 lines).**
+
+| File | Type | Content |
+|---|---|---|
+| `components/Footer.tsx` | Server (no `"use client"`, no hooks, no handlers) | Rewritten. Renders the footer landmark, the brand group, and the link group below. Uses plain `<a>` elements for the external links (not `next/link`, which is for in-app navigation). Uses no Next.js API, so it does not depend on the framework changes that `web/AGENTS.md` warns about. |
+| `components/shared/KanoMark.tsx` | Server-compatible (no hooks), also imported by the client `Header` | The "K" badge: `<span aria-hidden="true" className="inline-flex items-center justify-center size-6 rounded-md bg-primary-500 text-white text-xs font-semibold">K</span>`. The classes are the ones the Header already has, so the look does not change. Chosen over two local copies because the same six-class badge would otherwise exist twice and could drift. |
+| `components/shared/icons/GithubIcon.tsx`, `LinkedinIcon.tsx` | Server-compatible | Each returns `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false" className="size-5">` with one `<path>`. The path data is taken from the Simple Icons set (CC0) at implementation time and checked there. The icon inherits `currentColor`, so the hover color of the link changes it (design system section 5). |
+| `lib/footerContent.ts` | pure | `FOOTER_CONTENT`: `wordmark` "Kano", `portfolioPrefix` "Portfolio project built in 2026 by " and `author` "JC" (both fixed strings, no `new Date()`, R18.17), and `links`: `{ id: "github", href: "https://github.com", label: "Kano on GitHub" }` and `{ id: "linkedin", href: "https://www.linkedin.com", label: "Kano on LinkedIn" }`. It holds no Tailwind class, because `lib/` is not scanned by Tailwind. The forbidden-claims scan (below) reads this object. |
+
+**Markup and classes (complete static strings, design-system tokens only).**
+
+```tsx
+// components/Footer.tsx
+const LINK_CLASS =
+  "inline-flex size-11 items-center justify-center rounded-md text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500";
+
+<footer className="bg-surface border-t border-line px-4 py-3 min-w-0">
+  <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-x-4 gap-y-2 min-w-0">
+    <div className="flex flex-wrap items-center gap-2 min-w-0">
+      <KanoMark />
+      <span className="text-sm font-semibold text-ink">Kano</span>
+      <span aria-hidden="true" className="text-ink-subtle">·</span>
+      <p className="text-sm text-ink-muted min-w-0">
+        Portfolio project built in 2026 by <span className="font-medium text-ink">JC</span>
+      </p>
+    </div>
+    <div className="ml-auto flex items-center gap-1">
+      <a href="https://github.com" target="_blank" rel="noopener noreferrer" aria-label="Kano on GitHub" className={LINK_CLASS}><GithubIcon /></a>
+      <a href="https://www.linkedin.com" target="_blank" rel="noopener noreferrer" aria-label="Kano on LinkedIn" className={LINK_CLASS}><LinkedinIcon /></a>
+    </div>
+  </div>
+</footer>
+```
+
+(The literals above are shown in place for reading. The implementation reads the strings from `FOOTER_CONTENT` and maps `links` to the two anchors.)
+
+| Element | Classes and reason |
+|---|---|
+| Landmark | `bg-surface border-t border-line px-4 py-3 min-w-0`. The surface and 1 px `line` border match the Header (`bg-surface border-b border-line px-4`), a raised flat surface per design system section 2.6 (R18.21). `<footer>` placed directly in `body` by `layout.tsx` has the `contentinfo` role. |
+| Container | `max-w-7xl mx-auto`, the same width container as the Header (R18.16). |
+| Brand mark | `KanoMark`: `size-6 rounded-md bg-primary-500 text-white text-xs font-semibold`, white on `primary-500` is a documented pair (4.58:1). |
+| Wordmark | `text-sm font-semibold text-ink` (weight 600, R18.17). Plain `span`, not a link. |
+| Separator dot | `text-ink-subtle`, `aria-hidden="true"`. Decorative, so the contrast rule for essential text does not apply (design system section 6). |
+| Portfolio text | `text-sm text-ink-muted`, "JC" in its own `span` with `font-medium text-ink` (weight 500, allowed set 400, 500, 600). `ink-muted` on `surface` is a documented pair. |
+| Link | `size-11` is 44 px by 44 px at every width (R18.19, R27.12; 44 px is the design-system touch size, the `lg` button height, and it is the tap-target exception to the 4 px spacing scale step at every viewport width). `rounded-md` is the default radius. `text-ink-muted` becomes `text-ink` and the background becomes `sunken` on hover, with `transition-colors duration-150` (R18.20, design system recipe for ghost controls). The focus indicator is the 2 px focus-visible outline of the design system, recipe `focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500` (the product uses outlines, not Tailwind `ring`; V9 refinement: the first V9 text called it a "focus ring", superseded; Open issue 40 resolved). |
+| Icon | `size-5` (20 px, design system section 5 for icon buttons), `aria-hidden="true"`, `focusable="false"`. The link has no text content, so its accessible name is the `aria-label` (R18.19). |
+
+No `shadow-*`, gradient, blur, arbitrary value, hex code, or default palette class is used (R18.21, design system sections 0 and 8). No `font-bold`. `size-11` is not in the spacing scale of design system section 2.3 but equals the 44 px height of the `lg` button, which section 2.3 allows ("unless matching an existing element height"). R18.19 states this explicitly: 44 px is the tap-target exception to the 4 px scale step at every viewport width.
+
+**Layout by width (R18.16, R27.1, R27.2, R27.11, R27.12).**
+
+| Width | Behavior |
+|---|---|
+| 768 px and above | One row: the brand group on the left, the link group on the right (`justify-between`, and `ml-auto` keeps it right). All content fits (about 350 px of brand group and 92 px of links). |
+| 375 px to 767 px | The footer may wrap onto two lines (R27.11 as refined; the first V9 text implied wrapping was required). The outer container is `flex-wrap`. The brand group is about 350 px wide in one line, which is wider than the 343 px available, so the link group wraps to a second line and stays right-aligned through `ml-auto`. The brand group has its own `flex-wrap` and `min-w-0`, so on the narrowest screens its portfolio text wraps below the wordmark instead of overflowing. This is the "two lines without overlap" case of R27.11. |
+| Below 375 px | Page may scroll horizontally (R27.7). The same wrapping applies. |
+
+The Footer adds no `overflow` rule. All items use `min-w-0` or `shrink` defaults, so `document.documentElement.scrollWidth` does not exceed the viewport (R27.1). Link boxes (44 px) never overlap the text because they are separate flex items with `gap` (R27.2). On a very tall wrapped state the footer grows in height; there is no fixed height.
+
+**Contrast.** `ink-muted` on `surface` and on `sunken` (hover state shows `ink`), `ink` on `surface` and `sunken`, and white on `primary-500` are documented pairs of the design system, all at least 4.5:1 (lowest 4.58:1). No new token pair is introduced (design system section 6).
+
+**Security and privacy (R18.18, R18.21).** The two anchors have `target="_blank"` and `rel="noopener noreferrer"`: `noopener` gives the opened page no `window.opener`, `noreferrer` sends no Referer, which also keeps an invite path out of the Referer header if a visitor on `/invite/<token>` clicks a footer link (this complements Open issue 22). The Footer loads no script or tracking pixel, sets and reads no cookie, calls no API, and reads no environment variable. It is a Server Component, so it adds no client JavaScript. The two URLs are placeholders (Open issue 41).
+
+**Interaction with other tests and specs.** (1) The Header link named exactly "Kano" remains the only link with that exact name: the brand group is text, and the footer links are named "Kano on GitHub" and "Kano on LinkedIn". Testing Library matches a string `name` exactly, so `getByRole("link", { name: "Kano" })` still finds one element. Playwright matches `name` as a case-insensitive substring unless `exact: true` is set, so Playwright logo locators must stay scoped to the `banner` landmark (as in the V8 scenarios) or use `exact: true` (see Open issue 42). (2) The Welcome_Page forbidden-claims rule (R38.19) covers the shared Footer, because the Footer is rendered on that page. The V9 test scans `FOOTER_CONTENT` and the rendered footer text and attributes with `findForbiddenClaims` (Testing Strategy V9). The footer strings were checked by hand against the list: "Portfolio project built in 2026 by JC", "Kano", "Kano on GitHub", and "Kano on LinkedIn" contain none of the forbidden strings ("Kano on" is not "KAN-", and no listed substring such as "rating" or "4.9" occurs).
+
+```mermaid
+flowchart LR
+    L["layout.tsx (Server)"] --> F["Footer (Server)"]
+    F --> B["Brand group: KanoMark, wordmark, dot, portfolio text (no link)"]
+    F --> G["Link group: two external anchors"]
+    G --> I1["GithubIcon (inline SVG)"]
+    G --> I2["LinkedinIcon (inline SVG)"]
+    C["lib/footerContent.ts"] -.text, URLs, labels.-> F
+    K["shared/KanoMark.tsx"] --> B
+    K --> H["Header (Client)"]
+```
 
 ## Data Models
 
@@ -1923,7 +2018,7 @@ The V5 and V6 strategy stays in force. V8 is frontend only, so there are no pyte
 | Area | Tests | Properties |
 |---|---|---|
 | `logoTarget` (32.20) | fast-check over each AuthContext status (`loading`, `authenticated`, `anonymous`) and over random status sequences for `isVisitorAuthenticated(status)` and `logoTarget`; true only for `authenticated`; target never `/login`; the function takes no cookie, token, or user input (V8 refinement; the first V8 test generated user and token values, superseded) | 59 |
-| Header logo (32.20) | Render `Header` inside a test `AuthContext` provider. Assert: anonymous gives `href="/welcome"` with the cookie `kano_welcome_seen` present and absent; anonymous on the `/login` and `/register` pages (mocked `usePathname`) gives `/welcome`; status `authenticated` gives `/`; **V8 refinement (R32.20):** a visitor with only a refresh cookie gets `/welcome` while the status is `loading` or `anonymous` (including a 5xx restore failure that keeps the cookies) and `/` once the restoration succeeds (the test advances the mocked `GET /api/users/me` from pending to 200); in every status the logo target and the navigation (Log in and Register anchors versus My Tasks, bell, and user menu) match the same authentication state; after calling `logout()` the same rendered link changes to `/welcome`; the link name is "Kano" and its `href` is never `/login`; a click calls no `fetch` and no write to `document.cookie` (spy on the cookie setter). (Supersedes the first V8 case "refresh token only gives `/`".) | 59 |
+| Header logo (32.20) | Render `Header` inside a test `AuthContext` provider. Assert: anonymous gives `href="/welcome"` with the cookie `kano_welcome_seen` present and absent; anonymous on the `/login` and `/register` pages (mocked `usePathname`) gives `/welcome`; status `authenticated` gives `/`; **V8 refinement (R32.20):** a visitor with only a refresh cookie gets `/welcome` while the status is `loading` or `anonymous` (including a 5xx restore failure that keeps the cookies) and `/` once the restoration succeeds (the test advances the mocked `GET /api/users/me` from pending to 200); in every status the logo target and the navigation (Log in and Register anchors versus My Tasks, bell, and user menu) match the same authentication state; after calling `logout()` the same rendered link changes to `/welcome`; the link is found with `getByRole("link", { name: "Kano" })` (Testing Library matches the string exactly; scope to `getByRole("banner")` when the Footer is rendered too) and its `href` is never `/login`; a click calls no `fetch` and no write to `document.cookie` (spy on the cookie setter). (Supersedes the first V8 case "refresh token only gives `/`".) | 59 |
 | One Header and one Footer (32.20) | Render `RootLayout` around stub children for the welcome, login, register, dashboard, board, My Tasks, and profile stand-ins and assert one `banner` and one `contentinfo` role each. A static test reads `app/**/page.tsx` and `components/**` and fails if a file other than `layout.tsx` renders `<Header` or `<Footer`. |  |
 | Welcome_Page (32.21) | Render `WelcomeContent` (and the Header from the layout shell). Assert: the sections appear in the order hero, preview, features, bottom CTA (`compareDocumentPosition`); Header "Log in" is an anchor (`a[href="/login"]`) and "Register" an anchor (`a[href="/register"]`), neither rendered through `BaseButton` (V8 refinement, R38.2: the test checks they are `a` elements and have no `BaseButton` marker class or `button` role), while "Get started", the bottom "Create account", and the bottom "Log in" are `BaseButton`s; hero has the eyebrow, one `h1`, the subheadline, and the "Get started" button to `/register` (click calls `router.push("/register")` and sets the cookie); four feature cards with the exact titles and descriptions of R38.17; bottom "Create account" to `/register` and "Log in" to `/login`; `BoardPreview` content container has `aria-hidden="true"` and `container.querySelectorAll("a[href], button, input, select, textarea, summary, [tabindex]")` is empty; the horizontal scroller is the parent of that container (not inside it) and has `tabindex="-1"`; exactly one element of the preview carries `shadow-overlay` (the dragged Card) and no other element of the page has a `shadow-*` class; `fetch` is never called; no `blockquote`, `q`, `cite`, star character, or element with `role="img"` and a rating label. | 60 |
 | Forbidden claims (32.21, R38.19) | `findForbiddenClaims` over `WELCOME_COPY`, `FEATURES`, `PREVIEW_SAMPLE`, the page `metadata.description`, and over the DOM: all text nodes plus every `aria-label`, `alt`, and `title` attribute, case-insensitive substring matching for every entry except "free", which is a whole-word match (R38.19). A fixed example test shows the false positives of the rule ("operating", "integrating", and "generating" report "rating"; "freedom" does not report "free"). A source-text test also scans `components/welcome/**`, `app/welcome/page.tsx`, and `lib/welcomeContent.ts` for the strings. The forbidden list itself lives in `lib/forbiddenClaims.ts`, outside the scanned files. | 60 |
@@ -1932,11 +2027,43 @@ The V5 and V6 strategy stays in force. V8 is frontend only, so there are no pyte
 **Playwright (additions to the V6 scenarios; every scenario that is unauthenticated and visits `/` keeps using `setWelcomeSeen`, except the welcome scenario).**
 
 - **Welcome scenario (R33.13, amended).** Fresh context, no cookies. `goto("/")` ends on `/welcome`. Section-scoped locators: Header `page.getByRole("banner")` with links "Log in" and "Register"; hero `page.getByRole("region", { name: "Organize work smoothly, from idea to done" })` with the button "Get started"; bottom `page.getByRole("region", { name: "Ready to bring calm to your project planning?" })` with the buttons "Create account" and "Log in". Click the Header "Log in": URL `/login` and `context.cookies()` contains `kano_welcome_seen`. Then `goto("/")` ends on `/login`. In a second step, `goto("/welcome")` (always served to an anonymous visitor) and click the bottom "Create account": URL `/register`. The scoping avoids the ambiguity of two "Log in" controls.
-- **Logo scenarios (R33.15).** (1) Anonymous: `goto("/login")` (the proxy sets the cookie), click `page.getByRole("banner").getByRole("link", { name: "Kano" })`, `expect(page).toHaveURL(/\/welcome$/)`. (2) The same on `/register`. (3) Logged in with `requireCredentials()`: create a Board through the UI (unique name), open it, click the logo, `expect(page).toHaveURL(/\/$/)`, and assert the URL contains neither `/welcome` nor `/login` and the Dashboard heading is visible.
+- **Logo scenarios (R33.15).** (1) Anonymous: `goto("/login")` (the proxy sets the cookie), click `page.getByRole("banner").getByRole("link", { name: "Kano", exact: true })` (V9 refinement: `exact: true` added, because the footer links "Kano on GitHub" and "Kano on LinkedIn" contain "Kano"; the banner scope already excludes them), `expect(page).toHaveURL(/\/welcome$/)`. (2) The same on `/register`. (3) Logged in with `requireCredentials()`: create a Board through the UI (unique name), open it, click the logo, `expect(page).toHaveURL(/\/$/)`, and assert the URL contains neither `/welcome` nor `/login` and the Dashboard heading is visible.
 - **Layout scenarios (R33.16).** Run at `{ width: 375, height: 812 }` and `{ width: 1920, height: 1080 }` through `page.setViewportSize`. Welcome: `document.documentElement.scrollWidth <= clientWidth` (read with `page.evaluate`, polled with `expect.poll`), and at 375 px `boundingBox()` width and height at least 44 for the logo link, "Log in", "Register", hero "Get started", bottom "Create account", and bottom "Log in". Board page (logged-in user with a Board and two Columns): exactly one visible `getByRole("separator")`; a helper `expectNoOverlap(locators)` checks pairwise that the bounding boxes of the toolbar controls (back link, title, search input, Members, Analytics) do not intersect; the separator box top is at least the largest bottom of the toolbar controls and at most the top of the first Column; the separator height is 1 px (`boundingBox().height` equals 1 within 0.5); and the page `scrollWidth` does not exceed the viewport (the Kanban container may scroll). The guest view is covered by the unit tests, because it needs a second account.
 - **Unchanged.** Auto-waiting only, no `waitForTimeout`, 10 s assertions, 60 s tests, at most 2 retries, HTML report, serial Kanban journey, and the credentials scan (Property 58) over the new spec files. A V8 run must still end with all tests passed (R33.8).
 
 **Not property-tested (examples only).** The look of the Welcome_Page and the toolbar (design-system conformance), icon names, and Tailwind classes. These use the example and Playwright checks above and a manual review at 375 px and 1920 px (task 33.3 style checklist).
+
+### Testing Strategy: V9 additions (Requirements 32.23, 33.17, 18.16 to 18.21, 27.11, 27.12)
+
+The V5, V6, and V8 strategy stays in force. V9 is frontend only (no pytest change, no migration dependency). Network is mocked in unit tests (R32.9). The Footer is a Server Component with no hooks, so RTL renders it directly with `render(<Footer />)`.
+
+**Correctness Properties: none added.** The footer has fixed text, two fixed links, and fixed classes. Its behavior does not vary with input, so a universally quantified property would only restate a constant (PBT does not apply to this UI rendering). The existing Property 60 is not changed: its corpus (`WELCOME_COPY`, `FEATURES`, `PREVIEW_SAMPLE`, page description) does not include `FOOTER_CONTENT`, and R38.19 for the footer is covered by the example test below. If a property is wanted later it would be numbered 61.
+
+**Unit tests (Vitest and React Testing Library), file `web/__tests__/Footer.test.tsx` (R32.23).**
+
+| Area | Assertions |
+|---|---|
+| Brand and text | The text "K" (brand mark), the text "Kano" (wordmark), and the paragraph whose `textContent` is "Portfolio project built in 2026 by JC" are rendered; "JC" is found by `getByText("JC")` as its own element (`span`) with `font-medium` and `text-ink`; the brand mark and the dot are `aria-hidden`. |
+| Links | Queries are scoped with `within(screen.getByRole("contentinfo"))` (or use exact name matching, because "Kano on GitHub" and "Kano on LinkedIn" contain "Kano"). `getAllByRole("link")` inside the footer has length 2. The link named exactly "Kano on GitHub" has `href` `https://github.com`; the link named exactly "Kano on LinkedIn" has `href` `https://www.linkedin.com`; each has `target="_blank"` and a `rel` that contains `noopener` and `noreferrer` (split on spaces). |
+| Decorative icons | Each link contains one `svg` with `aria-hidden="true"` and `focusable="false"`; the link has no text content other than the `aria-label`. |
+| Hover and focus classes | Each link `className` contains `hover:text-ink`, `hover:bg-sunken`, `transition-colors`, `duration-150`, `focus-visible:outline-2`, and `focus-visible:outline-primary-500`, and has `size-11` (44 px) and `text-ink-muted`. (jsdom has no `:hover` or layout, so computed color and size are checked in Playwright.) |
+| Brand group not a link | `getByText("Kano")` inside the footer is not inside an `a` element, and the footer has no link whose name is exactly "Kano". A page-level check renders the Header (with a test AuthContext) and the Footer and asserts `getAllByRole("link", { name: "Kano" })` has length 1 and its `href` is the V8 logo target. |
+| No raw values | No element of the footer subtree has a class that starts with `shadow-`, `bg-[`, `text-[`, `p-[`, or `bg-gradient`, or equals `font-bold` (R18.21). |
+| No side effects | `fetch` is not called, and `document.cookie` setter spy is not called, when the footer renders and when each link is hovered and focused with `userEvent` (R18.21). |
+| Forbidden claims (R38.19) | `findForbiddenClaims` over `FOOTER_CONTENT` (all strings), the footer `textContent`, and every `aria-label`, `alt`, and `title` in the footer returns an empty list. |
+| One Footer per page (R18.13) | Re-use the V8 layout stand-in harness (`RootLayout` around stub children for the dashboard, board, My Tasks, profile, login, register, and invite pages) and add a stand-in for the Welcome_Page that renders `WelcomeContent`: exactly one `contentinfo` role on each page, and on the Welcome_Page the footer follows the bottom call-to-action section in document order. The static source test of V8 (no page renders `<Footer` itself) also covers the new files. |
+| Mark parity | `KanoMark` renders the same class list in the Header and in the Footer (both render the shared component), and `Header` has no remaining inline "K" `span`. |
+
+**Playwright, footer scenario (R33.17), file `web/e2e/footer.spec.ts`.** Runs at `{ width: 375, height: 812 }` and `{ width: 1920, height: 1080 }` through `page.setViewportSize`, on `/welcome` (fresh context, anonymous) and on the Dashboard (logged in with `requireCredentials()`, no literal e-mail or password in the file, Property 58 still applies).
+
+- Locators are scoped to the `contentinfo` role and use exact names (R33.17): `const footer = page.getByRole("contentinfo")`; `footer.getByRole("link", { name: "Kano on GitHub", exact: true })` and the LinkedIn equivalent (the `exact: true` option is required because Playwright matches names as substrings by default, and "Kano on GitHub" contains "Kano"). The logo scenarios of V8 (R33.15) use `page.getByRole("banner").getByRole("link", { name: "Kano", exact: true })`.
+- Assertions (web-first, auto-waiting): `expect(footer).toContainText("Portfolio project built in 2026 by JC")`; the footer shows the brand text "Kano"; both links `toBeVisible()`; `toHaveAttribute("href", "https://github.com")` and `("href", "https://www.linkedin.com")`; `toHaveAttribute("target", "_blank")`; `toHaveAttribute("rel", /noopener/)` and `/noreferrer/`.
+- No horizontal scroll: `await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true)` at both widths.
+- Tap target at 375 px: `boundingBox()` width and height of each link is at least 44. Overlap: the two link boxes do not intersect each other or the brand text box (`expectNoOverlap`, the V8 helper). The footer box lies inside the viewport width.
+- Hover (desktop width only): `link.hover()`, then the computed `background-color` of the link differs from its value before the hover and the computed `color` changes. The test compares before and after values and does not hard-code a color.
+- The suite never clicks a footer link and never navigates to an external site, uses no `waitForTimeout`, and keeps the 10 s assertion and 60 s test timeouts and the retry limit.
+
+**Not tested automatically.** The exact look (icon shape, spacing rhythm) is checked by a manual review at 375 px and 1920 px in the 33.3 style checklist. The real GitHub and LinkedIn URLs are not checked, because they are placeholders (Open issue 41).
 
 ## Part D: Deployment, Guidelines, and Documentation Design
 
@@ -2102,6 +2229,17 @@ Every requirement maps to at least one design element. Part references point to 
 | 38 (criteria 1, 2, 10, 15 to 21) | B13 (files, sections, copy, preview, design-system use, layout by width), B2 V8 note, B3 (Header anchors), D17, Property 60 (substring and whole-word "free" rule); Open issues 34, 35, 37, 38 (resolved) |
 | 32 (criteria 20 to 22), refined | Unit tests table in Testing Strategy: V8 additions: status-only logo cases (R32.20), anchors versus `BaseButton`, scroller `tabindex="-1"`, single `shadow-overlay` (R32.21), add-column outside the toolbar (R32.22) |
 
+#### V9 amendments to existing rows
+
+| Req | V9 design coverage |
+|---|---|
+| 18 (criteria 16 to 21, refined wording) | B15 (Footer files, markup, classes, `FOOTER_CONTENT`, inline SVG icons, `KanoMark`, security): one row from 768 px upward, may wrap below (16), 2 px focus-visible outline (20), 44 px tap target at every width as the exception to the 4 px scale (19); D18, B3 V9 note; Testing Strategy V9 additions (RTL and Playwright); Open issues 39 to 44 (40, 42 locator part, 44 resolved) |
+| 18 (criteria 13 to 15, unchanged) | B15 "Interaction with other tests" (one Footer per page including the Welcome_Page, one link named exactly "Kano") |
+| 27 (criteria 11, 12, refined) | B15 layout by width (one row at 768 px and above, may wrap below with `flex-wrap`, `ml-auto`, `min-w-0`; `size-11` 44 px at every width), Playwright footer scenario (no horizontal scroll, 44 px boxes at 375 px) |
+| 32 (criterion 23, refined) | Testing Strategy V9 additions, unit tests table (`web/__tests__/Footer.test.tsx`: focus-visible outline classes, links located in the `contentinfo` role or by exact name); no new Correctness Property |
+| 33 (criterion 17, refined) | Testing Strategy V9 additions, Playwright footer scenario (`web/e2e/footer.spec.ts`: `contentinfo` scope, `exact: true`), V8 logo scenarios scoped to `banner` with `exact: true`, no click-through |
+| 38 (criterion 19, applies to the shared Footer) | B15 (hand check of the footer strings), unit test with `findForbiddenClaims` over `FOOTER_CONTENT` and the rendered footer |
+
 ## Open issues
 
 These are gaps or conflicts found while designing and revising. Items marked "assumption" were chosen by the assistant in V4 and can be overridden.
@@ -2156,3 +2294,12 @@ These are gaps or conflicts found while designing and revising. Items marked "as
     **Resolved in V8 refinement.** R38.20 allows `shadow-overlay` on the one dragged preview Card only; everything else stays flat (B13).
 38. **Forbidden string matching (Requirement 38.19).** The list says "compared case-insensitively" and marks only "free" as a whole word. Matching the other entries as substrings means that words such as "operating" or "integrating" (contain "rating") fail the scan, and "14.9" (contains "4.9") too. The design matches substrings except for "free", and the copy of R38.16 and R38.17 has no such word. Recommendation: state in R38.19 that all entries except "free" are substring matches.
     **Resolved in V8 refinement.** R38.19 states the rule. `findForbiddenClaims` implements it and Property 60 covers it, including the false-positive words (B13).
+
+### V9 open issues
+
+39. **`lucide-react` has no brand icons (Requirement 18.18, 18.19).** Checked on the installed version 1.75.0: no `Github` or `Linkedin` export in `dist/lucide-react.d.ts` and no matching file in `dist/esm/icons/`. The design uses two inline SVG components (B15). The brand marks are trademarks of their owners and the path data comes from the CC0 Simple Icons set. Alternative: generic lucide icons (for example a link or user icon), which would be less recognizable and was not chosen. The path data is picked at implementation time.
+40. **"Focus ring" wording (Requirement 18.20, 32.23).** **Resolved in V9 refinement.** R18.20 and R32.23 now say "focus-visible outline (2 px outline)", which is what B15 and the Footer test use. The text below is kept as history. The requirements say the Footer shows "the design-system focus ring" and the test asserts "the `focus-visible` ring class". The design system defines the focus indicator as a 2 px outline (`focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500`), and `globals.css` also sets a global `:focus-visible` outline. The design uses the outline classes and the test asserts them. Recommendation: reword R18.20 and R32.23 to "focus-visible outline".
+41. **Placeholder URLs (Requirement 18.18).** `https://github.com` and `https://www.linkedin.com` point to the site home pages, not to the author's profiles. Replace both in `lib/footerContent.ts` and update R18.18, R32.23, and R33.17, which pin the literal values, when the real profile URLs are known. Until then the links are external and open in a new tab, and Playwright never clicks them.
+42. **Hard-coded text "2026" and "JC" (Requirement 18.17).** **Resolved in V9 refinement for the locator part.** R32.23 and R33.17 now require footer link locators inside the `contentinfo` role or with exact names, and the logo scenarios scoped to `banner` or `exact: true` (Testing Strategy V9 and V8). The fixed-year note (the year does not update by itself) stays open by design. Both are fixed strings in `FOOTER_CONTENT` and are not computed, as required. The year will not update by itself. Playwright and Testing Library name matching: a Playwright locator for the Header logo by name "Kano" matches "Kano on GitHub" and "Kano on LinkedIn" as a substring unless it is scoped to the `banner` landmark or uses `exact: true` (Testing Library matches names exactly, so its logo tests stay valid). The V8 Playwright logo scenarios are already banner-scoped; new locators must use `exact: true`.
+43. **External links versus same-origin links (Requirement 18.18).** The Footer links are the first external links in the product. They are plain `<a target="_blank">` with `rel="noopener noreferrer"`, not `next/link`, and are not prefetched. If a lint rule later requires `next/link` for all anchors, external URLs still need a plain anchor. No Content Security Policy or `connect-src` change is needed because the links only navigate.
+44. **"Single row" versus wrapping (Requirements 18.16, 27.11).** **Resolved in V9 refinement.** R18.16 now says one row from 768 px upward and R27.11 says the footer may wrap below 768 px; R18.19 states the 44 px tap-target exception to the 4 px scale at every width. B15 follows both. The text below is kept as history. R18.16 requires a single row and R27.11 requires wrapping onto two lines when the groups do not fit. The design reconciles them with `flex-wrap`: one row from about 768 px, two lines below (the link group wraps under the brand group, right-aligned). R18.16 could say "a single row when both groups fit". Also, `size-11` (44 px) is not a step of design system section 2.3 and is allowed only as the height of the existing `lg` control; the design system could list it explicitly. The shared `KanoMark` extraction also touches `Header.tsx` (a markup-neutral change), which is a V9 implementation detail, not a requirement change.

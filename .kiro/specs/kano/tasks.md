@@ -1,6 +1,6 @@
 # Implementation Plan: Kano
 
-**Version:** V8 (V1 to V5 tasks 1 to 22.2 preserved as history; V6 tasks added as 25 to 33; V7 narrows task 33.1; V8 frontend-only tasks added as 34 to 39)
+**Version:** V9 (V1 to V5 tasks 1 to 22.2 preserved as history; V6 tasks added as 25 to 33; V7 narrows task 33.1; V8 frontend-only tasks added as 34 to 39; V9 footer tasks added as 40 onward)
 
 ## Overview
 
@@ -20,6 +20,8 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
 **V6 revision (requirements V6, design V6).** Tasks 1 to 22.2 are completed and stay in this file exactly as written, as history documentation of what was built for V1 to V5. They are not renumbered, reworded, unchecked, or deleted. The pending tasks 22.3 to 22.9, 23.1 to 23.8, and 24 keep their numbers and text; V6 only adds `Depends on:` entries and short "V6 note" lines to them. All new V6 work is added as new top-level phases 25 to 33, because 23 and 24 already exist. Their order is backend first, then frontend: 25 backend models, schema, and permissions; 26 manual V6 migration (user-owned, no agent-generated migration script); 27 backend features with pytest and property tests 44 to 58; 28 backend V6 checkpoint; 29 frontend libraries and shared pieces; 30 frontend pages and components; 31 Playwright and `.env.test` work; 32 V6 frontend checkpoint; 33 final repository rules and pre-deployment manual verification. Because nothing is deployed yet, V6 needs only the local and test database migrations (task 26.1); the production schema created in task 22.4 already includes the V6 columns. Task 22.3 and everything after it now depend on the V6 checkpoint and the V6 repository tasks, so nothing is deployed before the V6 features are complete. Where a V6 task changes code or tests produced by an earlier task, it says "Supersedes the V5 behaviour of task X.Y; X.Y stays as history". Every V6 task follows the same rules as before: read `guidelines/backend.md`, `guidelines/database.md`, or `guidelines/frontend.md` before generating code, keep every file at or below 300 lines, and use the `[MANUAL]` prefix for user-owned tasks.
 
 **V8 revision (requirements V8, design V8, frontend only).** V8 changes the Header logo link, the Welcome_Page, and the board toolbar separator, with their tests and Playwright scenarios. There is no backend task, no migration, and no API change. All tasks 1 to 33.5 stay exactly as written. The new tasks 34 to 39 are appended below task 33.5 and are all unchecked: 34 Header logo and shared authentication check, 35 Welcome_Page, 36 board toolbar and separator, 37 V8 tests, Playwright scenarios, and repository checks, 38 V8 frontend checkpoint, 39 manual browser verification. In the dependency graph the V8 waves run before the deployment waves (22.3 onward), whose entries are unchanged and only moved to later wave ids. Every V8 task reads `guidelines/frontend.md` and `guidelines/design-system.md` first (read only, `guidelines/` is never modified).
+
+**V9 revision (requirements V9, design V9, frontend only).** V9 redesigns the shared Footer (brand group, portfolio text, GitHub and LinkedIn icon links). There is no backend task, migration, or API change. All tasks 1 to 39 stay exactly as written. The new tasks 40 to 43 are appended below task 39 and are all unchecked. Every V9 task starts by reading `guidelines/frontend.md` and `guidelines/design-system.md` (read only) and notes `web/AGENTS.md`: read the relevant Next.js docs in `web/node_modules/next/dist/docs/` before using any Next API (the Footer uses none).
 
 ## Tasks
 
@@ -1496,6 +1498,86 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
   - _Requirements: 18.14, 18.15, 21.25, 21.26, 21.27, 27.10, 38.15 to 38.21, 33.15, 33.16_
   - _Design: B12, B13, B14_
 
+- [ ] 40. Phase 23 (V9): Footer (frontend only)
+  - [ ] 40.1 Create `lib/footerContent.ts`
+    - Read `guidelines/frontend.md` and `guidelines/design-system.md` first (read only). Note `web/AGENTS.md`: read the relevant Next.js docs in `web/node_modules/next/dist/docs/` before using any Next API (this task uses none)
+    - Export `FOOTER_CONTENT` (pure, no Tailwind classes): `wordmark` "Kano", `portfolioPrefix` "Portfolio project built in 2026 by ", `author` "JC" (fixed strings, no `new Date()`), and `links` for GitHub (`https://github.com`, aria-label "Kano on GitHub") and LinkedIn (`https://www.linkedin.com`, aria-label "Kano on LinkedIn")
+    - The two URLs are placeholders (design Open issue 41); constants and tests change together when real profile links are set
+    - Supersedes the V8 plain one-line text footer of task 17.11; 17.11 stays as history
+    - _Requirements: 18.17, 18.18, 18.19, 18.21_
+    - _Design: B15 (files), D18_
+    - Depends on: 38
+
+  - [ ] 40.2 Create `components/shared/KanoMark.tsx` and use it in `Header.tsx`
+    - Read `guidelines/frontend.md` and `guidelines/design-system.md` first. Note `web/AGENTS.md` (this task uses no Next API)
+    - `KanoMark`: `<span aria-hidden="true">` with the classes the Header "K" span already has (`inline-flex items-center justify-center size-6 rounded-md bg-primary-500 text-white text-xs font-semibold`), no hooks; replace the inline "K" `span` in `Header.tsx` with `<KanoMark />` so the look and the Header link name "Kano" stay unchanged
+    - The existing Header logo tests (tasks 37.1) must keep passing
+    - Supersedes the inline mark of the V8 Header (tasks 34.3 and 17.11); those stay as history
+    - _Requirements: 18.14, 18.17_
+    - _Design: B15 (files, `KanoMark`), B3 (V9 change), D18_
+    - Depends on: 38
+
+  - [ ] 40.3 Create `GithubIcon.tsx` and `LinkedinIcon.tsx`
+    - Read `guidelines/frontend.md` and `guidelines/design-system.md` first. Note `web/AGENTS.md` (this task uses no Next API)
+    - One inline SVG component per file under `components/shared/icons/`: `viewBox="0 0 24 24"`, `fill="currentColor"`, `aria-hidden="true"`, `focusable="false"`, `className="size-5"`, one `<path>` (path data from the CC0 Simple Icons set, checked at implementation time); `lucide-react` 1.75.0 has no brand icons, so add no dependency
+    - _Requirements: 18.18, 18.19_
+    - _Design: B15 (icon source check, files), D18, Open issue 39_
+    - Depends on: 38
+
+  - [ ] 40.4 Rewrite `components/Footer.tsx` as a Server Component
+    - Read `guidelines/frontend.md` and `guidelines/design-system.md` first. Note `web/AGENTS.md` (the Footer uses no Next API, so no Next docs are needed)
+    - No `"use client"`, no hooks, no handlers. `<footer className="bg-surface border-t border-line px-4 py-3 min-w-0">` with a `max-w-7xl mx-auto flex flex-wrap items-center justify-between` container: brand group (`KanoMark`, wordmark `text-sm font-semibold text-ink`, `aria-hidden` dot, portfolio text `text-sm text-ink-muted` with "JC" in its own `span` `font-medium text-ink`), brand group plain text and never a link
+    - Link group `ml-auto`: two plain `<a>` (not `next/link`) with `target="_blank"`, `rel="noopener noreferrer"`, `aria-label` from `FOOTER_CONTENT`, one complete static class string `inline-flex size-11 items-center justify-center rounded-md text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500` (44 px at every width), each wrapping its icon
+    - Tokens only; no shadow, gradient, blur, arbitrary value, hex, or `font-bold`; no request, cookie, or environment variable; one row from 768 px, may wrap below; file at or below 300 lines
+    - Supersedes the V8 plain text footer of task 17.11; 17.11 stays as history
+    - _Requirements: 18.13, 18.16, 18.17, 18.18, 18.19, 18.20, 18.21, 27.11, 27.12_
+    - _Design: B15 (markup and classes, layout by width, security), D18_
+    - Depends on: 40.1, 40.2, 40.3
+
+  - [ ] 40.5 Write the Footer unit tests (`web/__tests__/Footer.test.tsx`)
+    - Read `guidelines/frontend.md` and `guidelines/design-system.md` first. Note `web/AGENTS.md`
+    - Assert: brand mark "K", wordmark "Kano", and the text "Portfolio project built in 2026 by JC" with "JC" in its own element; locate links inside `within(screen.getByRole("contentinfo"))` or by exact names; exactly two links, "Kano on GitHub" (`https://github.com`) and "Kano on LinkedIn" (`https://www.linkedin.com`), each with `target="_blank"` and `rel` containing `noopener` and `noreferrer`; icons `aria-hidden`; link classes contain `hover:text-ink`, `hover:bg-sunken`, `transition-colors`, `duration-150`, `focus-visible:outline-2`, `focus-visible:outline-primary-500`, and `size-11`; brand group not inside an `a`; no `shadow-`, `bg-[`, `text-[`, `bg-gradient`, or `font-bold` class; `fetch` and the `document.cookie` setter are not called
+    - Scan `FOOTER_CONTENT`, the footer text, and every `aria-label`, `alt`, and `title` with `findForbiddenClaims` (empty result)
+    - One `contentinfo` on each stand-in page of the layout harness including the Welcome_Page (footer after the bottom call-to-action section); rendering Header and Footer together has exactly one link named exactly "Kano" (the logo target of task 34.1); `KanoMark` has the same classes in both
+    - No new Correctness Property (example-based, design Testing Strategy V9)
+    - **Validates: Requirements 18.13, 18.16 to 18.21, 38.19**
+    - _Requirements: 32.23, 18.13, 18.14, 18.17, 18.18, 18.19, 18.20, 18.21, 38.19_
+    - _Design: Testing Strategy V9 additions (unit tests), B15_
+    - Depends on: 40.4
+
+  - [ ] 40.6 Update the frontend repository-rule tests for the V9 files
+    - Read `guidelines/frontend.md` and `guidelines/design-system.md` first. Note `web/AGENTS.md`
+    - Extend `web/__tests__/repo-rules.test.ts`: one component per file for `KanoMark.tsx`, `GithubIcon.tsx`, `LinkedinIcon.tsx`, and `Footer.tsx`; no native `<button` outside `BaseButton`; no `dangerouslySetInnerHTML`; `scripts/check_file_size.py` over `web/` (300 lines); the Footer has no `"use client"`; split any failing file
+    - Supersedes the V8 file list of task 37.9; 37.9 stays as history
+    - _Requirements: 28.9, 18.6, 30.6, 30.7_
+    - _Design: B1 (V9 change), File size and split rule_
+    - Depends on: 40.4
+
+- [ ] 41. Playwright footer spec and banner-scoped logo locators (V9)
+  - Read `guidelines/frontend.md` and `guidelines/design-system.md` first. Note `web/AGENTS.md`
+  - Create `web/e2e/footer.spec.ts`: at `{ width: 375, height: 812 }` and `{ width: 1920, height: 1080 }` (`setViewportSize`) on `/welcome` and `/login` as an anonymous visitor (use `requireCredentials()` and the Dashboard only if a logged-in check is added; prefer the anonymous pages); `const footer = page.getByRole("contentinfo")`; footer contains "Portfolio project built in 2026 by JC" and "Kano"; `footer.getByRole("link", { name: "Kano on GitHub", exact: true })` and the LinkedIn equivalent are visible with `href` `https://github.com` and `https://www.linkedin.com`, `target` `_blank`, `rel` matching `/noopener/` and `/noreferrer/`; `expect.poll` shows `scrollWidth <= clientWidth`; at 375 px each link `boundingBox()` is at least 44 by 44 px and the boxes do not overlap each other or the brand text; at 1920 px the hover changes the link background and color (compare before and after, no hard-coded color)
+  - Never click a footer link and never navigate to an external site; no `waitForTimeout`; no literal credentials (Property 58 scan covers the new file); set the welcome cookie through the task 31.1 helper before visiting `/` if needed
+  - Also update the logo locators of the V8 logo scenarios to `page.getByRole("banner").getByRole("link", { name: "Kano", exact: true })`. This new task supersedes the locator part of task 37.5; 37.5 stays as history
+  - **Validates: Requirements 33.17, 27.11, 27.12, 33.15**
+  - _Requirements: 33.17, 33.15, 33.6, 33.10, 27.11, 27.12, 18.19, 18.20_
+  - _Design: Testing Strategy V9 additions (Playwright footer scenario), B15_
+  - Depends on: 40.4, 40.5, 37.5, 31.1
+
+- [ ] 42. V9 frontend checkpoint
+  - Run `npm test` from `web/` (single run, exit code 0, no network and no running API), `npm run build` (exit code 0, zero TypeScript errors), and `scripts/check_file_size.py` over `web/`; no backend test is needed because V9 changes no backend file
+  - Ensure all tests pass, ask the user if questions arise
+  - Depends on: 40.1, 40.2, 40.3, 40.4, 40.5, 40.6, 41
+  - _Requirements: 32.9, 32.10, 32.11, 32.23, 30.6_
+  - _Design: Testing Strategy V9 additions_
+
+- [ ] 43. [MANUAL] Verify the footer in the browser and later set the real profile links
+  - NOT executed by the agent. Run the web app with `npm run dev` and check at 375 px and at 1920 px (browser device mode), on `/welcome` and on the Dashboard
+  - Check the look in words: one row from 768 px with a small rounded blue square holding a white "K", the wordmark "Kano", a small separator dot, and the muted text "Portfolio project built in 2026 by JC" with "JC" in the darker ink color on the left, and the GitHub and LinkedIn icons on the right; below 768 px the content may wrap onto two lines with no overlap and no horizontal scroll; hovering an icon darkens it and shows a light gray background; keyboard focus shows a 2 px outline; each icon link opens in a new tab; the Header logo is still the only link named "Kano"
+  - Later, when the real profile URLs are known, replace the two placeholder URLs in `lib/footerContent.ts`, and in the same change update the tests that pin them (task 40.5, task 41) and requirements 18.18, 32.23, and 33.17 (design Open issue 41); constants and tests must change together
+  - Depends on: 42
+  - _Requirements: 18.16, 18.17, 18.18, 18.19, 18.20, 27.11, 27.12, 33.17_
+  - _Design: B15, Open issue 41_
+
 ## Notes
 
 - Tasks marked `[MANUAL]` are performed by the user and never by the agent: 4.1, 4.2, 4.3, 15.2, 22.3, 22.4, 22.5, 22.6, 22.7, 22.8, 22.9, 23.4, 23.8, and the V6 manual tasks 26.1 (V6 migration on the development and test databases), 26.2 (optional backfill), 33.3 (browser verification of invite links and the welcome flow), 33.4 (`web/.env.test` and the local E2E account), and 33.5 (E2E account on the production database).
@@ -1599,8 +1681,21 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     { "id": 76, "tasks": ["23.3"] },
     { "id": 77, "tasks": ["23.5"] },
     { "id": 78, "tasks": ["23.8"] },
-    { "id": 79, "tasks": ["24"] }
+    { "id": 79, "tasks": ["24"] },
+    { "id": 80, "tasks": ["40.1", "40.2", "40.3"] },
+    { "id": 81, "tasks": ["40.4"] },
+    { "id": 82, "tasks": ["40.5", "40.6"] },
+    { "id": 83, "tasks": ["41"] },
+    { "id": 84, "tasks": ["42"] },
+    { "id": 85, "tasks": ["43"] }
 
   ]
 }
 ```
+
+## V9 Notes
+
+- V9 is frontend only: no backend task, migration, or API change. Tasks 1 to 39 and the waves 0 to 79 are unchanged history. Task 43 is a new `[MANUAL]` task.
+- V9 wave ids 80 to 85 are appended after the deployment waves only because wave ids are append-only. V9 tasks depend only on the V8 checkpoint (task 38) and on tasks 37.5 and 31.1 through their `Depends on:` lines, not on the deployment tasks (22.3 onward), so V9 tasks may run before or independently of the deployment waves 67 to 79. Because the Footer is shared by every page, run the V9 checkpoint (42) before the deployment tasks 22.3 onward if the footer should be part of the first deployment.
+- V9 requirement coverage (task numbers): R18.16 to R18.21 -> 40.1 to 40.5 · R27.11, R27.12 -> 40.4, 41 · R32.23 -> 40.5 · R33.17 -> 41. Also: R18.13 and R18.14 -> 40.2, 40.5 · R38.19 (footer text scan) -> 40.5 · R33.15 (banner-scoped logo locators) -> 41 · R30.6 and R30.7 -> 40.6, 42.
+- The README and the spec documents describe the footer look in words only and name no example HTML file or image (Requirement 36.14, task 37.8).
