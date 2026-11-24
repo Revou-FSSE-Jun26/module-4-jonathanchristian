@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import { isVisitorAuthenticated, logoTarget } from "@/lib/logoTarget";
 import { NotificationBell } from "@/components/NotificationBell";
+import { KanoMark } from "@/components/shared/KanoMark";
 import { UserMenu } from "@/components/users/UserMenu";
 
 /** Global top navigation bar adapting between authenticated and anonymous visitors. */
@@ -19,12 +20,7 @@ export function Header() {
             href={logoTarget(isAuth)}
             className="inline-flex items-center gap-2 min-h-[44px] min-w-[44px] px-1 rounded-md text-base font-semibold text-ink hover:text-primary-600 transition-colors duration-150"
           >
-            <span
-              aria-hidden="true"
-              className="inline-flex items-center justify-center size-6 rounded-md bg-primary-500 text-white text-xs font-semibold"
-            >
-              K
-            </span>
+            <KanoMark />
             <span>Kano</span>
           </Link>
           {isAuth ? (
