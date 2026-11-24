@@ -1,6 +1,6 @@
 # Design Document
 
-**Version:** V9 (revised against requirements V9, frontend only: the shared Footer; V8 covered the Header logo, the Welcome_Page, and the board toolbar; initial design was V3)
+**Version:** V10 (revised against requirements V10, documentation only: D3 screenshots; V9 was revised against requirements V9, frontend only: the shared Footer; V8 covered the Header logo, the Welcome_Page, and the board toolbar; initial design was V3)
 
 > **V9 change summary.** V9 is a frontend-only revision (no endpoint, model, migration, or backend test changes). It redesigns the shared `Footer` (B15): a Server Component with one row from 768 px upward that may wrap onto two lines below 768 px (V9 refinement; the first V9 text said "a single row", superseded), the brand group on the left (brand mark, wordmark, separator dot, portfolio text) and two external icon links (GitHub, LinkedIn) on the right, built only from design-system tokens. It adds a content module `lib/footerContent.ts`, one inline-SVG icon component per brand (the installed `lucide-react` 1.75.0 has no GitHub or LinkedIn icon), and a shared `KanoMark` so the Header and the Footer show the same "K" badge. No new Correctness Property is added (example-based, see the Testing Strategy V9 additions). `proxy.ts`, `decideRoute`, `Header` behavior, and every API are unchanged. Where V9 supersedes older text (the plain one-line footer), the old text stays and a "V9 change" note names the replacement. Index of V9 sections: D18 (decision), B1 and B3 V9 notes, B15, Testing Strategy (V9 additions), Traceability (V9 table), Open issues 39 to 44.
 
@@ -2146,6 +2146,8 @@ How code generation references them: every implementation task in `tasks.md` nam
 
 **V6 change to D3 (Requirement 36.13).** The README Features list gains card status, board invitation links with the guest role, and the welcome page. Test Steps document `web/.env.test` created from `web/.env.test.example` with `E2E_BASE_URL`, `E2E_USER_EMAIL`, and `E2E_USER_PASSWORD`, and the need for a pre-existing account. Local Run Steps state that the V6 schema changes need `flask db migrate` and `flask db upgrade` as a manual Migration_Step, including the hand-added check constraints. The Security note adds the invite-token exposure (Open issue 22).
 
+**V10 change to D3 (Requirement 36.10).** Screenshot images live in `docs/screenshots/`. The Screenshots section needs at least three captioned images of Kano_Web in use: currently the Welcome_Page (also the banner at the top of the README), the Dashboard, and Board Detail. Other subjects are optional. `scripts/check_readme_links.py` verifies that every relative link and image path in `README.md` resolves (Requirement 36.12).
+
 ## Traceability Matrix
 
 Every requirement maps to at least one design element. Part references point to sections of this document.
@@ -2187,7 +2189,7 @@ Every requirement maps to at least one design element. Part references point to 
 | 33 | E2E tests | none | `web/e2e/`, `playwright.config.ts` | Testing Strategy |
 | 34 | Deployment | `vercel.json`, `wsgi.py`, config incl. `JWT_ACCESS_TOKEN_EXPIRES`, `JWT_REFRESH_TOKEN_EXPIRES` (D1) | Vercel project `web/` (D1) | verification checklist |
 | 35 | Repository hygiene | `.gitignore`, `.env.example` | `web/.env.example` | checklist |
-| 36 | Documentation | none | `README.md` incl. seven AI Workflow subsections (with Antigravity), both-token XSS note and stateless refresh limitation (D3, V6 note) | checklist |
+| 36 | Documentation | none | `README.md` incl. seven AI Workflow subsections (with Antigravity), both-token XSS note and stateless refresh limitation (D3, V6 note), at least three screenshots in `docs/screenshots/` (D3, V10 note) | checklist, `scripts/check_readme_links.py` |
 | 37 | Board invitation links and guest role (V6) | endpoints 30 to 33, A4-V6, A12-V6, A14, `boards/service/invite_service.py`, `accept.py`, `invite_routes.py` | `/invite/[token]`, `InviteJoinCard`, `InviteLinksPanel`, `InviteLinkRow`, `MemberList`, `BoardRoleContext`, `lib/inviteRoles.ts`, `lib/nextParam.ts`, `next.config.ts` headers (B4-V6, B6-V6) | Properties 47, 49, 50, 51, 52, 55, 57 |
 | 38 | Welcome page (V6) | none | `/welcome`, `WelcomeContent`, `WelcomeActions`, `lib/decideRoute.ts`, `proxy.ts`, welcome cookie helpers (B2, B4-V6) | Property 53, E2E welcome scenario |
 

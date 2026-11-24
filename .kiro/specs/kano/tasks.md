@@ -1,6 +1,6 @@
 # Implementation Plan: Kano
 
-**Version:** V9 (V1 to V5 tasks 1 to 22.2 preserved as history; V6 tasks added as 25 to 33; V7 narrows task 33.1; V8 frontend-only tasks added as 34 to 39; V9 footer tasks added as 40 onward)
+**Version:** V10 (V10 relaxes the screenshot set of tasks 23.4 and 23.5 to at least three images in `docs/screenshots/`; V1 to V5 tasks 1 to 22.2 preserved as history; V6 tasks added as 25 to 33; V7 narrows task 33.1; V8 frontend-only tasks added as 34 to 39; V9 footer tasks added as 40 onward)
 
 ## Overview
 
@@ -742,7 +742,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
 
   - [ ] 22.6 [MANUAL] Verify the deployed API with Postman
     - NOT executed by the agent. Against the public API URL: `GET /api/health` (200), `POST /api/auth/register` (201), `POST /api/auth/login` (200 with `access_token` and `refresh_token`), then one request for each of the eight groups (auth, boards, columns, cards, comments, notifications, analytics, users), each with the envelope body
-    - Save the Postman run screenshot for task 23.4
+    - Save the Postman run screenshot for task 23.4 (optional since V10: Requirement 36.10 needs at least three screenshots of any Kano_Web subjects)
     - V6 note: also call GET `/api/boards/<id>/invite-links` as the admin, GET `/api/invites/<token>` and POST `/api/invites/<token>/accept` with a second account, PATCH `/api/cards/<id>` with `status`, and PATCH `/api/users/me` with `current_password`; every response keeps the envelope.
     - Depends on: 22.5
     - _Requirements: 34.4, 34.5_
@@ -765,14 +765,14 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Requirements: 33.1, 33.8, 33.9_
 
 - [ ] 23. Phase 11: Documentation and repository hygiene
-  - [ ] 23.1 Complete `docs/violation-report.md`
+  - [x] 23.1 Complete `docs/violation-report.md`
     - Review the generated code in `app/` and `web/` against the Guidelines; list at least 3 violations found, each with the violated guideline id, the file, and the fix applied; apply the fixes in code and re-run the affected tests
     - Record only violations that were actually found
     - _Requirements: 30.5_
     - V6 note: the review also covers the V6 code (tasks 25 to 31), for example the role helpers, the invitation module, and the new frontend components.
     - Depends on: 22.9, 1.5, 32
 
-  - [ ] 23.2 Complete `docs/guideline-comparison.md`
+  - [x] 23.2 Complete `docs/guideline-comparison.md`
     - Compare at least one AI-generated output produced without the Guidelines with the same output produced with the Guidelines; show the violation count of each version, with the count lower in the "after" version
     - Save the "without guidelines" sample in `docs/samples/`
     - _Requirements: 30.4_
@@ -785,26 +785,30 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: D3_
     - V6 note: the Features list must also name card status, board invitation links with the guest role, and the welcome page. Test Steps must document `web/.env.test` (created from `web/.env.test.example`) with `E2E_BASE_URL`, `E2E_USER_EMAIL`, and `E2E_USER_PASSWORD` and the need for a pre-existing account. Local Run Steps must state that the V6 schema changes need `flask db migrate` and `flask db upgrade` as a manual Migration_Step, including the hand-added check constraints. The Security note adds the invite-token exposure (design open issue 22). Requirements 36.13.
     - Depends on: 23.2, 22.9, 26.1, 31.9
+    - Status (2026-11-24): `README.md` written with every section. Open until the owner fills in the three TODO placeholders: the two public URLs (needs 22.3), the Antigravity subsection, and the Claude Code subsection.
 
-  - [ ] 23.4 [MANUAL] Capture the screenshots
+  - [x] 23.4 [MANUAL] Capture the screenshots
     - NOT executed by the agent. Save into `docs/screenshots/`: Postman run covering all eight groups against the public URL, Dashboard, Board Detail, Card Detail Modal, My Tasks, Profile, Register, Login, a Card being dragged between Columns, the notification bell with an unread count above zero, and the Playwright HTML report with all tests passed
     - Depends on: 22.9
     - _Requirements: 36.10_
     - V6 note: the screenshots may also include the welcome page, the invite links panel in the member panel, and the status control in the Card Detail Modal.
     - Depends on: 33.3
+    - V10 note: Requirement 36.10 now needs at least three screenshots of Kano_Web in use, so the list above is optional. The three captured images (welcome page, Dashboard, Board Detail) are in `docs/screenshots/`. They were first saved in `documentations/` and moved in V10.
 
-  - [ ] 23.5 Embed the screenshots in the README and check links
+  - [x] 23.5 Embed the screenshots in the README and check links
     - Add the Screenshots section with each image and a caption naming its subject; add a script or test that verifies every relative link and image path in `README.md` resolves to an existing file
     - _Requirements: 36.10, 36.12, 36.5_
     - Depends on: 23.3, 23.4
+    - Status (2026-11-24, V9): the Screenshots section embedded the 3 images from `documentations/`, and `scripts/check_readme_links.py` passed. The task stayed open because Requirement 36.10 V9 listed 11 subjects.
+    - V10 status (2026-11-24): complete. Requirement 36.10 now needs at least three screenshots, the images are in `docs/screenshots/`, the README paths point there, and `scripts/check_readme_links.py` passes.
 
-  - [ ] 23.6 Verify and complete the CHANGELOG refinement history
+  - [x] 23.6 Verify and complete the CHANGELOG refinement history
     - `CHANGELOG.md` must hold at least 5 refinement entries, each with the before text, the after text, the version number, and the date (V2 to V5 already contain entries; count them and add the missing before and after text if fewer than 5 qualify)
     - Never remove historical entries
     - _Requirements: 35.6_
     - Depends on: 22.9
 
-  - [ ] 23.7 Add a repository hygiene check script
+  - [x] 23.7 Add a repository hygiene check script
     - `scripts/check_repo_hygiene.py`: `.gitignore` rules present, both `.env.example` files list every variable the code reads, no tracked `.env*` file other than `.env.example`, a secrets scan of tracked files (JWT secret, database password, API key patterns), spec documents exist in `.kiro/specs/kano/`, `guidelines/` has the three files and `.kiro/steering/` has no copies
     - Run it and fix findings
     - V6 note: the script also checks that `.env.test` is git-ignored and `.env.test.example` is tracked (`git check-ignore` semantics), that `web/.env.test.example` lists `E2E_BASE_URL`, `E2E_USER_EMAIL`, and `E2E_USER_PASSWORD`, that no tracked `.env.test` exists, and that no file in `web/e2e/` contains a literal credential (reuse the scanner of task 31.9).
@@ -812,13 +816,13 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Requirements: 35.1, 35.2, 35.3, 35.5, 35.7, 30.1_
     - Depends on: 22.9
 
-  - [ ] 23.8 [MANUAL] Check the Git history and rotate secrets if needed
+  - [x] 23.8 [MANUAL] Check the Git history and rotate secrets if needed
     - NOT executed by the agent. Confirm each of the six phases (specification writing, guideline authoring, backend implementation, frontend implementation, testing, deployment) has at least one commit whose message names the phase, and that no real secret exists in any commit; if one does, remove it from history and rotate it
     - Depends on: 23.7, 23.5
     - _Requirements: 35.3, 35.4, 35.7_
     - V6 note: also confirm that no commit contains `web/.env.test` or real E2E credentials, and that the V6 work (tasks 25 to 33) appears in commits whose messages name the phase.
 
-- [ ] 24. Final checkpoint
+- [x] 24. Final checkpoint
   - Run `pytest -v` from `app/`, `npm test` and `npm run build` from `web/`, `scripts/check_file_size.py`, and `scripts/check_repo_hygiene.py`; confirm the committed Playwright report and the README links
   - V6 note: the run includes the V6 backend and frontend tests (properties 44 to 58) and the no-literal-credentials check of `web/e2e/`.
   - Depends on: 32, 23.8
@@ -1315,7 +1319,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: D1 (V6 deployment notes)_
     - Depends on: 33.1
 
-  - [ ] 33.3 [MANUAL] Verify the invite links and the welcome flow in the browser before deployment
+  - [x] 33.3 [MANUAL] Verify the invite links and the welcome flow in the browser before deployment
     - NOT executed by the agent. Run the API with `flask run` and the web app with `npm run dev` against the development database, at a desktop width and at 375 px (browser device mode)
     - Check: a first visit to `/` lands on `/welcome` and a later visit goes to `/login`; an anonymous visit to an invite link goes to `/login?next=...` and returns to the invite page after login or register; the member link joins as a member who can edit; the guest link joins as a guest with the "Guest" badge, no edit controls, and no drag; regenerate makes the old link show the not-found message; the status control updates the badge; the profile password change works and the email is read-only
     - Depends on: 32, 26.1
@@ -1570,7 +1574,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
   - _Requirements: 32.9, 32.10, 32.11, 32.23, 30.6_
   - _Design: Testing Strategy V9 additions_
 
-- [ ] 43. [MANUAL] Verify the footer in the browser and later set the real profile links
+- [x] 43. [MANUAL] Verify the footer in the browser and later set the real profile links
   - NOT executed by the agent. Run the web app with `npm run dev` and check at 375 px and at 1920 px (browser device mode), on `/welcome` and on the Dashboard
   - Check the look in words: one row from 768 px with a small rounded blue square holding a white "K", the wordmark "Kano", a small separator dot, and the muted text "Portfolio project built in 2026 by JC" with "JC" in the darker ink color on the left, and the GitHub and LinkedIn icons on the right; below 768 px the content may wrap onto two lines with no overlap and no horizontal scroll; hovering an icon darkens it and shows a light gray background; keyboard focus shows a 2 px outline; each icon link opens in a new tab; the Header logo is still the only link named "Kano"
   - Later, when the real profile URLs are known, replace the two placeholder URLs in `lib/footerContent.ts`, and in the same change update the tests that pin them (task 40.5, task 41) and requirements 18.18, 32.23, and 33.17 (design Open issue 41); constants and tests must change together

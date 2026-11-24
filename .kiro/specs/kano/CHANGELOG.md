@@ -503,3 +503,45 @@ Classification: specification and task planning change, frontend only. Only `tas
 - **Tasks:** `tasks.md` is now V9. Tasks 1 to 39 are unchanged as history. New tasks 40.1 to 40.6, 41, 42, and 43 cover Requirements 18.16 to 18.21, 27.11, 27.12, 32.23, and 33.17. Dependency graph waves 80 to 85 are appended.
 - **Classification:** specification and task planning change. No implementation change yet.
 - **No backend, migration, or guidelines change.**
+
+#### Implementation change (tasks 23.1, 23.2, 23.3, 23.5, 23.6, 23.7; 2026-11-24, no version bump)
+Classification: implementation change (documentation and repository scripts). No requirement, design, or task text changed, and no file in `app/` or `web/` changed.
+- **23.1** `docs/violation-report.md` gains a frontend and whole-repository review. One violation was found: G-FE-04 ("every form inside `BaseModal`") against six page and inline forms. It was accepted, because Requirements 19, 21, and 26 ask for those forms, and a guideline rewording is suggested. The checks that found nothing are listed.
+- **23.2** `docs/guideline-comparison.md` is filled in. The comments feature was generated in two fresh sub-agent sessions, without and with `guidelines/backend.md` and `guidelines/database.md`. The violation count was 14 before and 1 after. Both samples are saved unchanged in `docs/samples/`.
+- **23.3** Root `README.md` written with every Requirement 36 section. Three parts are left as visible TODO placeholders for the owner: the two public URLs (task 22.3 is not done), and the Antigravity and Claude Code subsections (how they were used is not recorded in the repository).
+- **23.5** The Screenshots section embeds the three images in `documentations/` (welcome page as the top banner, Dashboard, Board Detail). New `scripts/check_readme_links.py` verifies every relative link and image path. It passes for `README.md` and the new docs.
+- **23.6** Verified, nothing added. Dated before/after text exists in V2, V3, V4, V5, V6, V8, and V9, which is more than the 5 refinement entries Requirement 35.6 asks for. No historical entry was changed.
+- **23.7** New `scripts/check_repo_hygiene.py` covers the `.gitignore` rules and `git check-ignore` behaviour, tracked `.env*` files, the env-example coverage of every variable the code reads, a secrets scan, the spec files, and no guideline copies in steering. The `web/e2e` literal-credential check reuses the patterns of `web/scripts/scanCredentials.ts`. The first run reported four false positives (a config attribute and three local test-fixture URLs) and no real secret. The scanner was narrowed, and the check now passes.
+- **Open points (owner decision):** (1) Requirement 36.10 lists 11 screenshot subjects and task 23.4 names `docs/screenshots/`, but only 3 images exist and they are in `documentations/`. (2) Guideline G-FE-04 conflicts with Requirements 19, 21, and 26 as worded.
+
+## V10 - 2026-11-24
+### Changes
+- **Specification change (Requirement 36.10).** The README Screenshots section now needs at least three captioned images of Kano_Web in use, stored in `docs/screenshots/`. The eleven subjects that V9 required (Postman run, Dashboard, Board Detail, Card Detail Modal, My Tasks, Profile, Register, Login, card drag, notification bell, Playwright report) are now optional examples.
+- **Guideline change (G-FE-04, `guidelines/frontend.md`).** `BaseModal` is required only for dialog forms. Page forms and inline board forms are exempt. The quick checklist line was changed to match.
+- **Design change (D3 and Traceability row 36).** D3 has a V10 note on the screenshot location, the minimum of three images, and `scripts/check_readme_links.py`. Row 36 names both.
+- **Task edits.** Task 23.4 has a V10 note (the list is optional; the three images are in `docs/screenshots/`). Task 22.6 marks the Postman screenshot as optional. Task 23.5 is now complete, and its V9 status line is kept as history.
+- **Implementation change.** The three images were moved with `git mv` from `documentations/` to `docs/screenshots/` (`welcome.png`, `dashboard-page.png`, `board-content-page.png`), and the empty `documentations/` folder was removed. `README.md` image paths now point to `docs/screenshots/`. In `docs/violation-report.md`, the G-FE-04 entry changed from Accepted to Fixed (guideline reworded).
+
+#### Before / After
+- R36.10 before: "THE README.md Screenshots section SHALL include image files, each with a caption naming its subject, for: a Postman run covering all eight Blueprint_Package endpoint groups against the public URL, the Dashboard, Board Detail, Card Detail Modal, My Tasks, Profile, Register, and Login pages, a Card being dragged between Columns, the notification bell showing an unread count greater than zero, and the Playwright HTML report showing all tests passed."
+- R36.10 after: "THE README.md Screenshots section SHALL include at least three image files stored in `docs/screenshots/`, each with a caption naming its subject and each showing Kano_Web in use (for example the Welcome_Page, the Dashboard, and Board Detail). Further screenshots, for example a Postman run against the public URL, the Card Detail Modal, My Tasks, Profile, Register, or Login, a Card being dragged between Columns, the notification bell, or the Playwright HTML report, are optional."
+- G-FE-04 Rule before: "Render every button with `BaseButton`, status labels with `BaseBadge`, and every form inside `BaseModal`, all from `web/components/shared/`, and never use a raw `<button>` elsewhere."
+- G-FE-04 Rule after: "Render every button with `BaseButton`, status labels with `BaseBadge`, and every dialog form inside `BaseModal`, all from `web/components/shared/`, and never use a raw `<button>` elsewhere; page forms and inline board forms are exempt from `BaseModal`."
+- G-FE-04 checklist before: "One component per file; buttons are `BaseButton`; forms are inside `BaseModal`." After: "One component per file; buttons are `BaseButton`; dialog forms are inside `BaseModal` (page forms and inline board forms are exempt)."
+
+#### Consistency check
+- Requirement 36.10 V10 has design coverage (D3 V10 note, row 36) and task coverage (23.4, 23.5). Task 22.6 no longer requires a screenshot that the requirement does not need.
+- G-FE-04 no longer conflicts with Requirement 19 (login and register pages), Requirement 21 (inline quick-add card and add column), or Requirement 26 (profile page). This resolves both open points of the previous implementation entry.
+- Requirement 36.12 still holds: `scripts/check_readme_links.py` passes after the move. No other requirement names the screenshot list or `documentations/`.
+- `web/__tests__/repo-rules.test.ts` (tagged G-FE-04) checks only raw `<button>`, so the rewording needs no test change.
+
+### Reason
+- The owner chose to accept the three existing screenshots instead of capturing eight more, to store them in `docs/screenshots/`, and to apply the recommended G-FE-04 rewording.
+
+### Impact
+- **Requirements:** 36.10 only. Version marker V10.
+- **Design:** D3 (V10 note), Traceability row 36. Version marker V10.
+- **Tasks:** 22.6 (screenshot optional), 23.4 (V10 note), 23.5 (complete). Version marker V10.
+- **Guidelines:** `guidelines/frontend.md` G-FE-04 Rule and checklist line.
+- **Files:** `docs/screenshots/` (three moved images), `README.md` (paths), `docs/violation-report.md` (G-FE-04 status). No change in `app/` or `web/`.
+- **Breaking changes:** none.
