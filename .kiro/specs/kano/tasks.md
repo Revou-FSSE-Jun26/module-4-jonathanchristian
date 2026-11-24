@@ -1498,8 +1498,8 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
   - _Requirements: 18.14, 18.15, 21.25, 21.26, 21.27, 27.10, 38.15 to 38.21, 33.15, 33.16_
   - _Design: B12, B13, B14_
 
-- [ ] 40. Phase 23 (V9): Footer (frontend only)
-  - [ ] 40.1 Create `lib/footerContent.ts`
+- [x] 40. Phase 23 (V9): Footer (frontend only)
+  - [x] 40.1 Create `lib/footerContent.ts`
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first (read only). Note `web/AGENTS.md`: read the relevant Next.js docs in `web/node_modules/next/dist/docs/` before using any Next API (this task uses none)
     - Export `FOOTER_CONTENT` (pure, no Tailwind classes): `wordmark` "Kano", `portfolioPrefix` "Portfolio project built in 2026 by ", `author` "JC" (fixed strings, no `new Date()`), and `links` for GitHub (`https://github.com`, aria-label "Kano on GitHub") and LinkedIn (`https://www.linkedin.com`, aria-label "Kano on LinkedIn")
     - The two URLs are placeholders (design Open issue 41); constants and tests change together when real profile links are set
@@ -1508,7 +1508,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B15 (files), D18_
     - Depends on: 38
 
-  - [ ] 40.2 Create `components/shared/KanoMark.tsx` and use it in `Header.tsx`
+  - [x] 40.2 Create `components/shared/KanoMark.tsx` and use it in `Header.tsx`
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first. Note `web/AGENTS.md` (this task uses no Next API)
     - `KanoMark`: `<span aria-hidden="true">` with the classes the Header "K" span already has (`inline-flex items-center justify-center size-6 rounded-md bg-primary-500 text-white text-xs font-semibold`), no hooks; replace the inline "K" `span` in `Header.tsx` with `<KanoMark />` so the look and the Header link name "Kano" stay unchanged
     - The existing Header logo tests (tasks 37.1) must keep passing
@@ -1517,14 +1517,14 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B15 (files, `KanoMark`), B3 (V9 change), D18_
     - Depends on: 38
 
-  - [ ] 40.3 Create `GithubIcon.tsx` and `LinkedinIcon.tsx`
+  - [x] 40.3 Create `GithubIcon.tsx` and `LinkedinIcon.tsx`
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first. Note `web/AGENTS.md` (this task uses no Next API)
     - One inline SVG component per file under `components/shared/icons/`: `viewBox="0 0 24 24"`, `fill="currentColor"`, `aria-hidden="true"`, `focusable="false"`, `className="size-5"`, one `<path>` (path data from the CC0 Simple Icons set, checked at implementation time); `lucide-react` 1.75.0 has no brand icons, so add no dependency
     - _Requirements: 18.18, 18.19_
     - _Design: B15 (icon source check, files), D18, Open issue 39_
     - Depends on: 38
 
-  - [ ] 40.4 Rewrite `components/Footer.tsx` as a Server Component
+  - [x] 40.4 Rewrite `components/Footer.tsx` as a Server Component
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first. Note `web/AGENTS.md` (the Footer uses no Next API, so no Next docs are needed)
     - No `"use client"`, no hooks, no handlers. `<footer className="bg-surface border-t border-line px-4 py-3 min-w-0">` with a `max-w-7xl mx-auto flex flex-wrap items-center justify-between` container: brand group (`KanoMark`, wordmark `text-sm font-semibold text-ink`, `aria-hidden` dot, portfolio text `text-sm text-ink-muted` with "JC" in its own `span` `font-medium text-ink`), brand group plain text and never a link
     - Link group `ml-auto`: two plain `<a>` (not `next/link`) with `target="_blank"`, `rel="noopener noreferrer"`, `aria-label` from `FOOTER_CONTENT`, one complete static class string `inline-flex size-11 items-center justify-center rounded-md text-ink-muted transition-colors duration-150 hover:bg-sunken hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500` (44 px at every width), each wrapping its icon
@@ -1534,7 +1534,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B15 (markup and classes, layout by width, security), D18_
     - Depends on: 40.1, 40.2, 40.3
 
-  - [ ] 40.5 Write the Footer unit tests (`web/__tests__/Footer.test.tsx`)
+  - [x] 40.5 Write the Footer unit tests (`web/__tests__/Footer.test.tsx`)
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first. Note `web/AGENTS.md`
     - Assert: brand mark "K", wordmark "Kano", and the text "Portfolio project built in 2026 by JC" with "JC" in its own element; locate links inside `within(screen.getByRole("contentinfo"))` or by exact names; exactly two links, "Kano on GitHub" (`https://github.com`) and "Kano on LinkedIn" (`https://www.linkedin.com`), each with `target="_blank"` and `rel` containing `noopener` and `noreferrer`; icons `aria-hidden`; link classes contain `hover:text-ink`, `hover:bg-sunken`, `transition-colors`, `duration-150`, `focus-visible:outline-2`, `focus-visible:outline-primary-500`, and `size-11`; brand group not inside an `a`; no `shadow-`, `bg-[`, `text-[`, `bg-gradient`, or `font-bold` class; `fetch` and the `document.cookie` setter are not called
     - Scan `FOOTER_CONTENT`, the footer text, and every `aria-label`, `alt`, and `title` with `findForbiddenClaims` (empty result)
@@ -1545,7 +1545,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Testing Strategy V9 additions (unit tests), B15_
     - Depends on: 40.4
 
-  - [ ] 40.6 Update the frontend repository-rule tests for the V9 files
+  - [x] 40.6 Update the frontend repository-rule tests for the V9 files
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first. Note `web/AGENTS.md`
     - Extend `web/__tests__/repo-rules.test.ts`: one component per file for `KanoMark.tsx`, `GithubIcon.tsx`, `LinkedinIcon.tsx`, and `Footer.tsx`; no native `<button` outside `BaseButton`; no `dangerouslySetInnerHTML`; `scripts/check_file_size.py` over `web/` (300 lines); the Footer has no `"use client"`; split any failing file
     - Supersedes the V8 file list of task 37.9; 37.9 stays as history
@@ -1553,7 +1553,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B1 (V9 change), File size and split rule_
     - Depends on: 40.4
 
-- [ ] 41. Playwright footer spec and banner-scoped logo locators (V9)
+- [x] 41. Playwright footer spec and banner-scoped logo locators (V9)
   - Read `guidelines/frontend.md` and `guidelines/design-system.md` first. Note `web/AGENTS.md`
   - Create `web/e2e/footer.spec.ts`: at `{ width: 375, height: 812 }` and `{ width: 1920, height: 1080 }` (`setViewportSize`) on `/welcome` and `/login` as an anonymous visitor (use `requireCredentials()` and the Dashboard only if a logged-in check is added; prefer the anonymous pages); `const footer = page.getByRole("contentinfo")`; footer contains "Portfolio project built in 2026 by JC" and "Kano"; `footer.getByRole("link", { name: "Kano on GitHub", exact: true })` and the LinkedIn equivalent are visible with `href` `https://github.com` and `https://www.linkedin.com`, `target` `_blank`, `rel` matching `/noopener/` and `/noreferrer/`; `expect.poll` shows `scrollWidth <= clientWidth`; at 375 px each link `boundingBox()` is at least 44 by 44 px and the boxes do not overlap each other or the brand text; at 1920 px the hover changes the link background and color (compare before and after, no hard-coded color)
   - Never click a footer link and never navigate to an external site; no `waitForTimeout`; no literal credentials (Property 58 scan covers the new file); set the welcome cookie through the task 31.1 helper before visiting `/` if needed
@@ -1563,7 +1563,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
   - _Design: Testing Strategy V9 additions (Playwright footer scenario), B15_
   - Depends on: 40.4, 40.5, 37.5, 31.1
 
-- [ ] 42. V9 frontend checkpoint
+- [x] 42. V9 frontend checkpoint
   - Run `npm test` from `web/` (single run, exit code 0, no network and no running API), `npm run build` (exit code 0, zero TypeScript errors), and `scripts/check_file_size.py` over `web/`; no backend test is needed because V9 changes no backend file
   - Ensure all tests pass, ask the user if questions arise
   - Depends on: 40.1, 40.2, 40.3, 40.4, 40.5, 40.6, 41
