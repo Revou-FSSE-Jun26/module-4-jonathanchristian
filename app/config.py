@@ -1,4 +1,4 @@
-"""Application configuration read from the environment (G-BE-11)."""
+"""Application configuration read from the environment (G-BE-14)."""
 import os
 from dataclasses import dataclass
 

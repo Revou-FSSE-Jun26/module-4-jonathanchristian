@@ -1,4 +1,4 @@
-"""boards schemas package: keeps `from app.blueprints.boards.schema import X` working (G-BE-15)."""
+"""boards schemas package: keeps `from app.blueprints.boards.schema import X` working (G-BE-18)."""
 from app.blueprints.boards.schema.board_schemas import (
     BoardCreateSchema,
     BoardDetailSchema,

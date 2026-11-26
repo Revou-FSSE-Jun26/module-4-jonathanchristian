@@ -198,7 +198,7 @@ def _handle_unexpected_error(error):
     return fail(INTERNAL_ERROR_MESSAGE, 500)
 
 
-# --- logging hygiene (G-BE-12) ------------------------------------------------------------------
+# --- logging hygiene (G-BE-15) ------------------------------------------------------------------
 
 
 INVITE_PATH_RE = re.compile(r"(/api/invites/|/invite/)[A-Za-z0-9_-]{20,}")

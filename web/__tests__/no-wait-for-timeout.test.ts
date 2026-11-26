@@ -19,7 +19,7 @@ function collectE2EFiles(dir: string): string[] {
   return results;
 }
 
-describe("Playwright E2E conventions (G-FE-17, Property 58)", () => {
+describe("Playwright E2E conventions (G-FE-22, Property 58)", () => {
   it("forbids waitForTimeout in all web/e2e/ files", () => {
     const files = collectE2EFiles(E2E_DIR);
     const offenders = files.filter((file) =>

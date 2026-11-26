@@ -1,4 +1,4 @@
-"""pytest fixtures: guarded test database, app, per-test cleanup, and data factories (G-BE-14)."""
+"""pytest fixtures: guarded test database, app, per-test cleanup, and data factories (G-BE-17)."""
 import os
 from pathlib import Path
 

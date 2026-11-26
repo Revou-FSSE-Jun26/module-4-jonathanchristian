@@ -23,7 +23,7 @@ Every new entry must keep the Rule / Rationale / Kano Example structure.
 ### G-FE-04: Shared components only
 - **Rule:** Render every button with `BaseButton`, status labels with `BaseBadge`, and every dialog form inside `BaseModal`, all from `web/components/shared/`, and never use a raw `<button>` elsewhere; page forms and inline board forms are exempt from `BaseModal`.
 - **Rationale:** Shared components give one look, one disabled behavior, and one place to fix bugs.
-- **Kano Example:** `<BaseButton variant="destructive">` in `ConfirmDialog.tsx`; `CreateBoardModal.tsx` wraps its form in `BaseModal`.
+- **Kano Example:** `<BaseButton variant="destructive">` in `ConfirmDialog.tsx`; `CreateBoardModal.tsx` wraps its form in `BaseModal`; card status is always shown through `StatusBadge`, which renders `BaseBadge`.
 
 ### G-FE-05: Modal accessibility
 - **Rule:** Keep `BaseModal` with `role="dialog"` and `aria-modal`, close on Escape and backdrop click but not on content click, move focus inside on open, trap Tab, and restore focus on close.
@@ -51,7 +51,7 @@ Every new entry must keep the Rule / Rationale / Kano Example structure.
 - **Kano Example:** `AuthProvider.login(r)` calls `setAccessCookie(r.access_token, r.expires_in)` and `setRefreshCookie(r.refresh_token, r.refresh_expires_in)`.
 
 ### G-FE-10: Token refresh
-- **Rule:** Let `apiClient` refresh in the browser with one shared `POST /api/auth/refresh` and one retry after a 401, let only `middleware.ts` renew the token for server rendering, and never refresh or write cookies in server-side code.
+- **Rule:** Let `apiClient` refresh in the browser with one shared `POST /api/auth/refresh` and one retry after a 401, let only `proxy.ts` (the Next.js route guard, called `middleware.ts` in older Next versions) renew the token for server rendering, and never refresh or write cookies in server-side code.
 - **Rationale:** A single-flight refresh avoids refresh races, and Server Components cannot set cookies.
 - **Kano Example:** `web/lib/refreshSession.ts` `refreshAccessToken()`; a server 401 leads to `redirect("/login?expired=1")`.
 
@@ -75,18 +75,43 @@ Every new entry must keep the Rule / Rationale / Kano Example structure.
 - **Rationale:** Phone users must reach every control without page-level horizontal scrolling.
 - **Kano Example:** `KanbanColumn.tsx` uses `w-72 min-w-[240px] shrink-0`; `BaseButton` uses `min-h-[44px] min-w-[44px]`.
 
-### G-FE-15: No raw HTML injection
+### G-FE-15: Complete static class strings
+- **Rule:** Write every Tailwind class as a complete static string, in lookup objects when a value picks the style (status, label color, role badge), never build class names with template strings or concatenation, and keep such objects only in folders the Tailwind scanner covers (`app/`, `components/`, `hooks/`, and `lib/` through `@source "../lib";` in `globals.css`).
+- **Rationale:** Tailwind generates only the classes it finds as whole strings, so a built class name silently has no style.
+- **Kano Example:** `STATUS_STYLE` in `web/lib/status.ts` and `LABEL_CLASS` in `web/lib/labelColor.ts`; the checklist bar width is the only computed style (`style={{ width }}`), its colors stay static classes.
+
+### G-FE-16: Role gating with can(role, action)
+- **Rule:** Decide every show, hide, or disable of a role-dependent control with `can(role, action)` and `assignableRoles` / `canActOnMember` from `web/lib/roles.ts` (the four roles guest, member, manager, admin and their ranks), read the role from `my_role` through `BoardRoleContext`, and never treat the frontend check as security.
+- **Rationale:** One mirror of the permission table keeps the UI consistent with the server, which still returns 403 for every direct call.
+- **Kano Example:** `can(role, "manage_columns")` hides add, rename, delete, and reorder of Columns from members and guests; `useDragAndDrop({ enabled: can(role, "edit_cards") })`; the role dropdown lists `assignableRoles(myRole)`.
+
+### G-FE-17: Status and label color maps
+- **Rule:** Take card status text, color, and the four allowed values only from `web/lib/status.ts` (`CARD_STATUSES`, `STATUS_STYLE`) and render them through `StatusBadge`, and take label chip colors only from the pure `labelColor(text)` in `web/lib/labelColor.ts`, which normalizes the text (trim, NFC, lower case) and hashes it to one of eight palette keys with no randomness or date input.
+- **Rationale:** One map makes the board, the modal, and My Tasks agree, and a deterministic hash gives the same label the same color on every board and device without a schema change.
+- **Kano Example:** `NOT_STARTED` gray, `IN_PROGRESS` blue, `URGENT` red, `DONE` green; `labelColor(" Design ")` equals `labelColor("design")`.
+
+### G-FE-18: Card checklist and workspace links UI
+- **Rule:** Apply a checklist toggle to local state at once and revert it with one `handleError` call on failure, report new counts to the board with `onCountsChanged` after every successful change, validate link URLs with `validateLinkUrl` (trimmed, `http` or `https`, hostname) before any request, and render every link as `<a href target="_blank" rel="noopener noreferrer">` showing its hostname, with the progress and link-count chips hidden at zero.
+- **Rationale:** Immediate toggles feel responsive, counts on the card face must not need a reload, and external links must neither run script nor leak the opener.
+- **Kano Example:** `useChecklist` in `web/hooks/useChecklist.ts`; `LinkRow.tsx`; `CardMetaRow.tsx` shows `3/5` only when `checklist_total > 0`.
+
+### G-FE-19: Overdue notifications without polling
+- **Rule:** Load overdue items with `hooks/useOverdue.ts` once when the authenticated Header mounts and again each time the notification list opens, never on a timer, keep the previous items silently on error, and keep overdue items out of the unread count.
+- **Rationale:** Overdue items are computed on read, so refreshing on open is enough and polling would only add load.
+- **Kano Example:** `NotificationList.tsx` shows an "Overdue" group above stored items; `isOverdue(due, status, todayUtc())` in `lib/overdue.ts` drives the card-face chip.
+
+### G-FE-20: No raw HTML injection
 - **Rule:** Never use `dangerouslySetInnerHTML` anywhere under `web/` and render user text only as React children.
 - **Rationale:** Both tokens sit in readable cookies, so any XSS exposes them.
 - **Kano Example:** `CommentItem.tsx` renders `{comment.content}` as plain text.
 
-### G-FE-16: React Testing Library conventions
+### G-FE-21: React Testing Library conventions
 - **Rule:** Write unit tests with Vitest and React Testing Library that mock the network (`vi.fn()` on `fetch`), never call a real API, and assert behavior through roles and text.
 - **Rationale:** Tests must run offline and in a single run with `vitest --run`.
 - **Kano Example:** `web/__tests__/` tests of `RegisterForm` assert no request is sent for a 7-character password.
 
-### G-FE-17: Playwright conventions
-- **Rule:** Write Playwright tests against `E2E_BASE_URL` using auto-waiting locators and web-first assertions, never `waitForTimeout`, and use a unique email per run.
+### G-FE-22: Playwright conventions
+- **Rule:** Write Playwright tests against `E2E_BASE_URL` using auto-waiting locators (scope link locators to `banner` or `contentinfo`, or use `exact: true`) and web-first assertions, never `waitForTimeout`, and read the test account only from `E2E_USER_EMAIL` and `E2E_USER_PASSWORD` in `web/.env.test` through `requireCredentials()` (never a literal e-mail or password in `web/e2e/`), set the `kano_welcome_seen` cookie before visiting `/` as an anonymous user, and use a unique generated email per registration.
 - **Rationale:** Fixed sleeps cause flaky tests, and unique users keep runs independent.
 - **Kano Example:** `web/e2e/` Kanban journey uses `locator.dragTo` and `await expect(card).toBeVisible()`.
 
@@ -95,7 +120,8 @@ Every new entry must keep the Rule / Rationale / Kano Example structure.
 - [ ] One component per file; buttons are `BaseButton`; dialog forms are inside `BaseModal` (page forms and inline board forms are exempt).
 - [ ] All requests use `apiRequest`; errors go through `useErrorHandler`.
 - [ ] No cookie writes or refresh calls in server code.
-- [ ] Tailwind classes work at 375 px; tap targets are at least 44 px.
+- [ ] Tailwind classes work at 375 px; tap targets are at least 44 px; class names are complete static strings.
+- [ ] Role-dependent controls use `can(role, action)`; status and label colors come from `STATUS_STYLE` and `labelColor`.
 - [ ] No `dangerouslySetInnerHTML`.
 - [ ] Tests mock the network; no `waitForTimeout`.
 - [ ] Timers and listeners are cleaned up on unmount.

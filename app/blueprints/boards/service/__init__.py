@@ -1,4 +1,4 @@
-"""Boards service package: keeps `service.<function>` importable (G-BE-15)."""
+"""Boards service package: keeps `service.<function>` importable (G-BE-18)."""
 from app.blueprints.boards.service.board_service import (
     create_board,
     delete_board,

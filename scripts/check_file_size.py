@@ -1,4 +1,4 @@
-"""Fail when a source file is longer than 300 lines (guideline G-BE-15, Requirement 30.6/30.7).
+"""Fail when a source file is longer than 300 lines (guideline G-BE-18, Requirement 30.6/30.7).
 
 Usage:
     python scripts/check_file_size.py            # scan app/ and web/

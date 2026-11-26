@@ -26,6 +26,7 @@
     --blue-bg:#DCE8FF; --blue-fg:#2547AD;
     --teal-bg:#D5F3F1; --teal-fg:#0B6B66;
     --pink-bg:#FCE1EF; --pink-fg:#9C2A66;
+    --gray-bg:#E6E9EE; --gray-fg:#3F4757;
     --r-sm:6px; --r-md:8px; --r-lg:12px; --r-full:9999px;
     --shadow-overlay:0 8px 24px rgb(31 36 48 / 0.12);
   }
@@ -184,6 +185,7 @@
   .l-blue { background: var(--blue-bg); color: var(--blue-fg); }
   .l-teal { background: var(--teal-bg); color: var(--teal-fg); }
   .l-pink { background: var(--pink-bg); color: var(--pink-fg); }
+  .l-gray { background: var(--gray-bg); color: var(--gray-fg); }
   .badge { display: inline-flex; align-items: center; gap: 6px; height: 20px; padding: 0 10px; border-radius: var(--r-full); font-size: 12px; font-weight: 500; }
   .badge .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
   .b-neutral { background: var(--sunken); color: var(--ink-muted); }
@@ -274,6 +276,12 @@
   .progress .track { flex: 1; height: 8px; background: var(--sunken); border-radius: var(--r-full); overflow: hidden; }
   .progress .fill { height: 100%; background: var(--primary-500); border-radius: var(--r-full); }
   .progress .fill.done { background: var(--success); }
+  .bar-sm { height: 4px; background: var(--sunken); border-radius: var(--r-full); overflow: hidden; }
+  .bar-sm > span { display: block; height: 100%; background: var(--primary-500); border-radius: var(--r-full); }
+  .chk-row { display: flex; align-items: center; gap: 8px; min-height: 36px; }
+  .chk-row.done .t { color: var(--ink-muted); text-decoration: line-through; }
+  .link-row { display: flex; align-items: center; gap: 8px; min-height: 36px; }
+  .link-row .host { font-size: 12px; line-height: 16px; color: var(--ink-muted); }
   .progress .num { font-size: 12px; line-height: 16px; color: var(--ink-muted); width: 36px; text-align: right; }
   .empty { text-align: center; padding: 48px 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
   .empty > svg { color: var(--ink-subtle); margin-bottom: 4px; }
@@ -562,14 +570,23 @@
         <span class="label l-blue">Planning</span>
         <span class="label l-teal">Docs</span>
         <span class="label l-pink">Bug</span>
+        <span class="label l-gray">Misc</span>
       </div>
       <span class="tag" style="margin-top:24px">Status badges</span>
       <div class="row">
         <span class="badge b-neutral"><span class="dot"></span>Not started</span>
         <span class="badge b-info"><span class="dot"></span>In progress</span>
+        <span class="badge b-danger"><span class="dot"></span>Urgent</span>
         <span class="badge b-success"><span class="dot"></span>Done</span>
         <span class="badge b-warning"><span class="dot"></span>Due soon</span>
         <span class="badge b-danger"><span class="dot"></span>Overdue</span>
+      </div>
+      <span class="tag" style="margin-top:24px">Role badges (admin, manager, member, guest)</span>
+      <div class="row">
+        <span class="badge b-warning">admin</span>
+        <span class="badge b-info">manager</span>
+        <span class="badge b-success">member</span>
+        <span class="badge b-neutral">guest</span>
       </div>
       <span class="tag" style="margin-top:24px">Avatars (24 / 32 / 40) and stack</span>
       <div class="row gap-16">
@@ -641,6 +658,26 @@
       </div>
       <span class="tag" style="margin-top:24px">Drop placeholder</span>
       <div class="placeholder-card" style="max-width:288px"></div>
+      <span class="tag" style="margin-top:24px">With status, checklist progress, link count, and overdue chip</span>
+      <div style="max-width:288px">
+        <button class="card">
+          <span class="labels"><span class="label l-blue">Planning</span><span class="label l-gray">Misc</span></span>
+          <span class="title">Prepare the sprint review</span>
+          <span class="meta" style="flex-wrap:wrap;gap:4px">
+            <span class="badge b-danger">Urgent</span>
+            <span class="due over"><svg class="i"><use href="#cal"/></svg>Nov 12 · Overdue</span>
+            <span class="it"><svg class="i"><use href="#clip"/></svg>2</span>
+          </span>
+          <span class="meta"><span>3/5</span><span class="bar-sm" style="flex:1"><span style="width:60%"></span></span></span>
+        </button>
+      </div>
+      <span class="tag" style="margin-top:24px">Checklist and workspace link rows (card detail)</span>
+      <div class="panel" style="max-width:420px">
+        <div class="chk-row"><label class="check"><input type="checkbox" checked><span class="t">Write the agenda</span></label></div>
+        <div class="chk-row done"><label class="check"><input type="checkbox" checked><span class="t">Invite the team</span></label></div>
+        <div class="chk-row"><label class="check"><input type="checkbox"><span class="t">Share the slides</span></label></div>
+        <div class="link-row"><svg class="i"><use href="#clip"/></svg><a href="#cards" style="font-weight:500">Sprint notes</a><span class="host">notion.so</span></div>
+      </div>
     </div>
   </section>
 

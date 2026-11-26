@@ -78,7 +78,7 @@ Stack: Next.js (App Router), React, TypeScript, Tailwind CSS v4.
 
 #### Card label colors
 
-Eight fixed pairs for task labels/tags. Each is a soft background with a dark foreground of the same hue. Assign by user choice, not by meaning.
+Nine fixed pairs for task labels/tags and avatars. Each is a soft background with a dark foreground of the same hue. Label chips get their color automatically from the label text through the pure function `labelColor(text)` (a stable hash over eight keys: `gray, blue, green, yellow, orange, red, purple, pink`), so the same text has the same color everywhere; never choose a color by meaning. `teal` is not a label key and stays available for avatars.
 
 | Name | `label-*-bg` | `label-*-fg` |
 |---|---|---|
@@ -90,6 +90,7 @@ Eight fixed pairs for task labels/tags. Each is a soft background with a dark fo
 | blue | `#DCE8FF` | `#2547AD` |
 | teal | `#D5F3F1` | `#0B6B66` |
 | pink | `#FCE1EF` | `#9C2A66` |
+| gray | `#E6E9EE` | `#3F4757` |
 
 #### Color rules
 
@@ -235,6 +236,7 @@ Paste this once. The `initial` resets remove Tailwind's default palette, radii, 
   --color-label-blue-bg: #dce8ff;    --color-label-blue-fg: #2547ad;
   --color-label-teal-bg: #d5f3f1;    --color-label-teal-fg: #0b6b66;
   --color-label-pink-bg: #fce1ef;    --color-label-pink-fg: #9c2a66;
+  --color-label-gray-bg: #e6e9ee;    --color-label-gray-fg: #3f4757;
 
   /* Radius */
   --radius-sm: 6px;
@@ -268,6 +270,14 @@ Paste this once. The `initial` resets remove Tailwind's default palette, radii, 
     outline-offset: 2px;
   }
 }
+```
+
+Tailwind v4 scans `app/` automatically. Add the other source folders under the `@import` line so classes written as strings in `components/`, `hooks/`, and `lib/` (status and label color maps) are generated:
+
+```css
+@source "../components";
+@source "../hooks";
+@source "../lib";
 ```
 
 `app/layout.tsx` font setup:
@@ -360,11 +370,12 @@ disabled:bg-sunken disabled:text-ink-subtle disabled:cursor-not-allowed
 
 ### 4.4 Badge / label chip
 
-Card label (colored, user-chosen):
+Card label (colored, assigned from the label text by `labelColor`):
 ```
 inline-flex items-center h-5 px-2 rounded-sm text-xs font-medium
 bg-label-{color}-bg text-label-{color}-fg
 ```
+`{color}` is one of `gray, blue, green, yellow, orange, red, purple, pink`. In code, write each complete pair (for example `bg-label-blue-bg text-label-blue-fg`) as a value in a lookup object keyed by the color; never assemble the class name from `{color}` at runtime, because Tailwind would not generate it.
 Status badge (system):
 
 | Status | Classes |
@@ -376,6 +387,17 @@ Status badge (system):
 | danger | `bg-danger-soft text-danger-ink` |
 
 Same shape as label chips but `rounded-full px-2.5`. Always include text; an optional 6px dot may precede it.
+
+Card status (one `StatusBadge`, defined once in `lib/status.ts` and used on the board card, the card modal, and My Tasks):
+
+| Status | Label | Badge variant | Classes |
+|---|---|---|---|
+| `NOT_STARTED` | Not started | gray (neutral) | `bg-sunken text-ink-muted` |
+| `IN_PROGRESS` | In progress | blue (info) | `bg-primary-100 text-primary-700` |
+| `URGENT` | Urgent | red (danger) | `bg-danger-soft text-danger-ink` |
+| `DONE` | Done | green (success) | `bg-success-soft text-success` |
+
+`BaseBadge` variants map to the table above: gray = neutral, blue = info, green = success, red = danger, yellow = warning. Role badges use the same variants: admin yellow, manager blue, member green, guest gray (always with the role text).
 
 ### 4.5 Avatar
 
@@ -392,9 +414,10 @@ cursor-pointer transition-colors duration-150
 Anatomy, top to bottom, `gap-2`:
 1. Labels row (optional): up to 3 chips, then `+N`.
 2. Title: `text-sm font-medium text-ink`, `line-clamp-3`.
-3. Meta row (optional): `text-xs text-ink-muted`, icon + count items (comments, checklist `2/5`, attachments), due date chip on the left, avatar stack on the right.
+3. Meta row (optional): `text-xs text-ink-muted flex flex-wrap gap-1`, in this order: label chips, status badge, due date chip, link-count chip (16px link icon + count, shown only when the count is above 0), comment count, avatar stack on the right.
+4. Checklist progress (only when the card has checklist items): below the meta row, text `3/5` in `text-xs text-ink-muted` and a thin bar: track `h-1 rounded-full bg-sunken`, fill `h-1 rounded-full bg-primary-500` (`bg-success` at 100%); the fill width is the one computed inline style (`style={{ width: "60%" }}`).
 
-Due date chip: neutral by default; `bg-warning-soft text-warning-ink` when due within 24h; `bg-danger-soft text-danger-ink` when overdue; `bg-success-soft text-success` when completed. Always show the date text.
+Due date chip: neutral by default; `bg-warning-soft text-warning-ink` when due within 24h; `bg-danger-soft text-danger-ink` when overdue; `bg-success-soft text-success` when completed (status Done). Always show the date text. A card is overdue when its due date is before today (UTC) and its status is not Done; Urgent is not done, and a card due today is not overdue. An overdue chip also includes the word "Overdue".
 
 States: **selected** `border-primary-500 bg-primary-50`; **dragging** `rotate-2 shadow-overlay border-primary-200`; **placeholder** (where it will land) `border-2 border-dashed border-primary-200 bg-primary-50`.
 
@@ -438,7 +461,7 @@ Underline style: container `border-b border-line flex gap-4`; tab `h-10 text-sm 
 
 ### 4.14 Progress bar (checklists)
 
-Track `h-2 rounded-full bg-sunken`, fill `bg-primary-500 rounded-full`; at 100% fill becomes `bg-success`. Show the numeric value (`3/5` or `60%`) next to it.
+Track `h-2 rounded-full bg-sunken`, fill `bg-primary-500 rounded-full`; at 100% fill becomes `bg-success`. Show the numeric value (`3/5` or `60%`) next to it. The compact variant on the task card (§4.6) uses `h-1` for the track and fill.
 
 ### 4.15 Tooltip
 
@@ -452,19 +475,32 @@ Centered, `py-12`, simple 48px outline icon in `text-ink-subtle`, H3 title, one 
 
 `bg-sunken rounded-md animate-pulse`; match the shape of the real content. Buttons show a spinner; pages show skeleton columns and cards.
 
+### 4.18 Checklist section (card detail)
+
+Rows: `flex items-center gap-2 min-h-9`; checkbox per §4.3 (a native checkbox, disabled for guests), item text `text-sm text-ink`, and when done `text-ink-muted line-through` (strike-through plus muted color, never color alone). Delete is a ghost icon button (`size-8`, `aria-label="Delete item"`). The add form is an inline input + `primary sm` "Add item" at the end of the list, with field errors per §4.2 (1 to 200 characters). At 50 items the form is disabled with the helper text "Limit of 50 items reached". A progress bar per §4.14 sits above the rows.
+
+### 4.19 Workspace links section (card detail)
+
+Rows: `flex items-center gap-2 min-h-9`; provider icon `size-4 text-ink-muted` (generic lucide icon, no brand marks), label `text-sm font-medium text-ink`, hostname `text-xs text-ink-muted`, and an open icon button. The link is an `<a>` with `target="_blank" rel="noopener noreferrer"` in link style (`text-primary-600 hover:text-primary-700 hover:underline`). Add and edit use the inline form of §4.2 (URL + optional label); at 10 links the form is disabled with "Limit of 10 links reached". Guests see the list only.
+
+### 4.20 Overdue items in the notification list
+
+A group titled "Overdue" above the stored notifications. Each row: a danger `BaseBadge` "Overdue" (`bg-danger-soft text-danger-ink`), the text "N days overdue" (`text-xs text-ink-muted`), the card title (`text-sm font-medium`), and the board name. Overdue rows never change the unread count.
+
 ---
 
 ## 5. Iconography
 
 - Library: **lucide-react**. Stroke 1.5–2px, `size-4` (16px) inline with text, `size-5` (20px) in icon buttons, `size-12` in empty states.
 - Icons inherit `currentColor`; default `text-ink-muted`.
+- lucide-react has no GitHub or LinkedIn icon. Brand marks are inline SVG components (`fill="currentColor"`, `aria-hidden`), one per file.
 - Icon-only buttons need `aria-label` and a tooltip.
 
 ---
 
 ## 6. Accessibility checklist
 
-- Text contrast ≥ 4.5:1 and form-control borders ≥ 3:1. The documented text/background pairs were checked with a WCAG contrast script and pass (lowest: white on `primary-500` at 4.58:1, `success` on `success-soft` at 4.78:1, `field` border on `surface` at 3.33:1). Do not combine tokens outside the documented pairs. `text-ink-subtle` is for placeholders, captions on `surface`, and disabled text only (disabled text is exempt from the ratio, but never put essential info in it).
+- Text contrast ≥ 4.5:1 and form-control borders ≥ 3:1. The documented text/background pairs were checked with a WCAG contrast script and pass (lowest: white on `primary-500` at 4.58:1, `success` on `success-soft` at 4.78:1, `field` border on `surface` at 3.33:1, `label-gray-fg` on `label-gray-bg` at about 7.7:1). Do not combine tokens outside the documented pairs. `text-ink-subtle` is for placeholders, captions on `surface`, and disabled text only (disabled text is exempt from the ratio, but never put essential info in it).
 - Visible `:focus-visible` outline on everything interactive. Never `outline-none` without a replacement.
 - Hit areas ≥ 32px (`sm`) on desktop, ≥ 44px on touch contexts.
 - Drag and drop must have a keyboard alternative (a card menu with "Move to…" and arrow-key reordering).
@@ -496,6 +532,7 @@ app/globals.css  # tokens (§3)
 
 - Primitives accept `className` and forward refs; they never hard-code margins.
 - Compose variants with a `variants` object (see §4.1). Do not introduce `class-variance-authority` unless asked.
+- Write Tailwind class names as complete static strings (lookup objects for status, label color, and role variants), never built from template strings, and keep `@source` lines for `components/`, `hooks/`, and `lib/` in `globals.css`.
 - Colors, radii, and shadows in components must resolve to tokens in §3. A PR or agent output containing `#hex`, `rgb(`, `bg-gray-*`, `shadow-md`, or `rounded-xl` is wrong.
 
 ---
@@ -517,3 +554,4 @@ app/globals.css  # tokens (§3)
 ## 10. Changelog
 
 - **v1.0**: initial system: tokens, Tailwind v4 theme, 17 component specs, accessibility and copy rules.
+- **v1.1**: added the `label-gray` pair (labels now use `labelColor` over eight keys), the four-value card status mapping (Urgent in danger colors), role badge variants, the compact card checklist bar, link-count and overdue chips, checklist, links, and overdue sections (§4.18 to §4.20), `@source "../lib"`, and the complete-static-class-string rule.

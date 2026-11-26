@@ -1,4 +1,4 @@
-"""Routes of the boards feature, split by topic (G-BE-15); `bp` is registered by `create_app`.
+"""Routes of the boards feature, split by topic (G-BE-18); `bp` is registered by `create_app`.
 
 Each module exposes `register(bp)` and defines thin handlers: parse, call the service,
 return `ok(...)`.

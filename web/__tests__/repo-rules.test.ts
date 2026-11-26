@@ -26,7 +26,7 @@ function collectFiles(dir: string, exts: Set<string>, skipTestDirs = false): str
   return results;
 }
 
-describe("Frontend repository rules (G-FE-03, G-FE-04, G-FE-15, G-BE-15)", () => {
+describe("Frontend repository rules (G-FE-03, G-FE-04, G-FE-20, G-BE-18)", () => {
   it("forbids dangerouslySetInnerHTML anywhere under web/", () => {
     const files = collectFiles(WEB_ROOT, new Set([".ts", ".tsx", ".js", ".jsx"]));
     const selfPath = path.resolve(__filename);

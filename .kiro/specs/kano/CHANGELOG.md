@@ -545,3 +545,136 @@ Classification: implementation change (documentation and repository scripts). No
 - **Guidelines:** `guidelines/frontend.md` G-FE-04 Rule and checklist line.
 - **Files:** `docs/screenshots/` (three moved images), `README.md` (paths), `docs/violation-report.md` (G-FE-04 status). No change in `app/` or `web/`.
 - **Breaking changes:** none.
+
+## V11 - 2026-11-26
+Source: `improvements/kano-improvement-plan.md` plus the approved decisions of this session. Only `requirements.md` (now V11) and this file are changed in this step. `design.md` and `tasks.md` stay at V10 and are updated in the following steps (an explicit exception to the automatic design and task update of the development workflow, requested by the user).
+
+### Changes
+Classification: **specification changes**, with two **breaking changes** (marked). No design change, implementation change, or bug fix is made in this step.
+
+1. **Urgent status and label colors (new Requirement 39; amended Glossary Card_Status, 2.16, 11.4, 11.19, 21.22, 23.17, 25.2, 38.17, 38.18).** Card_Status has four values. `URGENT` is not completed, and the `completed_at` rules are unchanged. Chip colors come from one lookup (gray, blue, red, green). Label colors come from a pure `labelColor(text)` function with 8 palette keys and no schema change.
+2. **Overdue notification (new Requirement 40; new Glossary term Overdue_Card).** `GET /api/notifications/overdue` in the `notifications` package, computed on read, no stored rows, no scheduled job. Overdue means due date before the current UTC date and status not `DONE`. Recipients: the assignee, or the admin and managers for unassigned Cards, never guests. Index on the Card due date. Explicit exception to Requirement 13 criterion 4. Red "Overdue" tag with the days overdue in the list, a danger chip on the Card face, fetch on page load and on opening the list, no polling.
+3. **Card checklist (new Requirement 41; new Glossary term Checklist_Item).** Table `checklist_items`, FLOAT `order`, text 1 to 200, 50 items per Card, endpoints POST (201), PATCH, DELETE (200 object), and the new GET `/api/cards/<id>` (see gap 1). Writers (admin, manager, member) edit, guests read. Progress is computed, never stored. Optimistic toggle with revert.
+4. **Workspace links (new Requirement 42; new Glossary term Card_Link).** Table `card_links`, 10 links per Card, `http` and `https` only with a hostname, label defaulting to the hostname, anchors with `target="_blank"` and `rel="noopener noreferrer"`, `link_count` chip. Writers edit, guests read, no notification.
+5. **Manager role (new Requirement 43; new Glossary terms Board_Manager and Role_Rank; amended Project Brief, Glossary Board_Member, Board_Participant, Board_Membership, 2.15, 9.1, 9.6, 9.9, 10 (user story, 10.1 to 10.4, 10.7, new 10.11), 11.2, 14.10, 20.1, 21.2, 21.4, 21.5, 21.12, 21.13, 21.21, 23.20, 28.12, 37.1, 37.3 to 37.6, 37.12, 37.14 to 37.17, 37.22).** Ranks guest 0, member 1, manager 2, admin 3 in `app/permissions.py`. Admin and manager manage Columns, invitations, and members below their rank. Only the admin renames and deletes the Board, reads analytics, and grants `manager`. A new role-change endpoint `PATCH /api/boards/<id>/members/<user_id>` carries the two safety rules. `my_role` and `can(role, action)` on the frontend.
+6. **Schema, migration, query budget (new Requirement 44; amended 1.4, 1.9, 2.2, 2.9 to 2.11, 3.5, 3.9, new 3.11, 4.3).** 9 tables. One manual V11 Migration_Step with two hand-edited check constraints. Board counts for checklist and links come from one combined grouped query, so Requirement 29 criterion 2 (at most 5 queries) is unchanged.
+7. **Tests and docs (new 31.18 to 31.25, 32.24 to 32.30, 36.15; amended 31.5, 31.13, 31.16, 32.16, 32.18).** Property tests for URL validation, `labelColor`, and the role-change decision. Cap, guest, cascade, query-count, rank, member-cannot-manage-columns, and overdue tests. README mention of the new features and the V11 migration.
+8. **Welcome page copy (38.17, 38.18, 38.19).** Only the status wording changes. The string "checklist" is removed from the forbidden list because checklists are now a real feature. "subtask" stays forbidden.
+
+#### Before / After
+- Version marker before: "V10 (documentation-only change: Requirement 36.10 ...)". After: "V11 (adds the URGENT card status and label colors, the overdue notification, the card checklist, workspace links, and the Manager role in the new Part G, with 9 tables, and removes Column management from the role `member`; V10 was a documentation-only change: ...)".
+- Glossary Board_Member before: "In access rules, the term Board_Member covers the roles `admin` and `member` (a Board_Admin is also a Board_Member) and excludes the `guest` role." After: covers `admin`, `manager`, and `member`, and excludes `guest`. Board_Participant and Board_Membership list four roles.
+- Glossary Card_Status before: "`NOT_STARTED` (default), `IN_PROGRESS`, or `DONE`, ... "Not started", "In progress", and "Done"." After: adds `URGENT` and "Urgent", and states that only `DONE` is a completed state.
+- Project Brief before: roles Board_Admin, Board_Member, Board_Guest; features "card status (Not started, In progress, Done); board members with roles (admin, member, guest);". After: adds Board_Manager; features list four statuses, label colors, overdue notifications, checklists, workspace links, and four roles. Board_Member "Manages cards and comments" now reads "Manages cards, checklists, workspace links, and comments on that board, but not its columns."
+- R1.4 before: models "User, Board, Board_Membership, Column, Card, Comment, and Notification ... cards: Card;". After: adds Checklist_Item and Card_Link, both owned by `cards`. R2.2 lists the same two models.
+- R1.9 before: "detects all 7 tables (users, boards, board_memberships, columns, cards, comments, notifications)." After: "all 9 tables" with checklist_items and card_links added.
+- R2.9 before: "soft delete the Columns, Cards, Comments, and Board_Memberships". After: adds Checklist_Items and Card_Links. R2.10 and R2.11 gain the same two children.
+- R2.15 before: role values `admin`, `member`, `guest` ("unchanged for all three roles"). After: `admin`, `manager`, `member`, `guest` ("all four roles").
+- R2.16 before: status values `NOT_STARTED`, `IN_PROGRESS`, `DONE`. After: adds `URGENT`.
+- R3.5 before: tables for the 7 models. After: adds "after the V11 Migration_Step ... Checklist_Item and Card_Link". R3.9 before: "SHALL add no table, so the 7-table rule ... still holds." After: "(this describes the V6 step; the V11 step adds two tables, see Requirement 44 criterion 1)". R3.11 is new (manual V11 task and blocking rule).
+- R4.3 before: creating POSTs ended with "`/api/columns/<id>/cards`, and `/api/cards/<id>/comments`". After: adds `/api/cards/<id>/checklist` and `/api/cards/<id>/links` (both 201).
+- R9.1 before: "WHEN a Board_Admin sends POST `/api/boards/<id>/members` ...". After: "Board_Admin or a Board_Manager".
+- R9.6 before: "WHEN a Board_Admin sends DELETE ... for a non-admin member, ...". After: "Board_Admin or a Board_Manager ... for a Board_Participant whose role ranks below the role of the caller (Requirement 43 criterion 6)".
+- R9.9 before: "IF a Board_Member who is not the Board_Admin sends POST or DELETE to a members endpoint, THEN ... 403". After: "a Board_Member whose role is `member`".
+- R10 (**breaking change**) before: "WHEN a Board_Member sends POST `/api/boards/<id>/columns` ..." (and the same for PATCH, DELETE, reorder), user story "As a board member", and 10.7 "IF the current User is not a Board_Member of the Column's Board, THEN ... 403". After: "Board_Admin or a Board_Manager" in 10.1 to 10.4, the user story, and 10.7. New 10.11: a `member` gets 403 on the four Column endpoints.
+- R11.2 before: assignee role `admin` or `member`. After: `admin`, `manager`, or `member`. R11.4 before: status must be one of three values. After: four. R11.19 gains: any change among `NOT_STARTED`, `IN_PROGRESS`, and `URGENT` leaves `completed_at` unchanged.
+- R14.10 before: "(roles `admin` and `member`)". After: "(roles `admin`, `manager`, and `member`)". R14.7 (analytics admin only) is unchanged and already returns 403 to a manager.
+- R20.1 and R37.17 before: role badge `admin`, `member`, or `guest`. After: adds `manager`. R37.17 also lets the Board_Manager remove a Board_Guest.
+- R21.2, 21.4, 21.5 before: "WHEN a Board_Member submits/confirms ..." for Column actions. After: "Board_Admin or a Board_Manager".
+- R21.12 before: "WHERE the current User is the Board_Admin, ... member management panel (list, add by email, remove) and a link to the analytics view." After: panel for the admin or a manager (with role change), analytics link for the admin only.
+- R21.13 before: "WHERE ... a Board_Member who is not the Board_Admin, ... hide the member management controls and the analytics link." After: for a `member`, hide member management, Column controls, and the analytics link. For a manager, hide the analytics link.
+- R21.21, R37.15, R37.16, R28.12, R37.3 to R37.6 before: invite links and tokens for the Board_Admin only (and 403 for "a member"). After: Board_Admin or Board_Manager. R37.5 now says "a Board_Member whose role is `member`".
+- R21.22 and R25.2 before: badge labels "Not started", "In progress", "Done". After: adds "Urgent". R23.17 before: "exactly the three options". After: "exactly the four options". R23.20 before: assignees `admin` or `member`. After: adds `manager`.
+- R37.1 before: "SHALL add no table, so that the 7 tables of Requirement 1 criterion 9 remain." After: "SHALL add no table for this feature (the table count is defined in Requirement 1 criterion 9)." R31.16 gets the same change ("the 9 tables").
+- R37.12 before: "a `member` or `admin` who accepts the guest token SHALL keep the role". After: adds `manager`, and a manager who accepts the member token keeps `manager`.
+- R37.14 before: guest 403 list ended at the invite-link endpoints. After: adds PATCH members, POST checklist, PATCH and DELETE checklist, POST links, PATCH and DELETE links.
+- R37.22 before: "SHALL provide no endpoint that changes a role other than the upgrade of criterion 12." After: "... and the role-change endpoint of Requirement 43 criterion 5."
+- R38.17 before: "a status (Not started, In progress, or Done)". After: "(Not started, In progress, Urgent, or Done)". R38.18 gains the label "Urgent". R38.19 before: list contained `"checklist"`. After: `"checklist"` removed.
+- R31.5 before: "403 for a Board_Member who is not the Board_Admin on the member add, member remove, Board update, Board delete, and analytics endpoints." After: split into `member` role for member add and remove, and not-admin for Board update, Board delete, and analytics.
+- R31.13 gains "acceptance of `URGENT` on PATCH". R31.16 adds the manager for invite-links. R32.16 ("three options") is now "four options". R32.18 adds the Board_Manager for the invitation links.
+- New criteria without Before text: 3.11, 10.11, 31.18 to 31.25, 32.24 to 32.30, 36.15, and Requirements 39 to 44 (Part G).
+
+#### Consistency check (requirements only)
+Contradictions found and resolved in this step:
+- R37.22 (no role-change endpoint) versus the new role-change endpoint: R37.22 was amended.
+- R9.6 and R9.9 (admin only) versus managers who may add and remove members: both were amended, and the rank rule of Requirement 43 criteria 6 and 7 was added.
+- R9.6 "non-admin member" versus a manager who must not remove another manager: replaced by the rank rule.
+- R10, R21.2, R21.4, R21.5, R21.13 versus the loss of Column management for `member`: amended, with new R10.11.
+- R1.9, R3.5, R3.9, R37.1, R31.16 ("7 tables", "no table"): amended to 9 tables.
+- R2.9 to R2.11 cascades did not cover the two new child tables: amended.
+- R11.22 (a guest cannot be assignee) versus a role change to `guest`: new Requirement 43 criterion 10 clears the assignee, in the same way as R9.11.
+- R37.12 accept rules did not name the manager: amended.
+- R38.19 forbade "checklist" while Requirement 41 adds checklists: the string was removed from the list.
+- R4.3 (which POSTs return 201): amended.
+
+Gaps found and closed with an assumption (the user can override each one):
+1. The plan says "GET `/api/cards/<id>` includes the checklist", but no requirement defined that endpoint. It is new in Requirement 41 criterion 9 (any Board_Participant, 200, with checklist and links). It is a new endpoint and not a revision of an existing one.
+2. The plan lists "transfer ownership" as admin only, but no endpoint exists. Requirement 43 criterion 4 states that none is provided.
+3. Overdue items are not stored, so they would not fit the unread count. Requirement 40 criterion 12 excludes them from the bell count, and criterion 13 defines the empty state.
+4. The plan gives no limit for the overdue list. Assumption: at most 100 items with the full `total` (Requirement 40 criterion 5), and a 500 ms p95 target like Requirement 29 criterion 4.
+5. "Remove members and change roles" for a manager needed a precise rule. It is "caller rank strictly above the target rank and strictly above the new rank, and the new role is never `admin`" (Requirement 43 criteria 6 to 8). As a result a manager cannot change another manager or assign `manager`, and a manager cannot remove or change themselves (403 by the rank rule, 400 for the admin owner).
+6. The plan row "Manage lists and labels": labels are plain strings on Cards, so only Columns are manager-managed. No label management requirement was added.
+7. The card payload counts: Requirement 44 criterion 5 puts the three counts in the board detail and in the create, update, and position responses. Search and My Tasks do not carry them (assumption, to keep those queries unchanged).
+8. Production: R34.3 already requires `flask db upgrade` on the production schema at deployment. No separate production step was added.
+
+Open points that need a decision in the design step (no requirement change made):
+- The five invitation and member-management criteria that say "manager" rely on the helpers of `permissions.py` (Requirement 43 criterion 1). The design must replace the V6 helper matrix (A4-V6) and keep property 25.
+- Existing tests that use a `member` to create or move Columns (R31 Column tests, the Playwright journey of R33.4 uses the board creator, so it is not affected) must change to admin or manager.
+- Files that approach 300 lines (R30.6) are likely in the `cards` package and in `CardDetailModal`. The design must plan the split.
+- Welcome page copy (R38.17) does not mention checklists, links, or the Manager role. Only the status wording was changed, as decided.
+
+### Reason
+- The mentor's optional improvement plan, adjusted by eight user decisions: four statuses, compute-on-read overdue, checklist, links, one combined board count query, nine tables, a Manager role in which members lose Column management, and a trimmed forbidden-string list.
+
+### Impact
+- **Requirements amended:** Version marker, Project Brief, Glossary, 1.4, 1.9, 2.2, 2.9, 2.10, 2.11, 2.15, 2.16, 3.5, 3.9, 4.3, 9.1, 9.6, 9.9, 10 (user story, 10.1 to 10.4, 10.7), 11.2, 11.4, 11.19, 14.10, 20.1, 21.2, 21.4, 21.5, 21.12, 21.13, 21.21, 21.22, 23.17, 23.20, 25.2, 28.12, 31.5, 31.13, 31.16, 32.16, 32.18, 37.1, 37.3 to 37.6, 37.12, 37.14 to 37.17, 37.22, 38.17 to 38.19.
+- **Requirements added:** 3.11, 10.11, 31.18 to 31.25, 32.24 to 32.30, 36.15, and Requirements 39 to 44 in the new Part G.
+- **Design (not changed yet):** `permissions.py` helpers and the rank rule, the Card model and status map, `checklist_items` and `card_links` models, the cards service (counts query, GET card detail, checklist and link endpoints), the overdue endpoint, the member role-change endpoint, `labelColor`, `lib/status.ts`, `lib/roles.ts` (`can`), the CardDetailModal sections, the Card face chips, the member panel, the notification list, and the Testing Strategy.
+- **Tasks (not changed yet):** one V11 manual Migration_Step with two hand-edited constraints, and backend, frontend, and test tasks for Requirements 39 to 44.
+- **Breaking changes:** (1) the role `member` can no longer create, rename, delete, or reorder Columns (403). (2) Status accepts a fourth value, and an `URGENT` Card is not completed. Clients that assume three statuses or three roles (`admin`, `member`, `guest`) must be reviewed. The invitation links are now also readable and regenerable by managers.
+- **Implementation:** none in this step.
+
+#### Design edits (step 2: `design.md` V10 to V11, classification: design changes; no implementation change, no requirement change, `tasks.md` not changed)
+No V1 to V10 design text was deleted. Where V11 supersedes earlier text, the old text stays and a "V11 change" note or a V11 section names the replacement.
+- Version marker set to V11 with a V11 change summary and section index. New decisions D19 (four roles, rank rules in `permissions.py`), D20 (checklist and links inside `cards` as packages), D21 (one combined count query, 5 queries), D22 (overdue computed on read with a passed-in UTC date), D23 (`@source "../lib"` so Tailwind sees the status and label class strings).
+- New backend sections A15 (four roles, `decide_role_change`, `decide_member_removal`, helper list, V11 endpoint-by-role matrix), A16 (four-value status), A17 (file split of `cards/schema`, `service`, `routes`; checklist and link services; pure `validate_link_url`; extended cascades), A18 (combined count query, GET `/api/cards/<id>`), A19 (overdue endpoint, query, recipients, cap, index), A20 (role-change endpoint, member removal, invite links for managers), A21 (endpoint rows 34 to 42 and amended rows). New frontend sections B16 (`can`, `assignableRoles`, role dropdown, gating), B17 (`STATUS_STYLE`, `labelColor`, class maps), B18 (Card face indicators, `ChecklistSection`, `LinksSection`), B19 (overdue UI), B20 (types, welcome copy), B21 (files).
+- Data Models: V11 section with `ChecklistItem` and `CardLink`, changed constraints, the 9-table ER diagram, and the V11 migration table (two hand-edited check constraints, `ix_cards_due_date`, two tables). Correctness Properties 61 to 75 plus an amendment table for earlier properties. Error Handling: 19 V11 rows. Testing Strategy: V11 additions (backend, frontend, Playwright). Part D V11 notes. Traceability: rows for Requirements 39 to 44 and an amended-requirements table. Open issues 45 to 66.
+- "V11 change" notes were added in place at: A4-V6 (helper matrix), A9 (query plan), A12-V6 (token exposure), A13 (status constants), B6-V6 (role gating), B7-V6 (`lib/status.ts`), Data Models "ER diagram", Properties 25 and 47.
+
+#### Before / After (design)
+- Roles: before `ROLE_RANK = {guest: 0, member: 1, admin: 2}`, levels reader, writer, admin, helpers `require_board_writer` and `get_column_for_writer` for Columns. After `{guest: 0, member: 1, manager: 2, admin: 3}`, a `manager` level, `require_board_manager` and `get_column_for_manager` for Columns, member add and remove, role change, and invite links.
+- Columns, members, invite links: before "Admin" or "Member" (writer) in the V6 matrix. After admin and manager; a `member` gets 403 on the four Column endpoints.
+- Status: before three values (`lib/status.ts`, A13, `ck_cards_status`). After four values with `STATUS_STYLE` (label, variant, complete class string), red for `URGENT`.
+- Board detail: before 4 queries. After 5 queries (the fifth is the combined count query), at most 5 and constant.
+- Tables: before 7. After 9 (`checklist_items`, `card_links`). Cascades gain the two tables.
+- Analytics member activity: before roles `admin`, `member`. After `admin`, `manager`, `member`.
+- Welcome copy: before "(Not started, In progress, or Done)". After "(Not started, In progress, Urgent, or Done)". `FORBIDDEN_CLAIMS` has no "checklist".
+- Tailwind: before `@source` for `components/` and `hooks/` only. After also `lib/`.
+
+#### Inconsistencies found between requirements V11 and the design (no requirement text changed; recommendations are in design Open issues 45 to 66)
+1. R39.5 puts class strings in `lib/status.ts`, but R15.2 and D18 scan only `app/`, `components/`, `hooks/`. Design adds `@source "../lib"` (Open issue 45).
+2. R43.6 (403 by rank) and R43.8 (400 when naming the Board_Admin) overlap, and R9.7 says 400 for an admin who removes himself. Design: owner check first, 400 only for the admin, 403 for a manager (Open issue 47).
+3. R42.2 defaults the label to the hostname, which can exceed the 100-character label limit of R42.1 and R42.5. Design cuts to 100 (Open issue 48).
+4. R11.15 gives 403 to a non-Board_Member (a guest) on every single-Card endpoint, but R41.9 gives a guest 200 on GET `/api/cards/<id>` (Open issue 49).
+5. R43 does not say what a role change to the same role does or the order of 400 and 403; the design returns 200 and validates the body first (Open issue 59).
+6. R40.10 says "when the page loads"; a client-side navigation does not remount the Header, so the design refreshes on mount, reload, and list open (Open issue 50).
+7. R39.9 and R39.10 assume label and status token names that are not verified against `globals.css` (Open issue 46).
+
+### Impact (design, V11 step 2)
+- **Design:** `design.md` is now V11. **Requirements:** unchanged in this step. **Tasks:** `tasks.md` is still V10 and must get V11 tasks next: the manual V11 Migration_Step (two hand-edited check constraints, `ix_cards_due_date`, two tables), `permissions.py` rank helpers and `decide_*`, the `cards` package split, checklist and link models, schemas, services, routes, `counts.py`, GET card detail, the overdue service and route, the member role-change endpoint, the manager guards on columns, members, and invites, the frontend `roles.ts`, `status.ts`, `labelColor.ts`, `overdue.ts`, `linkProvider.ts`, hooks, components, `globals.css` `@source`, welcome copy, and tests for Properties 61 to 75.
+- **Breaking changes:** unchanged from the V11 requirements entry (role `member` loses Column management; four statuses and four roles).
+
+#### Task edits (step 3: `tasks.md` V10 to V11, classification: specification and task planning change; no implementation change)
+Tasks 1 to 43, their checkboxes, text, and waves 0 to 85 are unchanged history. Only the version line and Overview of `tasks.md` were changed (V11 paragraph), plus new tasks, waves, and notes appended. `requirements.md` and `design.md` were not edited.
+- **New tasks 44 to 56, all unchecked.**
+  - 44 Backend models, schema, and permissions (44.1 to 44.15): `cards` schema, service, and routes packages; `URGENT` and `ix_cards_due_date`; `ChecklistItem` and `CardLink` models; URL rule and schemas; four-role check; `ROLE_RANK` with manager, `decide_role_change`, `decide_member_removal`; manager helpers; Column, add-member, and invite-link guards moved to the manager level; extended cascades; combined count query; model metadata tests; pure property tests for 61, 68, 72, 73, 75.
+  - 45.1 [MANUAL] V11 migration on the development and test databases, hand-edited `ck_cards_status` and `ck_board_memberships_role`, no agent-generated script.
+  - 46 Backend features and pytest tests (46.1 to 46.18): conftest and factories for 9 tables, GET `/api/cards/<id>` with counts, checklist, links, overdue, role-change and manager rank rules, tests by role, status and analytics updates, V11 matrix, schema tests, endpoint-list tests. 47 backend checkpoint.
+  - 48 [MANUAL] design-system token check (R39.10).
+  - 49 Frontend libraries (49.1 to 49.7): types, `lib/status.ts` (four statuses), `lib/labelColor.ts`, `lib/roles.ts` (`can`), `@source "../lib"`, overdue and progress helpers, link provider and validators. 50 Components (50.1 to 50.11): board gating by `can` with Column controls hidden for `member`, member panel with role dropdown, Card face indicators, modal with four statuses and card detail loading, checklist, links, overdue UI, Dashboard and My Tasks, welcome copy, responsive pass, repository rules. 51 Frontend tests (51.1 to 51.5). 52 Playwright (52.1 to 52.4). 53 README and documentation. 54 final checkpoint. 55 [MANUAL] browser verification. 56 [MANUAL] production schema and verification.
+- **Superseded earlier tasks (named in the V11 tasks, history kept).** 3.5, 5.1, 8.1, 8.2, 8.4, 9.2, 14.1 to 14.3, 14.5, 17.12, 18.4, 18.5, 18.7, 25.2, 25.6 to 25.9, 27.4, 27.6, 27.7, 27.9 to 27.15, 29.1, 29.3, 29.4, 29.9, 30.1, 30.2, 30.4, 30.8, 30.11, 31.7, 31.9, 35.1, 36.1, 37.2, 37.3, 37.7, 37.9, 40.6.
+- **Dependency graph.** Waves 86 to 115 appended (valid JSON, every incomplete task without sub-tasks appears once; parent tasks 44, 45, 46, 49, 50, 51, 52, 53 do not appear). Waves 0 to 85 are unchanged.
+- **Notes.** Property coverage 61 to 75, requirement coverage for R39 to R44 and the amended rows, the map of invalidated tests, and the deployment ordering recommendation are in the "V11 Notes" section of `tasks.md`.
+- **Open issues handled.** Design Open issues 45 (task 49.5), 46 and 62 (task 48), 47 (46.11, 46.12), 48 (44.4, 46.7), 49 (46.2, 46.16), 50 and 51 (50.7, 49.6), 53 (50.1, 51.5, 52.1), 54 (46.4, 46.6), 55 (50.6), 56 (44.1, 50.3, 50.11), 57 and 58 (44.10, 46.2), 59 (46.11), 60 (50.9), 65 (44.11, 46.1, 53.2), 66 (the note on guideline mismatches in 53.2). Items 52, 61, 63, and 64 are accepted as designed.
+- **Inconsistencies reported (no requirement or design text changed):** R15.2 versus the `lib/` class strings; R39.10 versus the rule that agents never edit `guidelines/`; R43.6 versus R43.8 ordering; R11.15 versus R41.9 for guests; R42.2 default label length; R43 silent on same-role change and validation order; Requirement 33 has no V11 criteria; the CHANGELOG remark about removing "checklist" from the forbidden list does not match the current R38.19; the pending deployment waves 67 to 79 come before the new V11 waves because wave ids are append-only (recommendation in the V11 Notes).
+- **Classification.** Task planning only. No implementation change and no version bump beyond V11.

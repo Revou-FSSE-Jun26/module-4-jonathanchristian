@@ -1,6 +1,8 @@
 # Design Document
 
-**Version:** V10 (revised against requirements V10, documentation only: D3 screenshots; V9 was revised against requirements V9, frontend only: the shared Footer; V8 covered the Header logo, the Welcome_Page, and the board toolbar; initial design was V3)
+**Version:** V11 (revised against requirements V11: the URGENT status and label colors, the overdue notification, the card checklist, workspace links, the Manager role, 9 tables; V10 was revised against requirements V10, documentation only: D3 screenshots; V9 was revised against requirements V9, frontend only: the shared Footer; V8 covered the Header logo, the Welcome_Page, and the board toolbar; initial design was V3)
+
+> **V11 change summary.** V11 adds, in Part G of the requirements: the fourth status `URGENT` and deterministic label colors (R39), a compute-on-read overdue endpoint in the `notifications` package (R40), the card checklist (R41) and workspace links (R42) inside the `cards` package, the Manager role with rank rules (R43), and the V11 schema, migration, and query budget (R44). No V10 text was deleted. Where V11 supersedes earlier text (the three-role helper matrix of A4-V6, the three-value status of A13 and `lib/status.ts`, the "7 tables" statements, "admin only" for columns, members, and invite links, the four-query board plan), the old text stays and a "V11 change" note or the V11 sections name the replacement. Index of V11 sections: decisions D19 to D23 (Overview), A15 to A21 (backend, placed before Data Models), B16 to B21 (frontend), Data Models "V11 data models and migration", Correctness Properties 61 to 75 and the amendment table, Error Handling (V11 rows), Testing Strategy (V11 additions), Part D V11 notes, Traceability (V11 table), Open issues 45 to 66. `requirements.md` and `tasks.md` are not edited by this revision.
 
 > **V9 change summary.** V9 is a frontend-only revision (no endpoint, model, migration, or backend test changes). It redesigns the shared `Footer` (B15): a Server Component with one row from 768 px upward that may wrap onto two lines below 768 px (V9 refinement; the first V9 text said "a single row", superseded), the brand group on the left (brand mark, wordmark, separator dot, portfolio text) and two external icon links (GitHub, LinkedIn) on the right, built only from design-system tokens. It adds a content module `lib/footerContent.ts`, one inline-SVG icon component per brand (the installed `lucide-react` 1.75.0 has no GitHub or LinkedIn icon), and a shared `KanoMark` so the Header and the Footer show the same "K" badge. No new Correctness Property is added (example-based, see the Testing Strategy V9 additions). `proxy.ts`, `decideRoute`, `Header` behavior, and every API are unchanged. Where V9 supersedes older text (the plain one-line footer), the old text stays and a "V9 change" note names the replacement. Index of V9 sections: D18 (decision), B1 and B3 V9 notes, B15, Testing Strategy (V9 additions), Traceability (V9 table), Open issues 39 to 44.
 
@@ -46,6 +48,16 @@ Key design decisions:
 | # | Decision | Rationale |
 |---|----------|-----------|
 | D18 | **V9.** The Footer stays a Server Component with no state and no handlers. Hover and focus come from Tailwind classes only. Its text, the two placeholder URLs, and the two `aria-label` values live in `lib/footerContent.ts`, its Tailwind classes stay in `components/` as complete static strings (the Tailwind scanner covers `components/` and `hooks/`, not `lib/`). GitHub and LinkedIn marks are inline SVG components in `components/shared/icons/`, because the installed `lucide-react` has no brand icons. The "K" badge is one shared `KanoMark` used by the Header and the Footer. The brand group is plain text and never a link. | Requirements 18.16 to 18.21, 27.11, 27.12. A Server Component keeps the footer out of the client bundle. Keeping classes in `components/` avoids classes that are never generated. One `KanoMark` keeps both badges identical. A text-only brand group leaves exactly one link named "Kano" per page (R18.14). V9 refinement: the layout is one row from 768 px upward and may wrap onto two lines below 768 px (the first V9 text said "single row", superseded). |
+
+**V11 decisions.**
+
+| # | Decision | Rationale |
+|---|----------|-----------|
+| D19 | **V11.** Four roles ranked once in `permissions.py`: `ROLE_RANK = {guest: 0, member: 1, manager: 2, admin: 3}`. Levels are `reader`, `writer`, `manager`, `admin`. `role_allows` keeps its formula. Two new pure functions, `decide_role_change` and `decide_member_removal`, hold every rank rule. | R43.1 to R43.9. One table means one place to test (Properties 72 and 73). |
+| D20 | **V11.** Checklist items and workspace links are two models inside the `cards` package (R41.11, R42.10). `cards/schema`, `cards/service`, and `cards/routes` become packages, one module per resource, so no file passes 300 lines. | R1.2 allows 8 packages. R30.6 limits files to 300 lines. |
+| D21 | **V11.** Per-card counts for the board payload come from one grouped query that left-joins two grouped subqueries (checklist, links) onto the board's cards. The board request stays at 5 queries. | R44.4, Property 25 (now 71). |
+| D22 | **V11.** Overdue items are computed on read in `notifications/service/overdue_service.py` and are never stored. The "today" value is passed in as a parameter, so the query and the pure `days_overdue` are testable with a fixed date. | R40.1 to R40.6. A deliberate exception to R13.4. |
+| D23 | **V11.** Status and label class strings are complete static strings in `lib/status.ts` and `lib/labelColor.ts`. Tailwind must scan `lib/`, so `globals.css` gains `@source "../lib";` (a superset of the folders R15.2 lists). | R39.5, R39.9. Without it the classes are never generated (see D18 and Open issue 45). |
 
 Pure logic (ordering, validation boundaries, recipient computation, pagination, week boundaries, optimistic-move reducers, route-guard decisions, badge formatting) is isolated in side-effect-free functions so it can be tested with property-based tests. See Correctness Properties.
 
@@ -290,6 +302,8 @@ Each helper does one joined query that selects the resource with its Board and t
 
 **V6 change: this helper list is superseded by A4-V6 below.** The signatures above are kept for history. In V6 `require_board_member` and the `*_for_member` helpers no longer exist, because "member" was ambiguous once the guest role was added.
 
+> **V11 change.** The helper list, `ROLE_RANK`, `LEVEL_RANK`, and the endpoint-by-role matrix below are superseded by A15 (four roles, `require_board_manager`, `get_column_for_manager`, new card, checklist, and link helpers, the V11 matrix). The V6 text stays as history. `role_allows` and the check order (404, 403 no membership, 403 role) are unchanged.
+
 #### A4-V6. Role levels, helpers, and the endpoint by role matrix (Requirements 8.11, 8.12, 9.13 to 9.15, 10.10, 11.22, 11.23, 12.10, 12.11, 14.10, 28.14, 37.14)
 
 Role levels (pure, in `permissions.py`, no database access):
@@ -402,6 +416,8 @@ select(BoardMembership.user_id, ...).where(BoardMembership.board_id == board_id,
 
 ### A9. Board detail query plan (Requirements 8.3, 11.16, 29.1, 29.2)
 
+> **V11 change.** The four-query plan below becomes five queries: query 5 is the combined count query of A18 (`checklist_done`, `checklist_total`, `link_count` per Card). The total stays at most 5 and identical for 10 and 500 Cards (Property 71, which extends Property 25). The V5 text stays as history.
+
 `GET /api/boards/<id>` runs exactly four queries regardless of Card count: (1) JWT user lookup, (2) Board joined with the caller's membership, (3) active Columns ordered by `order`, (4) active Cards of the Board ordered by `order`, `created_at`, with the assignee loaded through `joinedload`. Columns and Cards are grouped in Python. The response includes `my_role`. Members and admins see all Cards (Requirement 11.16 adds no extra filter).
 
 ### A10. Card search and My Tasks (`GET /api/cards`, Requirement 11.10 to 11.14)
@@ -475,7 +491,7 @@ Passwords only as salted adaptive hashes; secrets only from environment; all que
 
 #### A12-V6. Security additions (Requirements 28.12 to 28.15, 37)
 
-- **Token entropy and exposure.** Invite_Tokens come from `secrets.token_urlsafe(32)`: 32 random bytes, 43 characters from `A-Z a-z 0-9 _ -`. Tokens are returned only to a Board_Admin (GET invite-links, regenerate) and echoed nowhere else. GET `/api/invites/<token>` returns the board id, name, and the role of the token to any authenticated user who already knows the token, and never returns the other role's token.
+- **Token entropy and exposure.** Invite_Tokens come from `secrets.token_urlsafe(32)`: 32 random bytes, 43 characters from `A-Z a-z 0-9 _ -`. Tokens are returned only to a Board_Admin (GET invite-links, regenerate) and echoed nowhere else. **V11 change:** the same two endpoints also serve a Board_Manager (R28.12, R37.3 to R37.6); a `member`, a `guest`, and a non-participant still get 403. GET `/api/invites/<token>` returns the board id, name, and the role of the token to any authenticated user who already knows the token, and never returns the other role's token.
 - **No token in logs.** `redact_invite_tokens(text)` replaces every match of `/api/invites/[A-Za-z0-9_-]{20,}` and `/invite/[A-Za-z0-9_-]{20,}` with the same prefix plus `<redacted>`. The logging filter applies it to the formatted message of every record (root and `werkzeug` loggers, which print the request line), so a 400, 401, 403, 404, or 500 caused by an invite request leaves no token behind. Services never put a token into an exception message. The platform's own request logs on Vercel are outside the application and cannot be filtered (Open issue 22).
 - **Token lookup and timing.** The format check (`^[A-Za-z0-9_-]{43,128}$`) runs before any query, so malformed tokens cost no database access and give the same 404 as unknown tokens. Lookup is an indexed equality on 256-bit random values, so a timing attack is infeasible and no constant-time comparison is added. No rate limit is designed (Open issue 26).
 - **Open redirect.** The server never redirects from user input. The frontend validates `next` with `safeNext` (B4), so only `/invite/<1 to 128 URL-safe characters>` is accepted (Requirements 19.11, 28.15).
@@ -484,6 +500,8 @@ Passwords only as salted adaptive hashes; secrets only from environment; all que
 - **No new environment variable** and no CORS change. Invite endpoints are ordinary JWT-protected `/api/*` routes.
 
 ### A13. Card status (Requirements 2.16, 11.2, 11.4, 11.17 to 11.24, 14.2, 25.7)
+
+> **V11 change.** `CARD_STATUSES` gains `"URGENT"` (order: `NOT_STARTED`, `IN_PROGRESS`, `URGENT`, `DONE`). `apply_status_change` is unchanged in code: its last branch (`return new_status, old_completed_at`) already covers every move among the three non-completed values, so `URGENT` needs no new branch. See A16 and Property 61.
 
 Constants and pure rule (`cards/service/status.py`, no database import):
 
@@ -951,6 +969,8 @@ Analytics view: `AnalyticsView` fetches `GET /api/boards/<id>/analytics` when op
 
 #### B6-V6. Role gating, guests, and the new-card flow (Requirements 21.12, 21.13, 21.17 to 21.23, 22.18, 22.19, 27.8, 37.15 to 37.17)
 
+> **V11 change.** The `canEdit`, `isAdmin`, `isGuest` helpers and the gating table below are superseded by `can(role, action)` and the V11 gating table in B16. Column controls now need `manage_columns` (admin or manager), so the role `member` loses them (R10.11). The V6 text stays as history.
+
 **Role derivation (`lib/roles.ts`, pure).** `canEdit(role) = role === "admin" || role === "member"`, `isAdmin(role) = role === "admin"`, `isGuest(role) = role === "guest"`, and `ROLE_VARIANT` maps a role to a `BaseBadge` variant. `BoardView` reads `my_role` from the board response and provides `{ role, canEdit, isAdmin }` through `BoardRoleContext`, so `KanbanColumn`, `ColumnHeader`, `CardItem`, `AddColumnForm`, `AddCardForm`, `CardSearchInput`, and `CardDetailModal` read the role from one source instead of receiving a prop per control. The server stays the authority (Requirement 28.14); the gating only removes controls that would get 403.
 
 | Element | admin | member | guest |
@@ -987,6 +1007,8 @@ stateDiagram-v2
 `CardDetailModal` (Client) renders inside `BaseModal`, shows title, description, due date, labels, assignee (a select of board members from `MemberPanel` data or GET members), and composes `CommentList` plus `CommentForm`. It sends PATCH with only changed fields, keeps entered values on error, validates the title (1 to 200) before sending, and uses `ConfirmDialog` for card deletion. `CommentList` loads `GET /api/cards/<id>/comments` on open, shows loading, empty, and error states, and renders `CommentItem`. Edit and delete controls appear only when `comment.author.user_id === user.user_id`, including for the Board_Admin (Requirement 23.14). Comment changes update list state only after a successful response.
 
 #### B7-V6. Status control, guest read-only view, and status badges (Requirements 21.22, 23.17 to 23.22, 25.2, 25.7)
+
+> **V11 change.** The three-value `lib/status.ts` below is superseded by B17 (four values, `STATUS_STYLE` with complete class strings, `Urgent` in red). The V6 text stays as history.
 
 **`lib/status.ts` (pure).**
 
@@ -1318,6 +1340,326 @@ flowchart LR
     K --> H["Header (Client)"]
 ```
 
+## V11 Design: Backend (A15 to A21)
+
+> These sections are new in V11 and sit after Part B so the V5 to V10 numbering stays stable. Backend sections are A15 to A21, frontend sections are B16 to B21 (below). Modules named here are planned; no source file is created by this document.
+
+### A15. Four roles, rank rules, and the endpoint-by-role matrix (Requirements 9, 10, 37, 43)
+
+**`permissions.py` (pure part, no database access).**
+
+```python
+ROLE_RANK  = {"guest": 0, "member": 1, "manager": 2, "admin": 3}          # single source (R43.1)
+LEVEL_RANK = {"reader": 0, "writer": 1, "manager": 2, "admin": 3}
+def role_allows(role, level) -> bool:        # unchanged formula; None -> False
+    return role is not None and ROLE_RANK[role] >= LEVEL_RANK[level]
+
+ASSIGNABLE_ROLES = ("guest", "member", "manager")                         # never "admin" (R43.8)
+def decide_role_change(caller, target, new_role, target_is_owner) -> str:  # "ok" | "forbidden" | "bad_request"
+    if new_role not in ASSIGNABLE_ROLES:               return "bad_request"
+    if not role_allows(caller, "manager"):             return "forbidden"
+    if target_is_owner:                                return "bad_request" if caller == "admin" else "forbidden"
+    if ROLE_RANK[caller] <= ROLE_RANK[target]:         return "forbidden"  # R43.6
+    if ROLE_RANK[new_role] >= ROLE_RANK[caller]:       return "forbidden"  # R43.7
+    return "ok"
+def decide_member_removal(caller, target, target_is_owner) -> str:         # "ok" | "forbidden" | "bad_request"
+    if not role_allows(caller, "manager"):             return "forbidden"
+    if target_is_owner:                                return "bad_request" if caller == "admin" else "forbidden"
+    return "ok" if ROLE_RANK[caller] > ROLE_RANK[target] else "forbidden"  # R9.6, R43.6
+```
+
+The `target_is_owner` check sits before the rank rule on purpose (Open issue 47): an admin who targets himself gets 400 (R9.7, R43.8), a manager who targets the admin gets 403 (R43.6). Setting a role equal to the current role is allowed when the other rules pass and changes nothing (Open issue 59).
+
+**Helpers (replace the V6 list; each still does one joined query and returns the membership).**
+
+| V11 helper | Level | Used by |
+|---|---|---|
+| `require_board_reader(board_id, user_id)` | reader | board detail, members list, card detail, comments list, search with `board_id`, GET `/api/cards/<id>` |
+| `require_board_writer(board_id, user_id)` | writer (`admin`, `manager`, `member`) | unchanged from V6 for card, comment, checklist, link writes |
+| **`require_board_manager(board_id, user_id)`** | manager (`admin`, `manager`) | create column, add member, member role change, member removal, invite-links and regenerate |
+| `require_board_admin(board_id, user_id)` | admin | Board PATCH and DELETE, analytics |
+| `get_column_for_writer` | writer | create card in a Column |
+| **`get_column_for_manager(column_id, user_id)`** | manager | column rename, delete, board column reorder uses `require_board_manager` |
+| `get_card_for_reader` / `get_card_for_writer(card_id, user_id, lock=False)` | reader / writer | `lock=True` runs `SELECT ... FOR UPDATE` on the Card row (cap checks, A17) |
+| **`get_checklist_item_for_writer(item_id, user_id)`**, **`get_card_link_for_writer(link_id, user_id)`** | writer | PATCH and DELETE of items and links; the join goes item to card to board to membership |
+| `assert_assignee_is_writer(board_id, assignee_id)` | writer | unchanged: `admin`, `manager`, and `member` pass because their rank is at least 1; a `guest` gives 400 |
+
+`permissions.py` now also imports `ChecklistItem` and `CardLink` from `cards/schema` (models only, no service import, rule 2 of the module graph).
+
+**Endpoint-by-role matrix (V11; replaces the V6 matrix).** `ok` allowed, `403` forbidden. "Rank rule" means A15 `decide_*`.
+
+| Endpoint group | admin | manager | member | guest | non-participant |
+|---|---|---|---|---|---|
+| GET board, members, card detail, comments, search | ok | ok | ok | ok | 403 |
+| PATCH or DELETE Board; GET analytics | ok | 403 | 403 | 403 | 403 |
+| POST members (by email) | ok | ok | 403 | 403 | 403 |
+| DELETE member; PATCH member role | ok, rank rule | ok, rank rule | 403 | 403 | 403 |
+| GET invite-links; POST regenerate | ok | ok | 403 | 403 | 403 |
+| POST column; PATCH, DELETE column; PATCH reorder | ok | ok | **403** | 403 | 403 |
+| Card create, update, delete, position; status | ok | ok | ok | 403 | 403 |
+| Checklist and link POST, PATCH, DELETE | ok | ok | ok | 403 | 403 |
+| Comment POST | ok | ok | ok | 403 | 403 |
+| Comment PATCH, DELETE | author | author | author | 403 | 403 |
+| GET `/api/notifications/overdue`, GET invite info, accept | any user | any user | any user | any user | any user |
+
+**Role effects elsewhere.** Analytics member activity filters `role in ("admin", "manager", "member")` (R14.10). The accept decision `resolve_accept` is unchanged and already covers `manager`: any existing role other than a guest holding the member token stays (Property 50 gains `manager` in its role set). `GET /api/boards/<id>` returns `my_role` with any of the four values (R43.12).
+
+### A16. Card status with four values (Requirements 2.16, 11.4, 11.19, 39.1 to 39.4, 44.1)
+
+- `CARD_STATUSES = ("NOT_STARTED", "IN_PROGRESS", "URGENT", "DONE")`. `CardUpdateSchema.status` keeps `validate.OneOf(CARD_STATUSES)` (exact, case-sensitive). `CardCreateSchema` still rejects `status` with 400.
+- The check constraint is `ck_cards_status`: `status IN ('NOT_STARTED','IN_PROGRESS','URGENT','DONE')`. It replaces the V6 constraint by a hand-edited migration (V11 migration table below).
+- `apply_status_change` is unchanged (A13 note). Transitions among `NOT_STARTED`, `IN_PROGRESS`, `URGENT` leave `completed_at` untouched; only entering or leaving `DONE` changes it (Property 61).
+- Analytics and overdue treat only `DONE` as completed. Existing rows keep their values; the migration changes no row (R39.4).
+- Labels stay a `text[]` of strings; colors are computed on the client (B17), so there is no schema, API, or migration change for label colors (R39.12).
+
+### A17. Checklist and workspace links inside the `cards` package (Requirements 41, 42, 44.6)
+
+**File split plan (each file at most 300 lines; `cards/__init__.py` keeps `routes`, `service`, and `schema` importable).**
+
+| Package | Modules |
+|---|---|
+| `cards/schema/` | `card_model.py` (Card), `checklist_model.py` (ChecklistItem), `link_model.py` (CardLink), `card_schemas.py`, `checklist_schemas.py`, `link_schemas.py`, `url_rules.py` (pure `validate_link_url`, `default_label`) |
+| `cards/service/` | `card_service.py`, `position_service.py`, `search_service.py`, `status.py`, `checklist_service.py`, `link_service.py`, `counts.py` (A18) |
+| `cards/routes/` | `card_routes.py`, `search_routes.py`, `checklist_routes.py`, `link_routes.py`; the blueprint registers all four |
+
+No ninth Blueprint_Package is added. The `boards` and `columns` services read `ChecklistItem` and `CardLink` from `cards/schema` for the cascades, the same way they read `Card` (decision D4).
+
+**Checklist service (`checklist_service.py`).**
+
+- `add_item(user, card_id, text)`: `get_card_for_writer(card_id, user.user_id, lock=True)`, count non-deleted items, `BadRequest("checklist: limit of 50 items reached")` when the count is already 50, insert with `order = next_last_order(max(order))` (1.0 when none), `is_done = False`. Locking the Card row serializes two concurrent adds so the cap cannot be exceeded (Open issue 54). Returns 201.
+- `update_item(user, item_id, fields)`: `get_checklist_item_for_writer`, update only the supplied fields (`text`, `is_done`, `order`), 200 with the item.
+- `delete_item(user, item_id)`: soft delete, 200 `{ "checklist_item_id": "<id>" }`. A soft-deleted item does not count toward the cap.
+- Progress is never stored. No Notification, no change to `status` or `completed_at` (R41.10).
+
+**Link service (`link_service.py`).** Same pattern: `add_link` (cap 10, row lock, `created_by = user.user_id`, `label = default_label(url)` when omitted), `update_link` (re-validates a supplied `url` and `label`), `delete_link` (soft delete, 200 `{ "card_link_id": "<id>" }`). No Notification and no outbound request to the stored URL (R42.9).
+
+**Pure URL rule (`url_rules.py`).**
+
+```python
+MAX_URL = 2048
+def validate_link_url(raw: str) -> str:                 # returns the trimmed URL or raises ValueError
+    url = raw.strip()
+    if not url or len(url) > MAX_URL: raise ValueError
+    if any(ch.isspace() or ord(ch) < 32 or ord(ch) == 127 for ch in url): raise ValueError
+    parts = urlsplit(url)                                # ValueError from urlsplit is also a rejection
+    if parts.scheme.lower() not in ("http", "https") or not parts.hostname: raise ValueError
+    return url
+def default_label(url: str) -> str:                      # hostname, lower case, cut to 100 characters
+    return urlsplit(url).hostname[:100]
+```
+
+The accepted set is exactly: trimmed, 1 to 2048 characters, no whitespace or control characters, scheme `http` or `https` in any letter case, non-empty hostname. `javascript:`, `data:`, `file:`, `//host/path`, `host/path`, and `http:///x` are rejected (Property 68). `label` must have 1 to 100 characters after trimming (R42.5); the hostname default is cut to 100 characters because a hostname can be longer (Open issue 48).
+
+**Schemas.** `ChecklistCreateSchema` (`text` stripped, 1 to 200, not blank), `ChecklistUpdateSchema` (`text`, `is_done` with `fields.Boolean(truthy={True}, falsy={False})` so only JSON booleans pass, `order` float greater than 0 and finite; `@validates_schema` rejects an empty body), `ChecklistItemSchema`, `CardLinkCreateSchema` (`url` validated by `validate_link_url`, optional `label`), `CardLinkUpdateSchema` (at least one field), `CardLinkSchema`, `CardDetailSchema` (A18). All use `unknown = RAISE`.
+
+**Soft-delete cascades (extends A5).** One `deleted_at` per transaction as before:
+
+| Deleted | Also soft deleted (V11 additions in bold) |
+|---|---|
+| Board | Memberships, Columns, Cards, Comments, **Checklist_Items, Card_Links** of the Board |
+| Column | Cards of the Column, their Comments, **Checklist_Items, and Card_Links** |
+| Card | Comments of the Card, **Checklist_Items, and Card_Links** |
+
+Each bulk `UPDATE` uses the same parent-id subquery pattern as the Comment cascade and `is_deleted = false` in its WHERE. A failure rolls back the whole transaction (R2.13). Later GET requests for the Card return 404, because the Card itself is soft deleted.
+
+### A18. Board payload counts and GET `/api/cards/<id>` (Requirements 41.9, 42.9, 44.4, 44.5, 29.2)
+
+**Combined count query (`cards/service/counts.py`).**
+
+```python
+ck = (select(ChecklistItem.card_id, func.count().label("total"),
+             func.count().filter(ChecklistItem.is_done.is_(True)).label("done"))
+      .where(ChecklistItem.is_deleted.is_(False)).group_by(ChecklistItem.card_id).subquery())
+lk = (select(CardLink.card_id, func.count().label("n"))
+      .where(CardLink.is_deleted.is_(False)).group_by(CardLink.card_id).subquery())
+select(Card.card_id, func.coalesce(ck.c.done, 0), func.coalesce(ck.c.total, 0), func.coalesce(lk.c.n, 0))
+  .outerjoin(ck, ck.c.card_id == Card.card_id).outerjoin(lk, lk.c.card_id == Card.card_id)
+  .where(Card.board_id == board_id, Card.is_deleted.is_(False))
+```
+
+Each subquery is grouped by `card_id`, so the left joins add no rows. `GET /api/boards/<id>` runs: (1) user lookup, (2) Board with membership, (3) Columns, (4) Cards, (5) counts. The counts are merged into each Card in Python by `card_id`. The total is 5 for any number of Cards (Property 71). Folding the counts into query 4 would give 4 and leave headroom; it is not chosen because it mixes ORM entity loading with aggregate subqueries (Open issue 57).
+
+`counts_for_card(card_id)` runs the same query restricted to one Card and is used by the update and position responses; the create response uses `0, 0, 0` without a query. Search and My Tasks Cards carry no counts (Open issue 58).
+
+**GET `/api/cards/<id>` (new, R41.9).** `get_card_for_reader`, then two queries (items ordered by `order`, `created_at`; links ordered by `created_at`). Response: the card fields of A11, `checklist` (`checklist_item_id`, `text`, `is_done`, `order`), `checklist_done`, `checklist_total`, `links` (`card_link_id`, `url`, `label`, `created_by`, `created_at`), and `link_count`. A guest gets 200; a non-participant gets 403; a missing or soft-deleted Card gets 404.
+
+### A19. Overdue notification (Requirements 40, 13.4, 24)
+
+**Placement.** `notifications/routes/overdue_routes.py` registers `GET /api/notifications/overdue` on the notifications blueprint; `notifications/service/` becomes a package with `notification_service.py` (V5 logic) and `overdue_service.py`. The route does not clash with `/api/notifications/<uuid:id>/read`.
+
+**Pure function.**
+
+```python
+def days_overdue(due: date, today_utc: date) -> int:      # >= 1 for an overdue card
+    return (today_utc - due).days
+```
+
+**Query (`overdue_service.list_overdue(user_id, today_utc)`).** `today_utc = datetime.now(timezone.utc).date()` is computed once in the route and passed in.
+
+```python
+base = (select(Card.card_id, Card.title, Card.due_date, Card.status, Column.name, Board.board_id, Board.name)
+  .join(Column, Column.column_id == Card.column_id).join(Board, Board.board_id == Card.board_id)
+  .join(BoardMembership, and_(BoardMembership.board_id == Card.board_id, BoardMembership.user_id == user_id,
+                              BoardMembership.is_deleted.is_(False)))
+  .where(Card.is_deleted.is_(False), Column.is_deleted.is_(False), Board.is_deleted.is_(False),
+         Card.due_date.is_not(None), Card.due_date < today_utc, Card.status != "DONE",
+         or_(and_(Card.assignee_id == user_id, BoardMembership.role.in_(("admin", "manager", "member"))),
+             and_(Card.assignee_id.is_(None),   BoardMembership.role.in_(("admin", "manager"))))))
+items = base.order_by(Card.due_date.asc(), Card.created_at.asc(), Card.card_id.asc()).limit(100)
+total = select(func.count()).select_from(base.subquery())
+```
+
+- A Card due today is not overdue (`<`). `URGENT` is not done (`!= "DONE"`). A guest-only user gets an empty list and `total = 0` through the role filter (R40.3). An unassigned Card goes to the admin and every manager of the Board, never to a member or guest. An assigned Card goes only to its assignee.
+- The response is `{ "data": { "items": [...], "total": N } }` with `card_id`, `title`, `due_date`, `status`, `column_name`, `board_id`, `board_name`, `days_overdue`. At most 100 items, `total` counts all matches (R40.5).
+- No Notification row is written, `GET /api/notifications` and its `unread_count` are untouched, and there is no scheduled job (R40.6). Requests without a valid access token get 401 (R40.9).
+- **Index.** `ix_cards_due_date` on `cards.due_date` (R40.7, R44.3). It is a plain index; the join to memberships bounds the rows, and a partial index on open cards is an optional later tuning (Open issue 64). Performance: 100 consecutive requests over 20 Boards and 2,000 Cards, p95 under 500 ms, same method as Requirement 29 (R40.8).
+
+### A20. Members, role change, and invitations for managers (Requirements 9, 37, 43)
+
+**Module placement (all in the `boards` package).** `boards/service/role_service.py` (new) holds `change_role`; `member_service.py` gets the updated removal rules; `boards/routes/member_routes.py` gets `PATCH /api/boards/<uuid:id>/members/<uuid:user_id>`; `MemberRoleSchema` (`role` required, string) goes into `boards/schema/member_schemas.py`.
+
+**`PATCH /api/boards/<id>/members/<user_id>` (R43.5 to R43.11).** Order: the route validates the body (400 for a missing `role` or a non-string; `admin` and any other value are rejected by `decide_role_change` as `bad_request`, so every invalid value gives 400), then the service runs `require_board_manager` (404 for a missing Board, 403 for no membership or a `member` or `guest`), loads the target membership `FOR UPDATE` (404 when none), calls `decide_role_change(caller_role, target_role, new_role, target_is_owner)` where `target_is_owner = board.created_by == target.user_id`, maps `forbidden` to 403 and `bad_request` to 400, then updates the role, and when the new role is `guest`, sets `assignee_id = NULL` on every non-deleted Card of the Board assigned to that user in the same transaction (R43.10). No Notification is created (R43.11). Response 200: `user_id`, name, email, role. Because body validation runs first, an invalid body gives 400 even for a caller who would get 403 (Open issue 59).
+
+**DELETE member (R9.6, R9.7).** `require_board_manager`, target lookup (404), `decide_member_removal`, then the V5 soft delete plus the assignee clearing of R9.11.
+
+**Add member (R9.1).** `require_board_manager`; the new membership always has the role `member`, so a manager cannot add a higher role.
+
+**Invite links.** `invite_service` and `invite_routes` switch their guard from `require_board_admin` to `require_board_manager`. Regenerate by a manager replaces one token exactly as for the admin. Accept is unchanged.
+
+**Check order summary.** 401 token, 404 Board, 403 level, 400 owner rule (admin only), 403 rank rule, then the write.
+
+### A21. V11 endpoint rows, shapes, and the other amended rows
+
+Rows 34 to 42 extend the A11 table (legend: `Manager` = admin or manager; `Participant` = any role; `Member` = writer level, which now includes `manager`). Amended earlier rows are listed below the table.
+
+| # | Method | Path | Auth / role | Request schema | Success | Error statuses | Requirement |
+|---|---|---|---|---|---|---|---|
+| 34 | GET | `/api/cards/<uuid:id>` | Participant | none | 200 card, `checklist`, `links`, counts | 403, 404 | 41.9, 42.9 |
+| 35 | POST | `/api/cards/<uuid:id>/checklist` | Member | `ChecklistCreateSchema` | 201 item | 400 (incl. 51st item), 403, 404 | 41.2, 41.5, 41.6 |
+| 36 | PATCH | `/api/checklist/<uuid:id>` | Member | `ChecklistUpdateSchema` | 200 item | 400, 403, 404 | 41.3, 41.6 |
+| 37 | DELETE | `/api/checklist/<uuid:id>` | Member | none | 200 `{checklist_item_id}` | 403, 404 | 41.4 |
+| 38 | POST | `/api/cards/<uuid:id>/links` | Member | `CardLinkCreateSchema` | 201 link | 400 (incl. 11th link, bad URL), 403, 404 | 42.2, 42.6, 42.7 |
+| 39 | PATCH | `/api/links/<uuid:id>` | Member | `CardLinkUpdateSchema` | 200 link | 400, 403, 404 | 42.3, 42.6 |
+| 40 | DELETE | `/api/links/<uuid:id>` | Member | none | 200 `{card_link_id}` | 403, 404 | 42.4 |
+| 41 | GET | `/api/notifications/overdue` | JWT | none | 200 `{items, total}` | 401 | 40 |
+| 42 | PATCH | `/api/boards/<uuid:id>/members/<uuid:user_id>` | Manager, rank rule | `MemberRoleSchema` | 200 member | 400, 403, 404 | 43.5 to 43.11 |
+
+Amended rows: rows 11 and 13 (add and remove member) are `Manager` with the rank rule; rows 14 to 17 (columns) are `Manager`; rows 30 and 31 (invite links) are `Manager`; rows 8, 18, 19, 21 return the three counts in the Card JSON (board detail, create, update, position responses); the legend row `Member` of V6 now includes `manager`. The card JSON gains `checklist_done`, `checklist_total`, `link_count` (board detail and the three Card writes only, R44.5). POST and DELETE status codes follow R4.3: rows 35 and 38 return 201, rows 37 and 40 return 200 with an object.
+
+## V11 Design: Frontend (B16 to B21)
+
+### B16. Roles, `can(role, action)`, and the member panel (Requirements 21.12, 21.13, 37.17, 43.13 to 43.15)
+
+**`lib/roles.ts` (pure).**
+
+```ts
+export type Role = "admin" | "manager" | "member" | "guest";
+export const ROLE_RANK: Record<Role, number> = { guest: 0, member: 1, manager: 2, admin: 3 };
+export type Action = "view_board" | "edit_cards" | "manage_columns" | "manage_members" | "view_invite_links"
+  | "change_roles" | "grant_manager" | "edit_board" | "delete_board" | "view_analytics";
+const MIN_RANK: Record<Action, number> = { view_board: 0, edit_cards: 1, manage_columns: 2, manage_members: 2,
+  view_invite_links: 2, change_roles: 2, grant_manager: 3, edit_board: 3, delete_board: 3, view_analytics: 3 };
+export function can(role: Role | null, action: Action): boolean { return role !== null && ROLE_RANK[role] >= MIN_RANK[action]; }
+export function assignableRoles(role: Role | null): Role[] {           // admin: guest, member, manager; manager: guest, member; others: none
+  return role === "admin" ? ["guest", "member", "manager"] : role === "manager" ? ["guest", "member"] : []; }
+export function canActOnMember(role: Role | null, targetRole: Role): boolean {   // dropdown and remove control
+  return role !== null && can(role, "change_roles") && ROLE_RANK[role] > ROLE_RANK[targetRole]; }
+export const ROLE_VARIANT: Record<Role, "yellow" | "blue" | "green" | "gray"> =
+  { admin: "yellow", manager: "blue", member: "green", guest: "gray" };
+```
+
+(The four variants are pairwise distinct, R43.15.) `can` mirrors the requirement-43 permission rule and is used only to show, hide, or disable controls; the server decides (R43.13, R28.14). It replaces `canEdit`, `isAdmin`, and `isGuest` (B6-V6 note). `BoardRoleContext` now provides `{ role, can }`.
+
+**Gating (V11; replaces the V6 table).**
+
+| Element | Needs | admin | manager | member | guest |
+|---|---|---|---|---|---|
+| Add column, rename, delete, reorder | `manage_columns` | shown | shown | hidden | hidden |
+| Add card, drag, status, assignee, checklist, links, comments form | `edit_cards` | shown | shown | shown | hidden or read-only |
+| Member panel (list, add by email, remove, role dropdown) | `manage_members` | shown | shown | hidden | hidden |
+| Invite links panel | `view_invite_links` | shown | shown | hidden | hidden |
+| Analytics link | `view_analytics` | shown | hidden | hidden | hidden |
+| Rename and delete Board controls (if present) | `edit_board` | shown | hidden | hidden | hidden |
+
+`useDragAndDrop({ enabled: can(role, "edit_cards") })`. The role dropdown in `MemberList` lists `assignableRoles(myRole)` and is rendered only when `canActOnMember(myRole, row.role)`; the remove control follows the same condition. Changing a role sends PATCH `/api/boards/<id>/members/<user_id>`, updates the row only after 200 (revert on error with `useErrorHandler`), and, when the new role is `guest`, the board state clears the user's assignments locally. `BaseBadge` shows each role with its distinct variant (R43.15). The member panel adds `RoleSelect.tsx` (one component).
+
+### B17. Status and label color maps (Requirements 39.5 to 39.11, 23.17, 21.22, 25.2)
+
+**`lib/status.ts` (pure; supersedes the V6 version).**
+
+```ts
+export const CARD_STATUSES = ["NOT_STARTED", "IN_PROGRESS", "URGENT", "DONE"] as const;
+export type CardStatus = (typeof CARD_STATUSES)[number];
+export const STATUS_STYLE: Record<CardStatus, { label: string; variant: "gray" | "blue" | "red" | "green"; className: string }> = {
+  NOT_STARTED: { label: "Not started", variant: "gray",  className: "bg-sunken text-ink-muted" },
+  IN_PROGRESS: { label: "In progress", variant: "blue",  className: "bg-primary-100 text-primary-700" },
+  URGENT:      { label: "Urgent",      variant: "red",   className: "bg-danger-soft text-danger-ink" },
+  DONE:        { label: "Done",        variant: "green", className: "bg-success-soft text-success-ink" },
+};
+export const STATUS_LABEL = (s: CardStatus) => STATUS_STYLE[s].label;
+```
+
+Every class string is written out in full, never built from a template. The exact token names (`bg-success-soft`, `text-success-ink`, and so on) are checked against `globals.css` and `guidelines/design-system.md` at implementation time; where a pair is missing, the design system gets it first (R39.10). `StatusBadge` renders `BaseBadge` with `STATUS_STYLE[status].variant` (keeps R18.4), and a test asserts that `className` and the `BaseBadge` variant classes agree. `className` is also used by non-badge elements (the status select dot, the Card face chip in the compact meta row). `StatusSelect` offers the four options in the order of `CARD_STATUSES`. The board Card, `CardDetailModal`, and My Tasks row all render `StatusBadge`, so the three places agree (R39.6, Property 62).
+
+**`lib/labelColor.ts` (pure).**
+
+```ts
+export const LABEL_KEYS = ["gray", "blue", "green", "yellow", "orange", "red", "purple", "pink"] as const;
+export type LabelKey = (typeof LABEL_KEYS)[number];
+export function normalizeLabel(text: string): string { return text.trim().normalize("NFC").toLowerCase(); }
+export function labelColor(text: string): LabelKey {                       // FNV-1a 32 bit, no Math.random, no Date
+  let h = 0x811c9dc5; for (const ch of normalizeLabel(text)) { h ^= ch.codePointAt(0)!; h = Math.imul(h, 0x01000193) >>> 0; }
+  return LABEL_KEYS[h % LABEL_KEYS.length]; }
+export const LABEL_CLASS: Record<LabelKey, string> = {
+  gray: "bg-label-gray-bg text-label-gray-fg", blue: "bg-label-blue-bg text-label-blue-fg", /* ...one full string per key... */ };
+```
+
+The result depends only on the normalized text, so it is the same on every Board and device and the same for texts that differ only in case or surrounding whitespace (R39.8). Each `LABEL_CLASS` value is a complete static string of two token classes whose contrast is at least 4.5:1 (documented pairs of the design system). The eight pair names above follow the `label-*-bg|fg` tokens already in `globals.css` (B13); keys that the design system lacks are added there first (Open issue 46). `globals.css` gains `@source "../lib";` so the Tailwind scanner sees `lib/status.ts` and `lib/labelColor.ts` (D23, Open issue 45). Label chips on the Card face and in the modal render `<span className={`${CHIP_BASE} ${LABEL_CLASS[labelColor(text)]}`}>` where `CHIP_BASE` is a static string.
+
+### B18. Card face, checklist and links sections, `CardDetailModal` (Requirements 41.12 to 41.17, 42.11 to 42.16, 23, 40.14)
+
+**Card face (`CardItem.tsx`, meta row, in this order).** Labels with `labelColor`; `StatusBadge`; overdue chip; link-count chip; and below the row the checklist progress. The row is `flex flex-wrap gap-1`.
+
+- **Overdue chip:** shown iff `isOverdue(card.due_date, card.status, todayUtc())` with the classes `bg-danger-soft text-danger-ink`, text "Overdue", no request (R40.14). `lib/overdue.ts` (pure): `todayUtc(now = new Date()) = now.toISOString().slice(0, 10)`, `isOverdue(due, status, today) = due !== null && due < today && status !== "DONE"` (string comparison of ISO dates is exact), `formatOverdue(n) = n === 1 ? "1 day overdue" : `${n} days overdue``.
+- **Link chip:** icon plus `link_count`, rendered iff `link_count > 0` (R42.15).
+- **Checklist progress:** rendered iff `checklist_total > 0`: text `${done}/${total}` and a bar: track `h-1 rounded-full bg-sunken`, fill `h-1 rounded-full bg-primary-500` with `style={{ width: `${pct}%` }}` where `pct = Math.round(done / total * 100)` (a computed width cannot be a static class; the colors are static strings). `lib/progress.ts` holds `progressPercent(done, total)` (0 for total 0).
+- A guest sees the same face, read-only.
+
+**`CardDetailModal` composition (V11).** The shell and `CardDetailForm` stay as in B7-V6. New children, one component per file: `ChecklistSection.tsx` (with `ChecklistItemRow.tsx`, `AddChecklistForm.tsx`) and `LinksSection.tsx` (with `LinkRow.tsx`, `LinkForm.tsx`). On open the modal sends `GET /api/cards/<id>` (A18), which supplies the items and links; the status select shows the four options.
+
+- **Checklist:** checkbox, text (inline edit on Enter or blur), delete control; add form with the field-level error for empty, whitespace-only, or over 200 characters (no request); at 50 items the add form is disabled and shows "Limit of 50 items reached". Toggle: `hooks/useChecklist.ts` applies `is_done` to local state at once (within 100 ms), sends PATCH `/api/checklist/<id>`, and on failure restores the value and calls `handleError` once (R41.14). Add, edit, delete failures leave the list unchanged, keep the entered text, and call `handleError` (R41.15). After every successful change the modal calls `onCountsChanged(cardId, { checklist_done, checklist_total, link_count })` so the Card face updates without a reload (R41.17).
+- **Links:** list of label, hostname, provider icon, and an open anchor `<a href={url} target="_blank" rel="noopener noreferrer">` (label rendered as text, never `dangerouslySetInnerHTML`); add form (URL, optional label) and edit and delete controls for writers. `validateLinkUrl` in `lib/validation.ts` mirrors `validate_link_url` (trim, at most 2048, no whitespace, `http` or `https`, hostname) and blocks the request with a field error (R42.13). `lib/linkProvider.ts`: `providerKey(hostname)` returns `"gdrive" | "onedrive" | "dropbox" | "notion" | "generic"` by exact host or subdomain suffix (`drive.google.com`, `docs.google.com`, `onedrive.live.com`, `1drv.ms`, `dropbox.com`, `notion.so`, `notion.site`); the icon is a generic lucide icon per key (no brand marks, because lucide has none, see B15). Failures keep the list and the entered values and call `handleError` (R42.16). The hostname is shown next to every label so a misleading label is visible (Open issue 55).
+- **Guest:** both sections render read-only (no add form, no edit, no delete, checkboxes disabled), R41.12, R42.11.
+
+### B19. Overdue UI (Requirements 40.10 to 40.15, 24)
+
+- `hooks/useOverdue.ts` returns `{ items, total, refresh }`. It calls `refresh()` once on mount when the AuthContext status is `authenticated` and again each time the notification list opens. There is no timer. A failed request keeps the previous items and shows no toast (R40.15). The call is made through `apiRequest` with the access token.
+- `NotificationBell` still shows `formatBadge(unreadCount)` from the stored notifications only; overdue items never change the count (R40.12). `NotificationList` renders an "Overdue" group above the stored items: each row has a red `BaseBadge` "Overdue", the text from `formatOverdue(days_overdue)`, the card title, and the board name; selecting a row navigates to `/boards/<board_id>` and closes the list (R40.11). The empty-state message appears only when both the stored list and the overdue list are empty (R40.13).
+- "Page load" means the first mount of the Header in a browser session or a full reload; client-side navigation does not remount the Header, so the list refreshes when it is opened (Open issue 50). The Card-face chip uses the client's UTC date; the list uses the server's UTC date, so they can differ for a few seconds around midnight UTC (Open issue 51).
+
+### B20. Types (`lib/types.ts` additions) and welcome copy
+
+```ts
+export type Role = "admin" | "manager" | "member" | "guest";                          // V11: manager added
+export type CardStatus = "NOT_STARTED" | "IN_PROGRESS" | "URGENT" | "DONE";           // V11: URGENT added
+export interface BoardCard extends Card { checklist_done: number; checklist_total: number; link_count: number }
+export interface ChecklistItem { checklist_item_id: string; card_id: string; text: string; is_done: boolean; order: number }
+export interface CardLink { card_link_id: string; card_id: string; url: string; label: string; created_by: string; created_at: string }
+export interface CardDetail extends BoardCard { checklist: ChecklistItem[]; links: CardLink[] }
+export interface OverdueItem { card_id: string; title: string; due_date: string; status: CardStatus; column_name: string;
+  board_id: string; board_name: string; days_overdue: number }
+export interface OverdueResult { items: OverdueItem[]; total: number }
+export interface MemberRoleUpdate { role: "guest" | "member" | "manager" }
+```
+
+`Column.cards` becomes `BoardCard[]`; search and My Tasks results stay `Card` (no counts). `Member.role` uses the four-value `Role`.
+
+**Welcome page copy (R38.17 to R38.19).** The feature card text in B13 "Add labels, due dates, and a status (Not started, In progress, or Done) to every card." becomes "Add labels, due dates, and a status (Not started, In progress, Urgent, or Done) to every card." (`WELCOME_COPY` and `FEATURES`). The preview sample statuses may include one "Urgent" chip. `FORBIDDEN_CLAIMS` in `lib/forbiddenClaims.ts` must not contain "checklist" (it is now a real feature) and keeps "subtask" and every other entry. Property 60 is unchanged otherwise.
+
+### B21. Files added or changed in the V11 frontend (B1 tree note)
+
+New: `lib/labelColor.ts`, `lib/overdue.ts`, `lib/progress.ts`, `lib/linkProvider.ts`, `hooks/useChecklist.ts`, `hooks/useOverdue.ts`, `components/cards/ChecklistSection.tsx`, `ChecklistItemRow.tsx`, `AddChecklistForm.tsx`, `LinksSection.tsx`, `LinkRow.tsx`, `LinkForm.tsx`, `components/boards/RoleSelect.tsx`, `components/notifications/OverdueItemRow.tsx`. Changed: `lib/roles.ts`, `lib/status.ts`, `lib/types.ts`, `lib/validation.ts` (`validateLinkUrl`, `validateChecklistText`), `components/boards/BoardView.tsx`, `KanbanColumn.tsx`, `ColumnHeader.tsx`, `AddColumnForm.tsx`, `MemberPanel.tsx`, `MemberList.tsx`, `InviteLinksPanel.tsx` (gating by `can`), `components/cards/CardItem.tsx`, `CardDetailModal.tsx`, `StatusSelect.tsx`, `components/shared/StatusBadge.tsx`, `NotificationBell.tsx`, `NotificationList.tsx`, `app/globals.css` (`@source "../lib";`). `CardItem.tsx` and `BoardView.tsx` are already near 300 lines, so the meta row moves to `CardMetaRow.tsx` (one component) and any search-result list stays in `SearchResultList.tsx` (V8 plan). No page, route, or `proxy.ts` change.
+
 ## Data Models
 
 ### Conventions
@@ -1379,6 +1721,8 @@ class Card(SoftDeleteMixin, db.Model):
 Indexes required by Requirement 29.3 are present: membership `user_id` and `board_id`, column `board_id`, card `column_id` and assignee, comment `card_id`, notification recipient, and the `order` columns inside composite indexes. All composite and filter indexes also include rows where `is_deleted = true`, which is acceptable at the expected data volume.
 
 ### ER diagram
+
+> **V11 change.** The diagram and the statement "7 tables" below describe V6 to V10. V11 has 9 tables; the V11 ER diagram is in "V11 data models and migration" after the Marshmallow schema list.
 
 ```mermaid
 erDiagram
@@ -1478,6 +1822,98 @@ WHERE col.column_id = c.column_id AND lower(col.name) = 'done'
 | analytics | `AnalyticsSchema` |
 
 Name fields strip whitespace and reject blank values. All input schemas set `unknown = RAISE`.
+
+### V11 data models and migration (Requirements 2.2, 2.15, 2.16, 3.5, 3.11, 39, 41, 42, 44)
+
+**Changed constraints (V11 text supersedes the V6 text of the Card model and of `board_memberships`; the earlier text stays).**
+
+- `cards.status`: `ck_cards_status` is now `status IN ('NOT_STARTED', 'IN_PROGRESS', 'URGENT', 'DONE')`. New index `ix_cards_due_date` on `due_date`.
+- `board_memberships.role`: `ck_board_memberships_role` is now `role IN ('admin', 'manager', 'member', 'guest')`. The partial unique index `uq_board_memberships_board_user_active` is unchanged.
+
+**New models (both in `cards/schema/`, both with `SoftDeleteMixin`).**
+
+```python
+class ChecklistItem(SoftDeleteMixin, db.Model):
+    __tablename__ = "checklist_items"
+    checklist_item_id = db.Column(db.Uuid, primary_key=True, default=uuid.uuid4)
+    card_id = db.Column(db.Uuid, db.ForeignKey("cards.card_id", name="fk_checklist_items_cards"), nullable=False)
+    text    = db.Column(db.String(200), nullable=False)
+    is_done = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
+    order   = db.Column(db.Float, nullable=False)
+    __table_args__ = (
+        db.CheckConstraint("char_length(text) BETWEEN 1 AND 200", name="ck_checklist_items_text_len"),
+        db.CheckConstraint('"order" > 0', name="ck_checklist_items_order_positive"),
+        db.Index("ix_checklist_items_card_id_order", "card_id", "order"),     # also serves the card_id filter (R44.3)
+    )
+
+class CardLink(SoftDeleteMixin, db.Model):
+    __tablename__ = "card_links"
+    card_link_id = db.Column(db.Uuid, primary_key=True, default=uuid.uuid4)
+    card_id    = db.Column(db.Uuid, db.ForeignKey("cards.card_id", name="fk_card_links_cards"), nullable=False)
+    created_by = db.Column(db.Uuid, db.ForeignKey("users.user_id", name="fk_card_links_users"), nullable=False)
+    url   = db.Column(db.String(2048), nullable=False)
+    label = db.Column(db.String(100), nullable=False)
+    __table_args__ = (
+        db.CheckConstraint("char_length(url) BETWEEN 1 AND 2048", name="ck_card_links_url_len"),
+        db.CheckConstraint("char_length(label) BETWEEN 1 AND 100", name="ck_card_links_label_len"),
+        db.Index("ix_card_links_card_id", "card_id"),
+    )
+```
+
+Both foreign keys have no `ON DELETE CASCADE`; the cascade is the service-level soft delete of A17. The scheme rule for `url` is enforced by `validate_link_url`, not by a database constraint. The SQL column `order` is quoted automatically, as for Cards and Columns.
+
+**V11 ER diagram (9 tables; the V6 diagram above is superseded).**
+
+```mermaid
+erDiagram
+    users ||--o{ board_memberships : "fk_board_memberships_users"
+    boards ||--o{ board_memberships : "fk_board_memberships_boards"
+    users ||--o{ boards : "fk_boards_users"
+    boards ||--o{ columns : "fk_columns_boards"
+    boards ||--o{ cards : "fk_cards_boards"
+    columns ||--o{ cards : "fk_cards_columns"
+    users ||--o{ cards : "fk_cards_users (assignee_id)"
+    cards ||--o{ comments : "fk_comments_cards"
+    users ||--o{ comments : "fk_comments_users"
+    users ||--o{ notifications : "fk_notifications_users"
+    cards ||--o{ notifications : "fk_notifications_cards"
+    boards ||--o{ notifications : "fk_notifications_boards"
+    cards ||--o{ checklist_items : "fk_checklist_items_cards"
+    cards ||--o{ card_links : "fk_card_links_cards"
+    users ||--o{ card_links : "fk_card_links_users (created_by)"
+    board_memberships { uuid board_membership_id PK
+        string role "admin, manager, member, guest" }
+    cards { uuid card_id PK
+        string status "NOT_STARTED, IN_PROGRESS, URGENT, DONE"
+        date due_date "indexed (V11)" }
+    checklist_items { uuid checklist_item_id PK
+        uuid card_id FK
+        string text
+        boolean is_done
+        float order }
+    card_links { uuid card_link_id PK
+        uuid card_id FK
+        uuid created_by FK
+        string url
+        string label }
+```
+
+Columns not shown are unchanged from the V6 diagram; every table also carries the four soft-delete columns.
+
+**V11 migration table (design only; the user runs `flask db migrate` and `flask db upgrade` from `app/` on the development and test databases; no script is committed).** One Migration_Step (R44.1, R3.11):
+
+| Change | Autogenerate detects it? | What the user does |
+|---|---|---|
+| Replace `ck_cards_status` (adds `URGENT`) | No (check constraints on existing tables are not compared) | Hand-edit: `op.drop_constraint("ck_cards_status", "cards")` then `op.create_check_constraint("ck_cards_status", "cards", "status IN ('NOT_STARTED','IN_PROGRESS','URGENT','DONE')")`; reverse in `downgrade()` (a downgrade fails if an `URGENT` row exists, so the user first sets those rows to another value) |
+| Replace `ck_board_memberships_role` (adds `manager`) | No | Hand-edit the same way with `'admin','manager','member','guest'` |
+| Index `ix_cards_due_date` | Yes | Review only |
+| Tables `checklist_items`, `card_links` with their indexes, FKs, and check constraints | Yes (check constraints defined in the new tables are created with them) | Review that the named FKs and the indexes appear |
+
+No existing row changes. A backend test lists the tables through `information_schema` and expects exactly the 9 names, and another test inserts `status = 'URGENT'` and `role = 'manager'` (both must succeed) and `status = 'urgent'` and `role = 'owner'` (both must fail) (Testing Strategy V11). Until the step is run, every V11 task that uses the new values, the index, or the tables is blocked (R3.11). Production is not deployed, so its first `flask db upgrade` applies the full history (D1).
+
+**Marshmallow additions.** cards: `ChecklistCreateSchema`, `ChecklistUpdateSchema`, `ChecklistItemSchema`, `CardLinkCreateSchema`, `CardLinkUpdateSchema`, `CardLinkSchema`, `CardDetailSchema`; `CardSchema` gains the three count fields for board detail, create, update, and position (R44.5); `CardCreateSchema` and `CardUpdateSchema` use the four-value `CARD_STATUSES`. boards: `MemberRoleSchema`. notifications: `OverdueItemSchema`, `OverdueResultSchema`. The glossary term `Role_Rank` maps to `ROLE_RANK` in `permissions.py`.
+
+**Statements that say 7 tables or three roles are superseded (V11 change).** Module-graph rule 5 ("all 7 tables"), the test-database safety check ("the expected 7 tables"), the V6 schema test ("the 7 tables listed from `information_schema`"), the V6 ER diagram, and the A14 row "7 tables" now mean 9 tables. The matrix in A4-V6, the `Role` type of B10 (`admin | member | guest`), the Property 55 role set, and the A8 member-activity filter (`admin`, `member`) now include `manager`.
 
 ## Correctness Properties
 
@@ -1652,6 +2088,8 @@ Name fields strip whitespace and reject blank values. All input schemas set `unk
 
 **Validates: Requirements 29.2**
 
+*V11 change:* the board plan has 5 queries (A9 note), and the Cards carry checklist and link counts. The extended property is Property 71. The bound "at most 5" is unchanged.
+
 ### Property 26: API client behavior
 
 *For any* path and payload, `apiRequest` returns the `data` field of a 2xx envelope; sends `Authorization: Bearer <access token>` iff an access token is available; and *for any* non-2xx status with an `error` string it throws `ApiError(statusCode, error)`, while *for any* non-2xx response with a body that is not an envelope it throws `ApiError(statusCode, "Unexpected server response")`.
@@ -1790,6 +2228,8 @@ Name fields strip whitespace and reject blank values. All input schemas set `unk
 
 **Validates: Requirements 8.11, 8.12, 9.13, 9.14, 10.10, 11.23, 12.10, 12.11, 14.10, 28.14, 37.14**
 
+*V11 change:* the roles are now {admin, manager, member, guest, none} and the matrix is the V11 matrix of A15 (Property 73). The guest rows are unchanged.
+
 ### Property 48: Assignee must be admin or member, guests are never notified
 
 *For any* Board whose memberships have arbitrary roles and any user as assignee in a Card create or update, the request is accepted iff the user has an active membership with role `admin` or `member`, a rejected request returns 400 and leaves the Card unchanged, and no Notification row exists for any user whose only active membership on the Board has the role `guest`; accepting an invitation creates no Notification.
@@ -1870,6 +2310,115 @@ Name fields strip whitespace and reject blank values. All input schemas set `unk
 
 **Validates: Requirements 38.18, 38.19**
 
+### V11 Correctness Properties (61 to 75)
+
+**Prework summary (V11).** Criteria that vary with input and test our own logic became properties: the four-value status machine (R11.19, R39.1 to R39.3), the status and label maps (R39.5 to R39.11), the overdue selection and its formatting (R40.2 to R40.5, R40.11, R40.14), the checklist and link rules (R41.2 to R41.6, R41.10, R41.16, R42.5 to R42.7), cascades (R2.9 to R2.11), the combined counts and query budget (R44.4, R44.5), the rank rules and the permission table (R43.3 to R43.10, R43.13, R43.14). Reflection: "completed only when DONE" (R39.3) is merged into Property 61 and Property 46; "analytics unchanged by URGENT" is part of 61; the checklist cap and the link cap share one shape but different code, so they stay separate properties (66, 68). Classified as example, integration, or smoke tests instead: R39.4 (migration leaves rows unchanged), R40.7 and R44.3 (indexes exist), R40.8 (performance), R40.10 (fetch on load and on open, never on a timer), R44.1 and R44.2 (manual migration, 9 tables), R41.1 and R42.1 (model definitions), R43.4 (no endpoint), R44.6 (file size and package count), R36.15 (README).
+
+#### Amendments to earlier properties (V11 change notes)
+
+| Property | V11 change |
+|---|---|
+| 13, 47 | The role set is {admin, manager, member, guest, none}; the matrix is the one of A15. The `member` row loses the Column endpoints (R10.11), the manager row gains Column, member, and invite-link endpoints |
+| 17 | Updatable Card fields stay as in V6; `status` may be `URGENT` |
+| 18, 48 | The assignee is accepted iff the active role is `admin`, `manager`, or `member` |
+| 24, 46 | Member activity lists roles `admin`, `manager`, `member`; `URGENT` Cards are not completed |
+| 25 | Superseded by Property 71 (5 queries, counts) |
+| 44, 45 | The status set has four values; `URGENT` is exercised in generators; behavior of the rule is Property 61 |
+| 50 | The existing-role set is {none, guest, member, manager, admin}; a manager who accepts any token keeps `manager` |
+| 55 | Guest UI is unchanged; a `member` view additionally hides the column controls, the member panel, and the invite links (Property 74) |
+| 56 | The status set has four values; labels "Not started", "In progress", "Urgent", "Done" pairwise distinct (Property 62) |
+| 60 | The forbidden list has no "checklist"; the copy mentions Urgent |
+
+### Property 61: Four-value status state machine
+
+*For any* initial status in {NOT_STARTED, IN_PROGRESS, URGENT, DONE}, any sequence of PATCH operations that supply or omit `status` (values from the four, and invalid values), and any increasing timestamps, `apply_status_change` sets `completed_at` to the current time exactly when the status changes to `DONE` from another value, sets it to null exactly when the status changes from `DONE` to another value, and leaves it unchanged for every change among `NOT_STARTED`, `IN_PROGRESS`, and `URGENT`, for `DONE` to `DONE`, and for an omitted status; after every step `completed_at` is not null iff the status is `DONE`; an invalid value (any string outside the four, any case variant, null) returns 400 and changes nothing; and `completed_this_week` never counts a Card whose status is not `DONE`.
+
+**Validates: Requirements 11.4, 11.19, 14.2, 39.1, 39.2, 39.3**
+
+### Property 62: Status style map
+
+*For any* `CardStatus`, `STATUS_STYLE` returns a non-empty label and a non-empty complete class string, the four labels are exactly "Not started", "In progress", "Urgent", "Done", the four class strings and the four variants are pairwise distinct, the `URGENT` entry uses the danger tokens and the `DONE` entry the success tokens, and *for any* Card the board face, the CardDetailModal, and the My Tasks row render the badge from the same entry.
+
+**Validates: Requirements 21.22, 23.17, 25.2, 39.5, 39.6**
+
+### Property 63: Label color
+
+*For any* string `t`, `labelColor(t)` is one of the eight palette keys; `labelColor(t)` equals `labelColor` of the same string on every call; `labelColor(t)` equals `labelColor(" " + t.toUpperCase() + "\t")` whenever the trimmed and lowercased forms are equal; and *for every* palette key `LABEL_CLASS[key]` is a non-empty string made only of design-system token classes with no template placeholder.
+
+**Validates: Requirements 39.7, 39.8, 39.9, 39.11**
+
+### Property 64: Overdue selection equals a naive model
+
+*For any* set of Boards, memberships (any role, with soft-deleted rows), Columns, and Cards (any due date, any status, any assignee, soft-deleted rows), any current user, and any UTC date `today`, the overdue response contains exactly the Cards that are non-deleted, on a non-deleted Board and Column, with `due_date < today` and `status != DONE`, and that either are assigned to the user who holds the role `admin`, `manager`, or `member`, or are unassigned on a Board where the user is `admin` or `manager`; `days_overdue = (today - due_date).days >= 1`; the items are ordered by due date ascending and capped at 100; `total` equals the number of all matching Cards; a user who holds only `guest` roles gets an empty list and `total = 0`; and the stored Notifications and the unread count are the same before and after the call.
+
+**Validates: Requirements 40.2, 40.3, 40.4, 40.5, 40.6**
+
+### Property 65: Overdue chip and text
+
+*For any* due date string (or null), status, and `today`, `isOverdue(due, status, today)` is true iff `due` is not null, `due < today`, and `status != DONE`; `formatOverdue(n)` is "1 day overdue" for `n = 1` and `n + " days overdue"` otherwise; and *for any* notification state, the unread count shown by the bell equals the count of stored unread notifications whatever the number of overdue items.
+
+**Validates: Requirements 40.11, 40.12, 40.14**
+
+### Property 66: Checklist rules
+
+*For any* Card and any sequence of add, toggle, edit, and delete operations by a writer, the 51st non-deleted item is rejected with 400 and creates nothing, a soft-deleted item does not count toward the cap, each new item gets an `order` greater than every non-deleted sibling (1.0 for the first), invalid text (empty, whitespace only, over 200 characters) is rejected with 400 and leaves the item unchanged, `checklist_total` equals the number of non-deleted items and `checklist_done` the number with `is_done` true (computed, never stored), and no operation changes the Card's `status`, `completed_at`, or creates a Notification; and *for any* `done` and `total` with `total > 0`, `progressPercent` is `round(done / total * 100)` and the progress text is `done/total`, while `total = 0` shows no indicator.
+
+**Validates: Requirements 41.2, 41.3, 41.5, 41.6, 41.10, 41.16**
+
+### Property 67: Optimistic checklist toggle
+
+*For any* checklist state, item, and request outcome, the toggled `is_done` value is visible in local state before the request resolves; a failed request restores the previous value and shows one error toast; a successful request keeps the value and updates the Card-face counts without a reload.
+
+**Validates: Requirements 41.14, 41.17**
+
+### Property 68: Link URL validation and cap
+
+*For any* string `s`, `validate_link_url(s)` accepts it iff after trimming it has 1 to 2048 characters, contains no whitespace or control character, has the scheme `http` or `https` in any letter case, and has a non-empty hostname; the client mirror `validateLinkUrl` returns the same decision; `javascript:`, `data:`, `file:`, scheme-less, and `//host` values are rejected with 400; *for any* Card, the 11th non-deleted link is rejected with 400, a soft-deleted link does not count, an omitted label becomes the hostname cut to 100 characters, and a supplied label outside 1 to 100 characters after trimming is rejected.
+
+**Validates: Requirements 42.2, 42.5, 42.6, 42.7, 42.13**
+
+### Property 69: Provider icon key
+
+*For any* hostname, `providerKey` returns one of `gdrive`, `onedrive`, `dropbox`, `notion`, `generic`; a listed host or any subdomain of it returns its key in any letter case; every other hostname returns `generic`; and *for any* link list, every rendered anchor has `target="_blank"`, a `rel` containing `noopener` and `noreferrer`, and the stored URL as `href`.
+
+**Validates: Requirements 42.12, 42.14**
+
+### Property 70: Soft-delete cascade covers checklist and links
+
+*For any* Board, Column, or Card tree whose Cards have Checklist_Items and Card_Links (some already soft deleted), deleting the Board, Column, or Card sets `is_deleted = true` and the same `deleted_at` on every non-deleted item and link below it, leaves rows that were deleted earlier and unrelated rows unchanged, and a failure part-way leaves every row unchanged; later GET requests for a deleted Card return 404.
+
+**Validates: Requirements 2.9, 2.10, 2.11, 2.13**
+
+### Property 71: Board payload counts and constant query count
+
+*For any* Board with any number of Cards from 0 to 500, any numbers of checklist items (done and not done) and links per Card, and any soft-deleted items and links, `GET /api/boards/<id>` executes the same number of SQL statements, at most 5, and every Card has `checklist_done`, `checklist_total`, and `link_count` equal to a naive in-memory count over non-deleted rows (0 when none); the create, update, and position responses carry the same three values for their Card.
+
+**Validates: Requirements 29.2, 44.4, 44.5, 41.10, 42.15**
+
+### Property 72: Role-change and removal decisions
+
+*For any* caller role, target role, new role (including `admin` and invalid values), and owner flag, `decide_role_change` returns `ok` iff the caller is `admin` or `manager`, the new role is in {guest, member, manager}, the target is not the owner, the rank of the caller is above the rank of the target, and the rank of the caller is above the rank of the new role; it returns `bad_request` for a new role outside {guest, member, manager} and for an admin who targets the owner; and `forbidden` otherwise (so a manager cannot change or remove a manager or the admin, and only the admin can grant `manager`); `decide_member_removal` returns `ok` iff the caller is `admin` or `manager`, the target is not the owner, and the caller rank is above the target rank; and *for any* successful change to `guest`, every non-deleted Card of the Board assigned to that user has an empty assignee afterward, no Notification is created, and the user keeps exactly one active membership.
+
+**Validates: Requirements 9.6, 9.7, 43.5, 43.6, 43.7, 43.8, 43.10, 43.11**
+
+### Property 73: V11 permission matrix
+
+*For any* role in {admin, manager, member, guest, none} and any endpoint of the V11 matrix in A15, the outcome equals the matrix cell: a `member` receives 403 on the four Column endpoints and succeeds on Card, checklist, link, and comment writes; a `manager` succeeds on Column, member-add, role-change (within the rank rule), member-removal, invite-links, and regenerate endpoints and receives 403 on Board update and delete and on analytics; the admin succeeds on every endpoint; a `guest` receives 403 on every write and succeeds on reads including GET `/api/cards/<id>`; a non-participant receives 403 on checklist, link, and card-detail endpoints; every 403 leaves the data unchanged; and `role_allows(role, level)` is true iff `ROLE_RANK[role] >= LEVEL_RANK[level]`.
+
+**Validates: Requirements 9.9, 10.7, 10.10, 10.11, 37.5, 41.7, 42.8, 43.2, 43.3, 43.9**
+
+### Property 74: Frontend `can` and role controls
+
+*For any* role and action, `can(role, action)` equals the permission rule of Requirement 43 criterion 3 (the Board_Admin allows every action; the Board_Manager allows every action except `grant_manager`, `edit_board`, `delete_board`, and `view_analytics`; the `member` allows only `view_board` and `edit_cards`; the `guest` only `view_board`; null nothing); `assignableRoles` is {guest, member, manager} for the admin, {guest, member} for a manager, and empty otherwise; the role dropdown and remove control are shown for a membership iff `canActOnMember`; and *for any* board rendered as `member`, no column control, member panel, invite link, or analytics link appears, while as `manager` the column controls, member panel, and both invite links appear and the analytics link does not.
+
+**Validates: Requirements 21.12, 21.13, 37.17, 43.13, 43.14, 43.15**
+
+### Property 75: Manager accept and invite links
+
+*For any* existing role in {none, guest, member, manager, admin} and token role in {member, guest}, `resolve_accept` returns `create` iff the existing role is none, `upgrade` to `member` iff the existing role is guest and the token role is member, and otherwise keeps the existing role (so a manager and an admin never lose rank); and *for any* Board, GET invite-links and regenerate succeed for the admin and every manager, return 403 for a `member`, a `guest`, and a non-participant, and never disclose a token in a 403 body.
+
+**Validates: Requirements 37.3, 37.5, 37.6, 37.12, 28.12**
+
 ## Error Handling
 
 | Situation | Behavior | Requirement |
@@ -1909,6 +2458,30 @@ Name fields strip whitespace and reject blank values. All input schemas set `unk
 | Polling failure | keep previous state, no toast | 24.9 |
 | Server Component load failure (not 401) | `ErrorPanel` with retry | 20.8, 25.5 |
 | Board 403 or 404 | access-denied or not-found message with link to `/` | 21.15 |
+
+#### V11 error handling rows
+
+| Situation | Behavior | Requirement |
+|---|---|---|
+| Card PATCH `status` is not one of the four exact values (`urgent`, `""`, null, unknown) | 400 naming `status`, Card unchanged | 11.4, 39.1 |
+| A `member` sends a Column write | 403, Column unchanged | 10.11 |
+| Role change: `role` missing or not `guest`, `member`, `manager` (including `admin`) | 400, membership unchanged | 43.8 |
+| Role change names the Board_Admin: caller is the admin / caller is a manager | 400 / 403 (owner check before the rank rule, Open issue 47) | 9.7, 43.6, 43.8 |
+| Caller rank not above the target rank, or new role not below the caller rank | 403, membership unchanged | 43.6, 43.7 |
+| Role change or removal target has no active membership | 404 | 43.9 |
+| 51st checklist item, 11th link | 400, nothing created | 41.5, 42.7 |
+| Checklist `text` empty, blank, over 200; `is_done` not a boolean; `order` not a float above 0; empty PATCH body | 400, item unchanged | 41.6 |
+| Link `url` fails the scheme, hostname, whitespace, or length rule; `label` outside 1 to 100 | 400, data unchanged | 42.6 |
+| Guest or non-participant on checklist, link, or card-detail endpoints | 403; guest GET card detail is 200 | 41.7, 42.8 |
+| Checklist item, link, or Card missing or soft deleted | 404 | 41.8, 42.8 |
+| Two concurrent adds at the cap | the Card row lock serializes them; the second gets 400 | 41.5, 42.7 |
+| Overdue request with a bad token | 401 | 40.9 |
+| Overdue request fails in the browser | keep previous items, no toast | 40.15 |
+| Checklist toggle fails | restore the value within 100 ms, one toast | 41.14 |
+| Checklist or link add, edit, delete fails | list unchanged, entered values kept, toast | 41.15, 42.16 |
+| Link form URL invalid | field error, no request | 42.13 |
+| Role change request fails in the member panel | row keeps its old role, toast | 43.14 |
+| Schema applied before the V11 migration (`URGENT`, `manager`, new tables) | the generic 500 handler answers with no database details | 3.6, 44.1 |
 
 ## Testing Strategy
 
@@ -2064,6 +2637,41 @@ The V5, V6, and V8 strategy stays in force. V9 is frontend only (no pytest chang
 - The suite never clicks a footer link and never navigates to an external site, uses no `waitForTimeout`, and keeps the 10 s assertion and 60 s test timeouts and the retry limit.
 
 **Not tested automatically.** The exact look (icon shape, spacing rhythm) is checked by a manual review at 375 px and 1920 px in the 33.3 style checklist. The real GitHub and LinkedIn URLs are not checked, because they are placeholders (Open issue 41).
+
+### Testing Strategy: V11 additions (Requirements 31.17 to 31.25, 32.24 to 32.30)
+
+V5 to V9 strategy stays. Property tests use Hypothesis and fast-check, at least 100 iterations, one test per property, tagged `Feature: kano, Property <n>: <text>`. DB-backed tests are blocked until the V11 manual Migration_Step has run on the test database (R3.11). The test-database check now expects the 9 tables.
+
+**Backend (pytest).**
+
+| Area | Tests | Properties |
+|---|---|---|
+| Status (31.13 extended) | `URGENT` accepted on PATCH; `urgent`, `""`, null, unknown give 400; stateful Hypothesis test over four-value sequences; `completed_this_week` ignores `URGENT` | 61 |
+| Schema | `information_schema` lists exactly the 9 tables; inserting `status = 'URGENT'` and `role = 'manager'` works, `'urgent'` and `'owner'` fail; `ix_cards_due_date`, `ix_checklist_items_card_id_order`, `ix_card_links_card_id` exist (smoke) | examples |
+| Links URL (31.18) | Hypothesis over generated strings and generated scheme prefixes: accepted iff the rule; `javascript:`, `data:`, `file:`, scheme-less rejected with 400 through the endpoint | 68 |
+| Caps (31.19) | 50th item accepted, 51st 400; 10th link accepted, 11th 400; a soft-deleted item or link does not count; a two-thread add at 49 items ends with 50 items | 66, 68 |
+| Guest and non-participant (31.20) | 403 on checklist and link writes, on PATCH members, and for a non-participant also on GET card detail; guest GET card detail 200 | 73 |
+| Cascades (31.21) | delete Card, Column, Board: items and links get `is_deleted` and the same `deleted_at`; earlier-deleted rows keep their own `deleted_at`; GET deleted Card 404; injected failure rolls back | 70 |
+| Query budget (31.22) | `before_cursor_execute` counter on GET board for 10 and 500 Cards with items and links: equal and at most 5; counts correct and exclude soft-deleted rows; create, update, position carry the counts | 71 |
+| Ranks (31.23) | Hypothesis over caller, target, new role, owner flag against `decide_role_change` and `decide_member_removal`; endpoint tests: manager cannot change or remove a manager or the admin, only the admin grants `manager`, admin self-target gives 400, manager on admin gives 403; change to `guest` clears assignments, creates no notification | 72 |
+| Columns by role (31.24) | `member` gets 403 on the four Column endpoints and keeps Card, checklist, link, comment access; manager and admin succeed | 73 |
+| Overdue (31.25) | due yesterday not `DONE` returned with `days_overdue = 1`; due today not returned; `DONE` not returned; `URGENT` past due returned; other assignee not returned; unassigned returned to admin and manager only; soft-deleted Card, Column, Board not returned; 100-item cap with full `total`; no Notification row created; p95 under 500 ms over 20 Boards and 2,000 Cards (marker `perf`) | 64 |
+| Invites (31.16 extended) | manager reads and regenerates links; `member`, `guest`, non-participant get 403; accept keeps `manager` | 75 |
+| Analytics (31.14 extended) | manager listed in member activity; manager gets 403 on analytics | 46 |
+
+**Frontend (Vitest and React Testing Library, network mocked).**
+
+| Area | Tests | Properties |
+|---|---|---|
+| `labelColor` (32.24) | fast-check: palette membership, determinism, case and whitespace invariance, complete class string per key | 63 |
+| Status map (32.25) | four distinct labels, classes, variants; `BaseBadge` parity; the board Card and My Tasks row show the same badge | 62 |
+| `can` and dropdown (32.26) | table test over every role and action against the R43 rule; `assignableRoles`; dropdown shown only through `canActOnMember`; role change updates the row after 200 and reverts on error | 74 |
+| Checklist (32.27) | `3/5` and 60 percent; no indicator at 0; optimistic toggle within 100 ms and restore with one toast; guest read-only; add control disabled at 50 | 66, 67 |
+| Links (32.28) | form rejects empty, `javascript:alert(1)`, `data:`, `file:`, and over 2048 characters without a request; anchors carry `target` and `rel`; chip hidden at 0; `providerKey` generic fallback; guest sees the list only | 68, 69 |
+| Overdue UI (32.29) | chip iff `isOverdue`; "1 day overdue" and "N days overdue"; request on mount and on list open, never on a timer (fake timers, no call after 10 minutes); overdue items not in the bell count; empty state only when both lists are empty | 65 |
+| Roles and welcome (32.30) | `member` view hides columns, member panel, invite links, analytics; manager view shows columns, panel, both links, no analytics; welcome copy passes `findForbiddenClaims` after the "Urgent" change | 74, 60 |
+
+**Playwright (additions; credentials only through `requireCredentials()`).** (1) The pre-existing user (the Board creator, so `admin`) adds a checklist item and a link in a card, sees `1/1` progress and the link chip on the Card face, and sets the status to "Urgent" and sees the red badge. (2) A past due date shows the "Overdue" chip and, after opening the bell, the overdue row. (3) The Board creator joins a second generated account through the member link, which sees no column controls; the creator promotes it to manager through the dropdown (reload shows the column controls). Touch and the visual look of the chips stay in the manual 33.3 checklist. The existing Kanban journey is unaffected because its user created the Board.
 
 ## Part D: Deployment, Guidelines, and Documentation Design
 
@@ -2242,6 +2850,36 @@ Every requirement maps to at least one design element. Part references point to 
 | 33 (criterion 17, refined) | Testing Strategy V9 additions, Playwright footer scenario (`web/e2e/footer.spec.ts`: `contentinfo` scope, `exact: true`), V8 logo scenarios scoped to `banner` with `exact: true`, no click-through |
 | 38 (criterion 19, applies to the shared Footer) | B15 (hand check of the footer strings), unit test with `findForbiddenClaims` over `FOOTER_CONTENT` and the rendered footer |
 
+#### V11 additions to the Traceability Matrix (Requirements 39 to 44 and amended rows)
+
+| Req | Title | Backend | Frontend | Tests |
+|---|---|---|---|---|
+| 39 | Urgent status and label colors | A16, `CARD_STATUSES`, `ck_cards_status`, A13 note | B17 (`lib/status.ts`, `lib/labelColor.ts`, `StatusBadge`, `@source "../lib"`) | Properties 61, 62, 63 |
+| 40 | Overdue notification | A19 (`overdue_service.py`, `GET /api/notifications/overdue`, `ix_cards_due_date`) | B19 (`useOverdue`, `NotificationList`, Card chip, `lib/overdue.ts`) | Properties 64, 65, perf test |
+| 41 | Card checklist | A17, A18, endpoints 34 to 37, `ChecklistItem` | B18 (`ChecklistSection`, `useChecklist`, progress on the Card face) | Properties 66, 67, 70, 71 |
+| 42 | Workspace links | A17 (`url_rules.py`), A18, endpoints 34, 38 to 40, `CardLink` | B18 (`LinksSection`, `lib/linkProvider.ts`, `validateLinkUrl`, link chip) | Properties 68, 69, 70, 71 |
+| 43 | Manager role | A15, A20 (`decide_role_change`, `decide_member_removal`, endpoint 42), `my_role` | B16 (`can`, `assignableRoles`, `RoleSelect`, gating) | Properties 72, 73, 74, 75 |
+| 44 | V11 schema, migration, query budget | Data Models V11, A18 (`counts.py`), A17 file split | B21 | Properties 70, 71, schema smoke tests |
+
+| Amended requirement | V11 design coverage |
+|---|---|
+| 1.4, 1.9, 2.2, 2.9 to 2.11, 3.5, 3.9, 3.11 | Data Models V11 (models, ER, migration), A17 cascades, Properties 70 |
+| 2.15, 2.16, 11.2, 11.4, 11.19 | A15, A16, Data Models V11, Properties 61, 73 |
+| 4.3 | A21 rows 35 and 38 (201), 37 and 40 (200 with object) |
+| 9.1, 9.6, 9.9, 10 (all), 14.10 | A15 matrix, A20, Properties 72, 73 |
+| 20.1, 21.2, 21.4, 21.5, 21.12, 21.13, 21.21, 21.22, 23.17, 23.20, 25.2 | B16, B17, B18, Properties 62, 74 |
+| 28.12, 37.1, 37.3 to 37.6, 37.12, 37.14 to 37.17, 37.22 | A12-V6 note, A15, A20, Property 75 |
+| 31.5, 31.13, 31.16, 31.18 to 31.25, 32.16, 32.18, 32.24 to 32.30 | Testing Strategy V11 additions |
+| 36.15 | Part D V11 notes |
+| 38.17 to 38.19 | B20 (welcome copy and forbidden list) |
+
+### Part D: V11 notes (Requirements 34, 35, 36.15)
+
+- **Migration.** The V11 Migration_Step (hand-edited `ck_cards_status` and `ck_board_memberships_role`, the due-date index, two tables) runs on the development and test databases. Production is not deployed, so its first `flask db upgrade` applies the whole history. No new environment variable and no CORS change. The Vercel build for `web/` needs no setting; `@source "../lib"` is in `globals.css`.
+- **Verification list** gains: GET `/api/notifications/overdue`, POST and PATCH of a checklist item and a link, GET `/api/cards/<id>`, and PATCH `/api/boards/<id>/members/<user_id>` with a second account.
+- **README (R36.15).** Features list adds the Urgent status and label colors, overdue notifications, checklists, workspace links (URLs only), and the Manager role with its permissions; Local Run Steps state that V11 needs `flask db migrate` and `flask db upgrade`, with the two hand-edited check constraints; a sentence states that the role `member` no longer manages Columns. `scripts/check_readme_links.py` still applies.
+- **Guidelines.** `guidelines/backend.md` and `database.md` entries that name "admin only" or "7 tables" are reviewed at implementation time; `guidelines/design-system.md` gets any missing label or status token pair first (R39.10).
+
 ## Open issues
 
 These are gaps or conflicts found while designing and revising. Items marked "assumption" were chosen by the assistant in V4 and can be overridden.
@@ -2305,3 +2943,28 @@ These are gaps or conflicts found while designing and revising. Items marked "as
 42. **Hard-coded text "2026" and "JC" (Requirement 18.17).** **Resolved in V9 refinement for the locator part.** R32.23 and R33.17 now require footer link locators inside the `contentinfo` role or with exact names, and the logo scenarios scoped to `banner` or `exact: true` (Testing Strategy V9 and V8). The fixed-year note (the year does not update by itself) stays open by design. Both are fixed strings in `FOOTER_CONTENT` and are not computed, as required. The year will not update by itself. Playwright and Testing Library name matching: a Playwright locator for the Header logo by name "Kano" matches "Kano on GitHub" and "Kano on LinkedIn" as a substring unless it is scoped to the `banner` landmark or uses `exact: true` (Testing Library matches names exactly, so its logo tests stay valid). The V8 Playwright logo scenarios are already banner-scoped; new locators must use `exact: true`.
 43. **External links versus same-origin links (Requirement 18.18).** The Footer links are the first external links in the product. They are plain `<a target="_blank">` with `rel="noopener noreferrer"`, not `next/link`, and are not prefetched. If a lint rule later requires `next/link` for all anchors, external URLs still need a plain anchor. No Content Security Policy or `connect-src` change is needed because the links only navigate.
 44. **"Single row" versus wrapping (Requirements 18.16, 27.11).** **Resolved in V9 refinement.** R18.16 now says one row from 768 px upward and R27.11 says the footer may wrap below 768 px; R18.19 states the 44 px tap-target exception to the 4 px scale at every width. B15 follows both. The text below is kept as history. R18.16 requires a single row and R27.11 requires wrapping onto two lines when the groups do not fit. The design reconciles them with `flex-wrap`: one row from about 768 px, two lines below (the link group wraps under the brand group, right-aligned). R18.16 could say "a single row when both groups fit". Also, `size-11` (44 px) is not a step of design system section 2.3 and is allowed only as the height of the existing `lg` control; the design system could list it explicitly. The shared `KanoMark` extraction also touches `Header.tsx` (a markup-neutral change), which is a V9 implementation detail, not a requirement change.
+
+### V11 open issues and inconsistencies between requirements V11 and this design
+
+45. **Tailwind scan of `lib/` (R39.5, R39.9 versus R15.2, D18).** R39.5 puts the complete class strings in `lib/status.ts`, but the project scans only `app/`, `components/`, and `hooks/`, so the classes would never be generated. The design adds `@source "../lib";` to `globals.css` (a superset of R15.2, so R15.2 is not violated). Alternative: keep the class strings in `components/shared/` and have `lib/status.ts` hold only labels. Recommendation: keep the design; add "and `lib/`" to R15.2 at the next revision.
+46. **Label palette tokens (R39.9, R39.10).** `globals.css` has eight label token pairs, but their exact names are not confirmed to equal `gray, blue, green, yellow, orange, red, purple, pink`. The implementation task checks `guidelines/design-system.md` first and adds missing pairs there. The same applies to the success and danger tokens used in `STATUS_STYLE`.
+47. **Owner and rank rule order (R9.7, R43.6, R43.8).** R43.6 says 403 when the caller rank is not above the target rank, and R43.8 says 400 when the request names the Board_Admin. For an admin who targets himself both apply (equal rank), and for a manager who targets the admin they give 403 and 400. Design decision: the owner check runs first and gives 400 only to the admin (R9.7, R43.8), and 403 to a manager (R43.6, R31.23). Recommendation: reword R43.8 to "IF the Board_Admin targets himself or herself, 400".
+48. **Default label length (R42.2 versus R42.1, R42.5).** A hostname can be longer than the 100-character label limit. The design cuts the default label to 100 characters. Recommendation: say so in R42.2.
+49. **R11.15 versus GET `/api/cards/<id>` (R41.9).** R11.15 says a User who is not a Board_Member gets 403 on every Card endpoint that targets a single Card, which includes a guest (a guest is not a Board_Member), but R41.9 gives a guest 200 on the new GET. The design follows R41.9. Recommendation: change R11.15 to "Board_Participant" for GET and keep "Board_Member" for the writes.
+50. **Overdue "on page load" (R40.10).** The Header does not remount on client-side navigation, so the overdue list refreshes on the first mount, a full reload, and each time the list opens, not on every route change. Alternative: also refresh on route change, which is not asked for.
+51. **UTC date skew (R40.4, R40.14).** The Card-face chip uses the browser clock's UTC date, the list uses the server's. They can differ near midnight UTC or with a wrong clock. Accepted.
+52. **Admin cannot be replaced (R43.4).** There is no ownership transfer and the admin cannot be removed or demoted, so a Board whose creator never returns has no admin. Accepted by requirement.
+53. **Breaking change for `member` (R10.11).** Existing backend tests, frontend gating (`canEdit` for column controls), and any user who relies on `member` creating Columns must change; the Playwright journey is not affected because its user created the Board. The V6 helpers `get_column_for_writer` for column rename and delete must be replaced by `get_column_for_manager` in the same task.
+54. **Cap races (R41.5, R42.7).** Two simultaneous adds could both see 49 items. The design locks the Card row (`SELECT ... FOR UPDATE`) in `add_item` and `add_link`. A database trigger is not used.
+55. **Link display and phishing (R42.11).** The label is user text and can claim a different site than the URL. The UI shows the hostname beside every label. The URL may include userinfo or a private host; the server never requests it (R42.9), so there is no SSRF risk, but the rule accepts them.
+56. **File sizes (R44.6, R30.6).** `CardItem.tsx`, `CardDetailModal.tsx`, `BoardView.tsx`, and `MemberPanel.tsx` are the files most likely to pass 300 lines; B21 plans `CardMetaRow.tsx`, the section components, and `RoleSelect.tsx`. The backend `cards` and `notifications` packages are split as in A17 and A19.
+57. **Count query placement (R44.4).** The design uses a fifth, separate query, which uses the whole budget of 5. Folding the counts into the Cards query would leave one query of headroom but mixes aggregate subqueries into ORM loading. Revisit if another per-card count is added.
+58. **No counts on search and My Tasks (R44.5).** Only board detail and the three Card writes carry the counts, as the requirement says; search and My Tasks rows show no progress or link chip.
+59. **Role change details not stated in R43.** Setting a role equal to the current role returns 200 and changes nothing, and body validation (400) runs before the permission check (403), as everywhere else in the API. Recommendation: state both in R43.5.
+60. **Welcome copy and forbidden list (R38.17 to R38.19).** The V8 copy "(Not started, In progress, or Done)" must change to include Urgent, and `lib/forbiddenClaims.ts` must not contain "checklist". No other copy changes. The footer is unaffected.
+61. **Overdue ordering and cap (R40.5).** Ties on due date are ordered by `created_at` then `card_id` so the first 100 are stable. `total` can exceed 100, and the UI shows the first 100 only and no "more" control.
+62. **Role badge variants (R43.15).** The design picks admin yellow, manager blue, member green, guest gray. Blue and green also appear for statuses, which is acceptable because they sit in different places, but the design system should confirm.
+63. **Assignee role changes.** A role change from `member` to `manager` keeps assignments; only a change to `guest` clears them (R43.10). Removing a member clears them (R9.11). No other transition touches Cards.
+64. **Overdue index selectivity (R40.7).** A plain index on `due_date` is weakly selective for old open cards. A partial index on open, non-deleted cards is a later option; the requirement asks only for an index on the column.
+65. **Existing `7 tables` and `three roles` statements.** Several V5 and V6 passages (module-graph rule 5, test-database safety, A14 schema test, B10 `Role`, Property 55 and 56 sets) still say 7 tables or three roles. They are superseded by the V11 notes and not rewritten, as the V6 convention requires.
+66. **Pre-existing unresolved items.** Open issues 6 to 8, 10 to 13, 15, 16, 18, 20 to 26, 29 to 32, 39, 41, and 43 are not affected by V11 except issue 22, whose invite-token exposure now also applies to managers.

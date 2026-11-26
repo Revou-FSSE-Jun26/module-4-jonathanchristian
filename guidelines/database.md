@@ -18,20 +18,20 @@ Every new entry must keep the Rule / Rationale / Kano Example structure.
 ### G-DB-03: Named foreign keys
 - **Rule:** Declare every foreign key with an explicit constraint name `fk_<child_table>_<parent_table>`.
 - **Rationale:** Named constraints make migrations and error messages readable.
-- **Kano Example:** `db.ForeignKey("columns.column_id", name="fk_cards_columns")` and `fk_cards_users` for `assignee_id`.
+- **Kano Example:** `db.ForeignKey("columns.column_id", name="fk_cards_columns")` and `fk_cards_users` for `assignee_id`; `fk_checklist_items_cards`, `fk_card_links_cards`, and `fk_card_links_users` for the V11 tables.
 
 ### G-DB-04: SoftDeleteMixin on every model
 - **Rule:** Apply `SoftDeleteMixin` from `app/soft_delete.py` to every model so it has `created_at`, `updated_at` (set on insert and every update), `deleted_at`, and `is_deleted`, all timestamps `timestamptz` in UTC.
-- **Rationale:** One shared mixin keeps audit and delete columns identical across all seven tables.
+- **Rationale:** One shared mixin keeps audit and delete columns identical across all nine tables (users, boards, board_memberships, columns, cards, comments, notifications, checklist_items, card_links).
 - **Kano Example:** `class Card(SoftDeleteMixin, db.Model)`; time comes from `utcnow()`.
 
 ### G-DB-05: Soft delete only, active-only reads
-- **Rule:** Delete rows only by setting `is_deleted = true` and `deleted_at`, never with `DELETE`, and add `is_deleted` false to every query, join, and count.
+- **Rule:** Delete rows only by setting `is_deleted = true` and `deleted_at`, never with `DELETE` and never with `ON DELETE CASCADE`, and add `is_deleted` false to every query, join, subquery, and count.
 - **Rationale:** Deleted data stays recoverable, and one missed filter would leak deleted rows.
 - **Kano Example:** `select(Card).where(Card.board_id == board_id, active(Card))` in `app/blueprints/cards/service.py`.
 
 ### G-DB-06: Cascading soft delete in one transaction
-- **Rule:** Cascade a soft delete (Board to memberships, columns, cards, comments; Column to cards and comments; Card to comments) with bulk updates in one transaction using a single `deleted_at` value captured once, and roll everything back on failure.
+- **Rule:** Cascade a soft delete (Board to memberships, columns, cards, comments, checklist items, card links; Column to cards, their comments, checklist items, and card links; Card to comments, checklist items, and card links) with bulk updates in one transaction using a single `deleted_at` value captured once, and roll everything back on failure.
 - **Rationale:** A shared timestamp ties children to the parent deletion, and one transaction prevents half-deleted trees.
 - **Kano Example:** `app/blueprints/boards/service/cascade.py` calls `soft_delete_where(db.session, Column, Column.board_id == board_id, deleted_at=ts)`; removing a member also nulls `assignee_id` on that user's cards.
 
@@ -43,17 +43,17 @@ Every new entry must keep the Rule / Rationale / Kano Example structure.
 ### G-DB-08: FLOAT Order_Value columns
 - **Rule:** Define `order` as `db.Column(db.Float, nullable=False)` with a check `order > 0`, and compute new values only with `app/ordering.py` as new-last `max + 1.0` (1.0 if empty), midpoint of two neighbors, or half of the first.
 - **Rationale:** FLOAT ordering moves one row without renumbering its siblings; ties are broken by `created_at`.
-- **Kano Example:** `next_last_order(current_max)` when creating a card; `PATCH /api/cards/<id>/position` stores the client-supplied order after validation.
+- **Kano Example:** `next_last_order(current_max)` when creating a card or a checklist item (`checklist_items.order`); `PATCH /api/cards/<id>/position` stores the client-supplied order after validation.
 
 ### G-DB-09: Indexes on filtered columns
 - **Rule:** Add an index on every foreign key used for filtering and on every `order` column, as a composite where queries sort within a parent.
 - **Rationale:** These columns drive board detail, search, and notification queries that must answer within 500 ms.
-- **Kano Example:** `ix_cards_column_id_order` on (`column_id`, `order`), `ix_cards_assignee_id`, `ix_notifications_recipient_created`.
+- **Kano Example:** `ix_cards_column_id_order` on (`column_id`, `order`), `ix_cards_assignee_id`, `ix_cards_due_date` (overdue query), `ix_checklist_items_card_id_order`, `ix_card_links_card_id`, `ix_notifications_recipient_created`.
 
 ### G-DB-10: Explicit loading and fixed query count
-- **Rule:** Declare relationships with `lazy="raise"` and load related rows through explicit queries or `joinedload`, so `GET /api/boards/<id>` runs a fixed number of queries (at most 5) regardless of card count.
+- **Rule:** Declare relationships with `lazy="raise"` and load related rows through explicit queries or `joinedload`, so `GET /api/boards/<id>` runs a fixed number of queries (exactly 5: user, board plus membership, columns, cards, counts) regardless of card count, and fetch per-card counts (checklist done and total, link count) with one query that left-joins grouped subqueries.
 - **Rationale:** Lazy loading hides N+1 queries and can return soft-deleted children.
-- **Kano Example:** board detail runs user lookup, board plus membership, columns, and cards with `joinedload` on the assignee, then groups in Python.
+- **Kano Example:** board detail runs user lookup, board plus membership, columns, cards with `joinedload` on the assignee, and `cards/service/counts.py`, then groups in Python.
 
 ### G-DB-11: Parameterized queries only
 - **Rule:** Build every query with SQLAlchemy expressions and bound parameters, and escape `\`, `%`, and `_` in user text used with `ilike`.
@@ -61,9 +61,14 @@ Every new entry must keep the Rule / Rationale / Kano Example structure.
 - **Kano Example:** `Card.title.ilike(pattern, escape="\\")` in `app/blueprints/cards/service.py` for `GET /api/cards?q=`.
 
 ### G-DB-12: Migrations are user-owned
-- **Rule:** Never create, edit, or delete files in `app/migrations/` and never run `flask db init`, `migrate`, or `upgrade`; only install Flask-Migrate and call `migrate.init_app(app, db)` after importing every model-defining `schema.py`.
-- **Rationale:** The project owner generates and applies migrations manually, and the other tasks that need tables wait for that step.
-- **Kano Example:** `create_app` in `app/__init__.py` imports the six model `schema.py` files, then calls `migrate.init_app(app, db)`.
+- **Rule:** Never create, edit, or delete files in `app/migrations/` and never run `flask db init`, `migrate`, or `upgrade`; only install Flask-Migrate and call `migrate.init_app(app, db)` after importing every model-defining `schema.py` (the `cards` package defines three models).
+- **Rationale:** The project owner generates and applies migrations manually (including hand edits for what autogenerate misses), and the other tasks that need tables or columns wait for that step.
+- **Kano Example:** `create_app` in `app/__init__.py` imports the six model-defining `schema.py` packages so `flask db migrate` sees all nine tables, then calls `migrate.init_app(app, db)`.
+
+### G-DB-13: Enumerated values as named check constraints
+- **Rule:** Store an enumerated value (card status, board role) as a string column with a named check constraint `ck_<table>_<column>` listing the exact allowed values, and keep the same list as one constant in the service layer.
+- **Rationale:** The database rejects a bad value even if a service forgets to, and Alembic autogenerate does not detect check-constraint changes, so the owner edits the migration by hand when a value is added.
+- **Kano Example:** `ck_cards_status` allows `NOT_STARTED`, `IN_PROGRESS`, `URGENT`, `DONE` (`CARD_STATUSES` in `cards/service/status.py`); `ck_board_memberships_role` allows `admin`, `manager`, `member`, `guest`.
 
 ## Quick checklist
 - [ ] Primary key is `<table>_id` UUID; every FK is named `fk_<child>_<parent>`.
@@ -73,4 +78,6 @@ Every new entry must keep the Rule / Rationale / Kano Example structure.
 - [ ] New unique rules are partial indexes; new filter or order columns are indexed.
 - [ ] `order` columns are FLOAT, not null, computed via `app/ordering.py`.
 - [ ] No string-built SQL; LIKE input is escaped.
+- [ ] Enumerated values use a named check constraint and a matching constant.
+- [ ] Per-card counts come from the one grouped count query, not from per-card queries.
 - [ ] Nothing was added to `app/migrations/`.
