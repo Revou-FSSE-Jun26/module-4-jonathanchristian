@@ -2,17 +2,23 @@
 from sqlalchemy import func, select
 from sqlalchemy.orm import joinedload
 
-from app.blueprints.cards.schema import Card, CardLink, CardSchema, ChecklistItem
+from app.blueprints.cards.schema import Card, CardDetailSchema, CardLink, CardSchema, ChecklistItem
 from app.blueprints.comments.schema import Comment
 from app.blueprints.cards.service.counts import NO_COUNTS, apply_counts, counts_for_card
 from app.blueprints.cards.service.status import apply_status_change
 from app.blueprints.notifications import service as notifications
 from app.extensions import db
 from app.ordering import next_last_order
-from app.permissions import assert_assignee_is_writer, get_card_for_writer, get_column_for_writer
+from app.permissions import (
+    assert_assignee_is_writer,
+    get_card_for_reader,
+    get_card_for_writer,
+    get_column_for_writer,
+)
 from app.soft_delete import active, soft_delete_where, utcnow
 
 card_schema = CardSchema()
+detail_schema = CardDetailSchema()
 UPDATABLE_FIELDS = ("title", "description", "due_date", "labels", "assignee_id")
 
 
@@ -29,6 +35,27 @@ def dump_card(card_id, counts=None):
     ).scalar_one()
     apply_counts(card, counts if counts is not None else counts_for_card(card_id))
     return card_schema.dump(card)
+
+
+def get_card_detail(user, card_id):
+    """The Card with its checklist and links: the Card itself plus two queries (design A18)."""
+    get_card_for_reader(card_id, user.user_id)  # 404, then 403 for a non-participant
+    card = db.session.execute(
+        select(Card).options(joinedload(Card.assignee)).where(Card.card_id == card_id)
+    ).scalar_one()
+    items = db.session.execute(
+        select(ChecklistItem)
+        .where(ChecklistItem.card_id == card_id, active(ChecklistItem))
+        .order_by(ChecklistItem.order, ChecklistItem.created_at)
+    ).scalars().all()
+    links = db.session.execute(
+        select(CardLink)
+        .where(CardLink.card_id == card_id, active(CardLink))
+        .order_by(CardLink.created_at, CardLink.card_link_id)
+    ).scalars().all()
+    card.checklist, card.links = items, links
+    apply_counts(card, (sum(1 for item in items if item.is_done), len(items), len(links)))
+    return detail_schema.dump(card)
 
 
 def _notify_assignment(card, assignee_id, current_user):

@@ -28,6 +28,7 @@ def test_board_detail_orders_columns_and_cards(
     assert set(cards[0]) == {
         "card_id", "board_id", "column_id", "title", "description", "due_date",
         "labels", "assignee", "order", "status", "completed_at", "created_at", "updated_at",
+        "checklist_done", "checklist_total", "link_count",
     }
 
 
@@ -81,4 +82,4 @@ def test_board_detail_runs_a_fixed_number_of_queries(
         make_card(column, assignee=board.owner)
     with query_counter() as many:
         assert_envelope(client.get(f"/api/boards/{board.board_id}", headers=headers), 200)
-    assert few.count == many.count == 4
+    assert few.count == many.count == 5

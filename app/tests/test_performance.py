@@ -151,4 +151,4 @@ def test_property_board_detail_query_count_is_constant(
     board_id = seed(owner, columns=columns, cards_per_column=cards_per_column)
     with query_counter() as counter:
         assert_envelope(client.get(f"/api/boards/{board_id}", headers=auth_header(owner)), 200)
-    assert counter.count == 4, counter.statements
+    assert counter.count == 5, counter.statements

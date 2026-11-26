@@ -1,4 +1,4 @@
-"""Role and membership enforcement matrix over every Board-scoped endpoint (V6: four actors)."""
+"""Role and membership enforcement matrix over every Board-scoped endpoint (V11: five actors)."""
 import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
@@ -8,7 +8,7 @@ from helpers import assert_envelope
 
 pytestmark = pytest.mark.e2e
 
-ACTORS = ["nonmember", "guest", "member", "admin"]
+ACTORS = ["nonmember", "guest", "member", "manager", "admin"]
 READ_ONLY_ENDPOINTS = {e.id for e in ENDPOINTS if "guest" in e.allowed}
 BY_ID = {endpoint.id: endpoint for endpoint in ENDPOINTS}
 
@@ -55,7 +55,7 @@ def test_guest_gets_403_on_every_write_and_succeeds_on_every_read(app, client, a
         else:
             assert_envelope(response, 403)
             assert snapshot(app) == before, endpoint.id
-    assert READ_ONLY_ENDPOINTS == {"get_board", "list_members", "search_cards", "list_comments"}
+    assert READ_ONLY_ENDPOINTS == {"get_board", "list_members", "search_cards", "list_comments", "get_card"}
 
 
 @pytest.mark.parametrize("method,body", [("patch", {"content": "Edited"}), ("delete", None)])
@@ -69,7 +69,7 @@ def test_guest_who_authored_an_old_comment_still_gets_403(app, client, auth_head
     assert snapshot(app) == before
 
 
-def test_no_role_but_the_admin_can_read_the_invite_tokens(app, client, auth_header, world):
+def test_only_the_admin_and_managers_can_read_the_invite_tokens(app, client, auth_header, world):
     for actor in ("nonmember", "guest", "member"):
         message = assert_envelope(
             client.get(f"/api/boards/{world.board.board_id}/invite-links", headers=auth_header(world.actors[actor])), 403
@@ -89,22 +89,29 @@ def test_removed_member_is_locked_out_of_every_endpoint(app, client, auth_header
     assert snapshot(app) == before
 
 
-# Feature: kano, Property 13: Role and membership enforcement (member means admin or member)
-# Feature: kano, Property 47: Guest never writes (role by endpoint matrix), database-backed part
+# Feature: kano, Property 13: Role and membership enforcement (updated role set)
+# Feature: kano, Property 47: Guest never writes (updated role set)
+# Feature: kano, Property 73: V11 permission matrix (database part)
 @settings(max_examples=100, deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture])
 @given(endpoint_id=st.sampled_from(ENDPOINT_IDS), actor=st.sampled_from(ACTORS), body_ok=st.booleans())
 def test_property_forbidden_requests_get_403_before_validation_and_never_leak(
     app, client, auth_header, make_user, make_board, make_member, make_column, make_card, make_comment,
-    persist, reset_database, endpoint_id, actor, body_ok,
+    persist, make_checklist_item, make_card_link, reset_database, endpoint_id, actor, body_ok,
 ):
     reset_database()
-    w = build_world(make_user, make_board, make_member, make_column, make_card, make_comment, persist)
+    w = build_world(
+        make_user, make_board, make_member, make_column, make_card, make_comment, persist,
+        make_checklist_item, make_card_link,
+    )
     endpoint = BY_ID[endpoint_id]
     body = "default" if (body_ok or endpoint.bad_body is None) else endpoint.bad_body
     before = snapshot(app)
     response = call(client, endpoint, w, auth_header(w.actors[actor]), body)
     invalid = body != "default"
-    if actor not in endpoint.allowed:
+    if invalid and endpoint.validates_first:
+        assert_envelope(response, 400)  # the role-change body is validated before any 403
+        assert snapshot(app) == before
+    elif actor not in endpoint.allowed:
         # Membership and role are checked before the body is validated: always 403.
         message = assert_envelope(response, 403)
         assert all(secret not in message for secret in SECRETS.values())

@@ -18,6 +18,11 @@ def register(bp):
             service.create_card(current_user, column_id, lambda: load_json(create_schema)), 201
         )
 
+    @bp.get("/cards/<uuid:card_id>")
+    @jwt_required()
+    def get_card(card_id):
+        return ok(service.get_card_detail(current_user, card_id))
+
     @bp.patch("/cards/<uuid:card_id>")
     @jwt_required()
     def update_card(card_id):

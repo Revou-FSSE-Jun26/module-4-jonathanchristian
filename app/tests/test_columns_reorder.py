@@ -31,12 +31,12 @@ def column_url(column):
 # --- reorder -----------------------------------------------------------------------------------------
 
 
-def test_reorder_stores_the_supplied_order(client, make_board, make_member, make_column, auth_header, fetch):
+def test_reorder_stores_the_supplied_order(client, make_board, make_manager, make_column, auth_header, fetch):
     from app.blueprints.columns.schema import Column
 
     board = make_board()
     first, second = make_column(board), make_column(board)
-    member = make_member(board).member
+    member = make_manager(board).member
     body = {"column_id": str(second.column_id), "order": 0.5}
     data = assert_envelope(client.patch(reorder_url(board), json=body, headers=auth_header(member)), 200)
     assert data["order"] == 0.5 and data["column_id"] == str(second.column_id)

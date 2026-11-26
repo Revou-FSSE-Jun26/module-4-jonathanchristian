@@ -5,9 +5,14 @@ return `ok(...)`.
 """
 from flask import Blueprint
 
-from app.blueprints.cards.routes import card_routes, search_routes
+from app.blueprints.cards.routes import (
+    card_routes,
+    checklist_routes,
+    link_routes,
+    search_routes,
+)
 
 bp = Blueprint("cards", __name__, url_prefix="/api")
 
-for _module in (card_routes, search_routes):
+for _module in (card_routes, search_routes, checklist_routes, link_routes):
     _module.register(bp)

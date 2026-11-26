@@ -15,7 +15,7 @@ DB_SETTINGS = settings(
     deadline=None,
     suppress_health_check=[HealthCheck.function_scoped_fixture],
 )
-STATUSES = ("NOT_STARTED", "IN_PROGRESS", "DONE")
+STATUSES = ("NOT_STARTED", "IN_PROGRESS", "URGENT", "DONE")
 
 
 def patch(client, headers, card_id, body):
@@ -48,7 +48,7 @@ def notes(app):
 # --- property tests ---------------------------------------------------------------------------------------
 
 
-# Feature: kano, Property 44: Status and completed_at transition rule (stateful PATCH sequences)
+# Feature: kano, Property 61: Four-value status state machine (database part, stateful PATCH sequences)
 @DB_SETTINGS
 @given(
     st.lists(
@@ -92,7 +92,7 @@ _status_values = st.one_of(st.none(), st.integers(), _case_variants, st.sampled_
 # Feature: kano, Property 45: Status validation and position independence
 @DB_SETTINGS
 @given(_status_values)
-def test_status_is_accepted_iff_it_is_exactly_one_of_the_three(
+def test_status_is_accepted_iff_it_is_exactly_one_of_the_four(
     client, reset_database, make_board, make_column, make_card, auth_header, fetch, value
 ):
     reset_database()
@@ -137,13 +137,13 @@ def test_position_changes_never_touch_status_or_completed_at(
     assert data["status"] == status
 
 
-_ROLES = st.sampled_from(["admin", "member", "guest", "removed", "outsider"])
+_ROLES = st.sampled_from(["admin", "manager", "member", "guest", "removed", "outsider"])
 
 
-# Feature: kano, Property 48: Assignee must be admin or member, guests are never notified
+# Feature: kano, Property 48: Assignee must be admin, manager, or member; guests are never notified
 @DB_SETTINGS
 @given(_ROLES, st.booleans())
-def test_assignee_is_accepted_iff_admin_or_member_and_guests_get_no_notification(
+def test_assignee_is_accepted_iff_admin_manager_or_member_and_guests_get_no_notification(
     client, reset_database, make_board, make_member, make_column, make_card, make_user,
     auth_header, notes, role, on_update,
 ):
@@ -151,14 +151,14 @@ def test_assignee_is_accepted_iff_admin_or_member_and_guests_get_no_notification
     board = make_board()
     column = make_column(board)
     other = make_user()
-    if role in ("member", "guest", "removed"):
+    if role in ("manager", "member", "guest", "removed"):
         make_member(board, other, role="member" if role == "removed" else role)
     if role == "removed":
         assert_envelope(
             client.delete(f"/api/boards/{board.board_id}/members/{other.user_id}", headers=auth_header(board.owner)), 200
         )
     candidate = board.owner if role == "admin" else other
-    allowed = role in ("admin", "member")
+    allowed = role in ("admin", "manager", "member")
     headers = auth_header(board.owner)
     if on_update:
         card = make_card(column)

@@ -18,10 +18,12 @@ EXPECTED_TABLES = {
     "cards",
     "comments",
     "notifications",
+    "checklist_items",
+    "card_links",
 }
 TRUNCATE_SQL = (
-    "TRUNCATE users, boards, board_memberships, columns, cards, comments, notifications "
-    "RESTART IDENTITY CASCADE"
+    "TRUNCATE users, boards, board_memberships, columns, cards, comments, notifications, "
+    "checklist_items, card_links RESTART IDENTITY CASCADE"
 )
 # --- database guard -------------------------------------------------------------------------
 
@@ -47,7 +49,12 @@ def test_database_url():
         if not EXPECTED_TABLES <= existing:
             raise RuntimeError("schema missing")
     except Exception:
-        pytest.exit(f"Test database {name} unavailable or schema not applied", returncode=2)
+        pytest.exit(
+            f"Test database {name} unavailable or the V11 schema is not applied (expected the 9 "
+            "tables). Run `flask db upgrade` against it and review the hand-edited check "
+            "constraints ck_cards_status and ck_board_memberships_role of task 45.1.",
+            returncode=2,
+        )
     finally:
         engine.dispose()
     return test_url
@@ -80,7 +87,7 @@ def reset_database(app):
 
 @pytest.fixture(autouse=True)
 def _truncate_after_test(request):
-    """Empty the 7 tables after every database test so tests are order independent."""
+    """Empty the 9 tables after every database test so tests are order independent."""
     if request.node.get_closest_marker("unit"):
         yield
         return
@@ -110,4 +117,4 @@ def query_counter(app):
 
 
 
-pytest_plugins = ["data_fixtures", "endpoints"]
+pytest_plugins = ["data_fixtures", "data_fixtures_v11", "endpoints"]

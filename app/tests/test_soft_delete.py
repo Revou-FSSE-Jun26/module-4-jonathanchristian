@@ -66,7 +66,7 @@ def test_board_delete_cascades_with_one_timestamp_and_spares_everything_else(cli
 def test_column_delete_cascades_only_to_its_cards_and_comments(client, tree, auth_header, fetch):
     t = tree
     victims = [t["cols"][0], t["cards"][0], t["cards"][1], t["comments"][0], t["comments"][1]]
-    assert_envelope(client.delete(f"/api/columns/{t['cols'][0].column_id}", headers=auth_header(t["member"])), 200)
+    assert_envelope(client.delete(f"/api/columns/{t['cols'][0].column_id}", headers=auth_header(t["admin"])), 200)
     rows = [fetch(type(obj), pk_of(obj)) for obj in victims]
     assert all(r.is_deleted for r in rows) and len({r.deleted_at for r in rows}) == 1
     for obj in [t["board"], t["membership"], t["cols"][1], t["cards"][2], t["comments"][2], *t["other"]]:
@@ -133,7 +133,7 @@ def inject(monkeypatch, module, fail_on_call):
     monkeypatch.setattr(module, "soft_delete_where", flaky)
 
 
-@pytest.mark.parametrize("fail_on_call", [1, 2, 3, 4, 5])
+@pytest.mark.parametrize("fail_on_call", [1, 2, 3, 4, 5, 6, 7])
 def test_failed_board_cascade_leaves_every_row_unchanged(app, client, tree, auth_header, monkeypatch, fail_on_call):
     from app.blueprints.boards.service import cascade
 
@@ -144,7 +144,7 @@ def test_failed_board_cascade_leaves_every_row_unchanged(app, client, tree, auth
     assert snapshot(app) == before
 
 
-@pytest.mark.parametrize("fail_on_call", [1, 2, 3])
+@pytest.mark.parametrize("fail_on_call", [1, 2, 3, 4, 5])
 def test_failed_column_cascade_leaves_every_row_unchanged(app, client, tree, auth_header, monkeypatch, fail_on_call):
     from app.blueprints.columns import service
 
@@ -155,7 +155,7 @@ def test_failed_column_cascade_leaves_every_row_unchanged(app, client, tree, aut
     assert snapshot(app) == before
 
 
-@pytest.mark.parametrize("fail_on_call", [1, 2])
+@pytest.mark.parametrize("fail_on_call", [1, 2, 3, 4])
 def test_failed_card_cascade_leaves_every_row_unchanged(app, client, tree, auth_header, monkeypatch, fail_on_call):
     from app.blueprints.cards.service import card_service
 
@@ -222,7 +222,7 @@ def test_property_cascade_marks_exactly_the_subtree_and_hides_it(
 
 # Feature: kano, Property 8: Cascade atomicity
 @DB_SETTINGS
-@given(fail_on_call=st.integers(1, 5))
+@given(fail_on_call=st.integers(1, 7))
 def test_property_a_failed_cascade_changes_nothing(
     app, client, make_user, make_board, make_column, make_card, make_comment, auth_header,
     reset_database, fail_on_call,

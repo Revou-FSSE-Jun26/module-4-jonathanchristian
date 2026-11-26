@@ -1,4 +1,4 @@
-"""Envelope, status code, and serialization tests across all 33 endpoint rows plus 3a (V6)."""
+"""Envelope, status code, and serialization tests across the 42 endpoint rows of A11 and A21 plus 3a (V11)."""
 import re
 import uuid
 
@@ -89,9 +89,11 @@ def test_success_has_one_data_key_and_the_documented_status(client, full, header
     check_formats(data)
 
 
-def test_exactly_six_endpoints_answer_201():
+def test_exactly_eight_endpoints_answer_201():
     assert {e.id for e, _ in ALL if e.success == 201} == CREATING_POSTS
-    assert len(ALL) == 34  # the 33 endpoint rows of design A11 plus 3a
+    assert len(CREATING_POSTS) == 8  # register, boards, members, columns, cards, comments, checklist, links
+    assert len(ALL) == 43  # the 42 endpoint rows of design A11 and A21 plus 3a
+    assert all(e.success == 200 for e, _ in ALL if e.id in ("change_role", "get_overdue"))
     assert {e.id for e, _ in ALL if e.id in ("regenerate_invite_link", "accept_invite")} == {
         "regenerate_invite_link", "accept_invite"}
     assert all(e.success == 200 for e, _ in ALL if e.id in ("regenerate_invite_link", "accept_invite"))  # R4.3
@@ -200,10 +202,13 @@ def test_database_violations_map_to_statuses_without_sql_details(client, full, a
 @given(index=st.integers(0, len(ALL) - 1), scenario=st.sampled_from(["ok", "no_token", "unknown_id", "bad_body", "wrong_method"]))
 def test_property_every_outcome_has_one_envelope_key_and_its_status(
     client, make_user, make_board, make_member, make_column, make_card, make_comment, make_notification,
-    headers_for, persist, reset_database, index, scenario,
+    headers_for, persist, make_checklist_item, make_card_link, reset_database, index, scenario,
 ):
     reset_database()
-    w = build_world(make_user, make_board, make_member, make_column, make_card, make_comment, persist)
+    w = build_world(
+        make_user, make_board, make_member, make_column, make_card, make_comment, persist,
+        make_checklist_item, make_card_link,
+    )
     w.note = make_notification(w.member, w.card)
     endpoint, auth = ALL[index]
     headers = headers_for(w, auth)
@@ -240,10 +245,13 @@ def test_property_every_outcome_has_one_envelope_key_and_its_status(
 )
 def test_property_ids_are_lowercase_uuids_and_timestamps_end_in_z(
     client, make_user, make_board, make_member, make_column, make_card, make_comment, make_notification,
-    auth_header, persist, reset_database, title, content,
+    auth_header, persist, make_checklist_item, make_card_link, reset_database, title, content,
 ):
     reset_database()
-    w = build_world(make_user, make_board, make_member, make_column, make_card, make_comment, persist)
+    w = build_world(
+        make_user, make_board, make_member, make_column, make_card, make_comment, persist,
+        make_checklist_item, make_card_link,
+    )
     w.note = make_notification(w.member, w.card)
     headers = auth_header(w.admin)
     created = assert_envelope(client.post(f"/api/columns/{w.column.column_id}/cards", json={"title": title, "assignee_id": str(w.member.user_id)}, headers=headers), 201)
@@ -260,3 +268,10 @@ def test_property_ids_are_lowercase_uuids_and_timestamps_end_in_z(
     ):
         check_formats(assert_envelope(client.get(url, headers=headers), 200))
     check_formats(assert_envelope(client.get("/api/notifications", headers=auth_header(w.member)), 200))
+    # V11: card detail, checklist, links, and overdue use the same id and timestamp formats
+    item = assert_envelope(client.post(f"/api/cards/{created['card_id']}/checklist", json={"text": "s"}, headers=headers), 201)
+    link = assert_envelope(client.post(f"/api/cards/{created['card_id']}/links", json={"url": "https://a.org"}, headers=headers), 201)
+    check_formats(item)
+    check_formats(link)
+    check_formats(assert_envelope(client.get(f"/api/cards/{created['card_id']}", headers=headers), 200))
+    check_formats(assert_envelope(client.get("/api/notifications/overdue", headers=headers), 200))

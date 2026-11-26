@@ -4,17 +4,49 @@ from sqlalchemy import select, update
 from app.blueprints.boards.schema import BoardMembership, MemberSchema
 from app.blueprints.cards.schema import Card
 from app.blueprints.users.schema import User
-from app.errors import BadRequest, Conflict, NotFound
+from app.errors import BadRequest, Conflict, Forbidden, NotFound
 from app.extensions import db
-from app.permissions import MEMBER, require_board_admin, require_board_manager, require_board_reader
+from app.permissions import (
+    BAD_REQUEST,
+    FORBIDDEN,
+    MEMBER,
+    decide_member_removal,
+    require_board_manager,
+    require_board_reader,
+)
 from app.soft_delete import active, soft_delete_where, utcnow
 
 member_schema = MemberSchema()
+OWNER_MESSAGE = "The board creator's role cannot be changed or removed"
 
 
 def serialize_member(member_user, role):
     member_user.role = role
     return member_schema.dump(member_user)
+
+
+def load_target_membership(board_id, target_user_id):
+    """The target's active membership, locked FOR UPDATE; 404 when there is none."""
+    target = db.session.execute(
+        select(BoardMembership)
+        .where(
+            BoardMembership.board_id == board_id,
+            BoardMembership.user_id == target_user_id,
+            active(BoardMembership),
+        )
+        .with_for_update()
+    ).scalar_one_or_none()
+    if target is None:
+        raise NotFound("Member not found")
+    return target
+
+
+def raise_for(decision, owner_message=OWNER_MESSAGE):
+    """Map a pure decision to the API error (`ok` returns)."""
+    if decision == BAD_REQUEST:
+        raise BadRequest(owner_message)
+    if decision == FORBIDDEN:
+        raise Forbidden()
 
 
 def add_member(user, board_id, load_data):
@@ -51,10 +83,16 @@ def list_members(user, board_id):
 
 
 def remove_member(user, board_id, target_user_id):
-    """Soft delete a membership and clear the member's card assignments in one transaction."""
-    require_board_admin(board_id, user.user_id)
-    if target_user_id == user.user_id:
-        raise BadRequest("You cannot remove yourself from the board")
+    """Soft delete a membership and clear the member's card assignments in one transaction.
+
+    Order: 404 Board, 403 level, 404 target, then the owner and rank rules (design A15).
+    """
+    board, caller = require_board_manager(board_id, user.user_id)
+    target = load_target_membership(board_id, target_user_id)
+    raise_for(
+        decide_member_removal(caller.role, target.role, board.created_by == target.user_id),
+        "The board creator cannot be removed",
+    )
     ts = utcnow()
     changed = soft_delete_where(
         db.session,

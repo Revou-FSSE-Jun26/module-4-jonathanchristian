@@ -17,6 +17,7 @@ DB_SETTINGS = settings(
 CARD_FIELDS = {
     "card_id", "board_id", "column_id", "title", "description", "due_date", "labels",
     "assignee", "order", "status", "completed_at", "created_at", "updated_at",
+    "checklist_done", "checklist_total", "link_count",
 }
 _safe_text = st.characters(blacklist_categories=("Cs",), blacklist_characters="\x00")
 

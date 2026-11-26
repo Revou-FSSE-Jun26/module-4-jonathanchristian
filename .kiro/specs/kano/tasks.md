@@ -1710,15 +1710,15 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Requirements: 3.11, 44.1, 44.2, 2.15, 2.16_
     - _Design: Data Models (V11 migration table), Manual migration dependency_
 
-- [ ] 46. Phase 26 (V11): Backend features and pytest tests
-  - [ ] 46.1 Update `conftest.py` and the factories for 9 tables and the new roles
+- [x] 46. Phase 26 (V11): Backend features and pytest tests
+  - [x] 46.1 Update `conftest.py` and the factories for 9 tables and the new roles
     - Read `guidelines/backend.md` and `guidelines/database.md` first. The session-start check expects the 9 tables; the autouse `TRUNCATE ... RESTART IDENTITY CASCADE` lists `checklist_items` and `card_links` too; new factories `make_checklist_item`, `make_card_link`, and a role argument or `make_manager` for memberships; the test-database safety rules stay
     - Supersedes the 7-table check and truncate list of task 5.1; 5.1 stays as history
     - _Requirements: 31.2, 31.7, 31.9, 31.10, 44.2_
     - _Design: Testing Strategy (Test database safety), Open issue 65_
     - Depends on: 45.1
 
-  - [ ] 46.2 Implement GET `/api/cards/<id>` and the counts in the board detail and Card write responses
+  - [x] 46.2 Implement GET `/api/cards/<id>` and the counts in the board detail and Card write responses
     - `GET /api/cards/<uuid:id>` for any Board_Participant (`get_card_for_reader`; guest 200, non-participant 403, missing or soft-deleted 404): Card, `checklist` ordered by `order` then `created_at`, `checklist_done`, `checklist_total`, `links` ordered by `created_at`, `link_count`; two extra queries
     - `GET /api/boards/<id>` runs the fifth query of `counts.py` and merges the counts by `card_id` (at most 5 queries, identical for 10 and 500 Cards); create returns `0, 0, 0` without a query; update and position return `counts_for_card`
     - Supersedes the exactly-four-query board detail of tasks 8.1 and 27.7; those stay as history
@@ -1726,7 +1726,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A18, A21 row 34, A9 (V11 note), Open issues 49, 57, 58_
     - Depends on: 44.10, 46.1
 
-  - [ ] 46.3 Write pytest tests for card detail, the counts, and the query budget
+  - [x] 46.3 Write pytest tests for card detail, the counts, and the query budget
     - GET card detail 200 for admin, manager, member, and guest, 403 for a non-participant, 404 for missing, soft-deleted, and non-UUID ids; counts correct and exclude soft-deleted items and links; create, update, and position responses carry the three counts; query counter: board detail at most 5 and identical for 10 and 500 Cards with items and links (marker `perf`, p95 under 500 ms over 100 requests)
     - Property test: **Property 71: Board payload counts and constant query count**
     - Supersedes the query-count assertions of tasks 14.5 and 27.15; those stay as history
@@ -1735,13 +1735,13 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Correctness Property 71, A18_
     - Depends on: 46.2
 
-  - [ ] 46.4 Implement the checklist service and routes
+  - [x] 46.4 Implement the checklist service and routes
     - `cards/service/checklist_service.py`: `add_item` (`get_card_for_writer(..., lock=True)`, 400 when 50 non-deleted items exist, `order = next_last_order(max)` or 1.0, `is_done` false), `update_item` (only supplied fields), `delete_item` (soft delete, returns `{ "checklist_item_id" }`); `cards/routes/checklist_routes.py`: POST `/api/cards/<uuid:id>/checklist` (201), PATCH and DELETE `/api/checklist/<uuid:id>` (200); register on the cards blueprint; no Notification and no change to `status` or `completed_at`; counts never stored
     - _Requirements: 41.2, 41.3, 41.4, 41.5, 41.6, 41.7, 41.8, 41.10, 41.11, 4.3_
     - _Design: A17 (checklist service), A21 rows 35 to 37, Open issue 54_
     - Depends on: 44.4, 44.7, 46.2
 
-  - [ ] 46.5 Write pytest tests for the checklist
+  - [x] 46.5 Write pytest tests for the checklist
     - 201 and `order` rules, partial update, soft delete with `{ "checklist_item_id" }`, the 50th item accepted and the 51st 400, a soft-deleted item does not count, a two-thread add at 49 items ends with 50 items, text boundaries 0, blank, 1, 200, 201, non-boolean `is_done`, bad `order`, empty PATCH body, 403 for a guest and a non-participant, 404 for missing or soft-deleted, 401, no Notification and no `status` or `completed_at` change
     - Property test: **Property 66: Checklist rules** (generated add, toggle, edit, and delete sequences against a naive model)
     - **Validates: Requirements 41.2 to 41.10**
@@ -1749,13 +1749,13 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Correctness Property 66_
     - Depends on: 46.4
 
-  - [ ] 46.6 Implement the link service and routes
+  - [x] 46.6 Implement the link service and routes
     - `cards/service/link_service.py`: `add_link` (row lock, 400 for the 11th non-deleted link, `created_by` the current user, label defaults to the hostname via `default_label`), `update_link` (re-validates a supplied `url` and `label`), `delete_link` (soft delete, `{ "card_link_id" }`); `cards/routes/link_routes.py`: POST `/api/cards/<uuid:id>/links` (201), PATCH and DELETE `/api/links/<uuid:id>` (200); no Notification and no outbound request to the stored URL
     - _Requirements: 42.2, 42.3, 42.4, 42.5, 42.6, 42.7, 42.8, 42.9, 42.10, 4.3_
     - _Design: A17 (link service), A21 rows 38 to 40, Open issues 48, 54, 55_
     - Depends on: 44.4, 44.7, 46.4
 
-  - [ ] 46.7 Write pytest tests for workspace links
+  - [x] 46.7 Write pytest tests for workspace links
     - 201, default label from the hostname (including a hostname over 100 characters cut to 100), label boundaries 0, 1, 100, 101, PATCH validation, delete, the 10th link accepted and the 11th 400, soft-deleted link not counted, `javascript:`, `data:`, `file:`, scheme-less, whitespace, and 2049-character values give 400, 403 for a guest and a non-participant, 404, 401, links listed by creation time in card detail, no Notification
     - Property test: **Property 68: Link URL validation and cap** (endpoint part)
     - **Validates: Requirements 42.2 to 42.9**
@@ -1763,7 +1763,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Correctness Property 68_
     - Depends on: 46.6
 
-  - [ ] 46.8 Write the cascade tests for checklist items and links
+  - [x] 46.8 Write the cascade tests for checklist items and links
     - Soft deleting a Board, a Column, and a Card sets `is_deleted` and the same `deleted_at` on the Checklist_Items and Card_Links below, leaves rows deleted earlier and unrelated rows unchanged, later GET of the deleted Card is 404, and an injected failure part-way leaves every row unchanged with a 500 envelope
     - Property test: **Property 70: Soft-delete cascade covers checklist and links**
     - Supersedes the cascade assertions of tasks 14.2 and 27.14 for Boards, Columns, and Cards; those stay as history
@@ -1772,13 +1772,13 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Correctness Property 70, A17_
     - Depends on: 44.9, 46.4, 46.6
 
-  - [ ] 46.9 Implement the overdue endpoint
+  - [x] 46.9 Implement the overdue endpoint
     - Convert `notifications/service` to a package (`notification_service.py` with the V5 logic, `overdue_service.py`) and `notifications/routes` to a package (`notification_routes.py`, `overdue_routes.py`) keeping `routes`, `service`, and `schema` importable; pure `days_overdue(due, today_utc)`; `list_overdue(user_id, today_utc)` with the query of design A19 (due date before today, status not `DONE`, assigned to the user with role `admin`, `manager`, or `member`, or unassigned where the user is `admin` or `manager`; order by due date, `created_at`, `card_id`; limit 100; `total` counts all matches); `today_utc` computed once in the route; `OverdueItemSchema` and `OverdueResultSchema`; GET `/api/notifications/overdue` (200); no Notification row, no change to `GET /api/notifications` or its unread count
     - _Requirements: 40.1, 40.2, 40.3, 40.4, 40.5, 40.6, 40.7, 40.9, 4.9_
     - _Design: A19, D22, A21 row 41, Open issues 61, 64_
     - Depends on: 44.2, 46.1
 
-  - [ ] 46.10 Write pytest tests for the overdue endpoint
+  - [x] 46.10 Write pytest tests for the overdue endpoint
     - Cover the list of Requirement 31.25: due yesterday and not `DONE` returned with `days_overdue` 1, due today not returned, `DONE` not returned, `URGENT` past due returned, a Card assigned to another user not returned, an unassigned Card returned to the admin and a manager and not to a `member` or a `guest`, soft-deleted Cards, Columns, and Boards not returned, at most 100 items with the full `total`, no Notification row created, `GET /api/notifications` unread count unchanged, 401 without a token and with a refresh token; fixed `today` passed to the service; marker `perf`: 20 Boards and 2,000 Cards, p95 under 500 ms over 100 requests
     - Property test: **Property 64: Overdue selection equals a naive model**
     - **Validates: Requirements 40.2 to 40.9**
@@ -1786,7 +1786,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Correctness Property 64, A19_
     - Depends on: 46.9
 
-  - [ ] 46.11 Implement the role-change endpoint and the manager rank rules for members
+  - [x] 46.11 Implement the role-change endpoint and the manager rank rules for members
     - `boards/service/role_service.py` `change_role`: validate the body (`MemberRoleSchema`, 400 first), `require_board_manager` (404, 403), load the target membership `FOR UPDATE` (404 when none), `target_is_owner = board.created_by == target.user_id`, `decide_role_change` (`forbidden` gives 403, `bad_request` gives 400), a role equal to the current role returns 200 and changes nothing (Open issue 59), set the role, and when the new role is `guest` set `assignee_id` to NULL on the user's non-deleted Cards of the Board in the same transaction; no Notification; response `user_id`, name, email, role
     - `member_service.py`: DELETE a member uses `decide_member_removal` (admin self-target 400, manager on admin or manager 403, the V5 assignee clearing stays); POST members by a manager always creates the role `member`; route PATCH `/api/boards/<uuid:id>/members/<uuid:user_id>` (200); `GET /api/boards/<id>` returns `my_role` with any of the four values
     - Supersedes the admin-only removal and the V5 and V6 member-removal rules of tasks 8.2 and 27.7; those stay as history
@@ -1794,7 +1794,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A20, A15, A21 row 42, Open issues 47, 59, 63_
     - Depends on: 44.5, 44.6, 44.8, 46.1
 
-  - [ ] 46.12 Write pytest tests for the role change and member removal
+  - [x] 46.12 Write pytest tests for the role change and member removal
     - Cover Requirement 31.23: a manager cannot change or remove a manager or the admin, only the admin grants `manager`, the admin cannot be demoted or removed (admin self-target 400, manager on the admin 403), a manager can change and remove `member` and `guest`, `role` missing or `admin` or invalid gives 400 before any 403 (invalid body from a `member` still 400), 404 when the target has no active membership, 403 for `member`, `guest`, and non-participants, a change to `guest` clears the assignee of that user's Cards in the same transaction, a change to `manager` keeps assignments, same-role change returns 200, no Notification, the user keeps exactly one active membership
     - Property test: **Property 72: Role-change and removal decisions**, endpoint part (generated caller, target, and new role against the database and against `decide_role_change`)
     - Supersedes the member-removal assertions of tasks 8.4 and 27.10 where only the admin removed members; those stay as history
@@ -1803,7 +1803,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Correctness Property 72, A20_
     - Depends on: 46.11
 
-  - [ ] 46.13 Write the Column tests by role
+  - [x] 46.13 Write the Column tests by role
     - Supersedes the V5 and V6 Column tests of tasks 9.2 and 27.11 wherever a `member` creates, renames, deletes, or reorders Columns; 9.2 and 27.11 stay as history
     - A `member` gets 403 on the four Column endpoints with the data unchanged while keeping full Card, Checklist_Item, Card_Link, Comment, and status access; a manager and the admin succeed on all four; a guest and a non-participant get 403; 404 and 400 paths as before
     - **Validates: Requirements 10.1 to 10.11**
@@ -1811,7 +1811,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A15 (matrix), Correctness Property 73_
     - Depends on: 44.8, 46.1
 
-  - [ ] 46.14 Write the invite-link tests for managers
+  - [x] 46.14 Write the invite-link tests for managers
     - Supersedes the admin-only assertions of task 27.9; 27.9 stays as history
     - GET invite-links and regenerate succeed for the admin and every manager, return 403 for a `member`, a `guest`, and a non-participant without disclosing a token; regenerate by a manager invalidates the old token and leaves the other role's token; accept keeps `manager` and `admin` for any token and upgrades a guest only through the member token; add member by email by a manager creates `member`
     - Property test: **Property 75: Manager accept and invite links** (endpoint part)
@@ -1820,7 +1820,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Correctness Property 75, A12-V6 (V11 note), A20_
     - Depends on: 44.8, 46.1
 
-  - [ ] 46.15 Update the status, analytics, and assignee tests for URGENT and the manager role
+  - [x] 46.15 Update the status, analytics, and assignee tests for URGENT and the manager role
     - Supersedes the three-value tests and generators of tasks 27.4 and 27.6 and the role sets of Properties 46 and 48; those stay as history
     - Status: `URGENT` accepted on PATCH and `urgent`, `""`, null, unknown rejected with 400, stateful Hypothesis test over four-value PATCH sequences against the database, `URGENT` to `NOT_STARTED` leaves `completed_at` unchanged, a position change leaves both unchanged; analytics: an `URGENT` Card is not counted as completed, a manager appears in member activity, a manager gets 403 on analytics; assignee: a manager is accepted, a guest is rejected, no Notification for a guest
     - Property tests: **Property 61: Four-value status state machine** (database part), **Property 46** (role set `admin`, `manager`, `member`), **Property 48** (role set includes `manager`)
@@ -1829,7 +1829,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Correctness Properties 46, 48, 61_
     - Depends on: 44.2, 44.8, 46.1
 
-  - [ ] 46.16 Write the V11 role and permission matrix tests
+  - [x] 46.16 Write the V11 role and permission matrix tests
     - Supersedes the V6 matrix of tasks 27.11 and 14.1 (three roles, `member` managing Columns); those stay as history
     - Parametrize admin, manager, member, guest, and non-participant over every endpoint of the V11 matrix in design A15 (Board, members, role change, Columns, Cards, status, checklist, links, comments, invite-links, regenerate, analytics, search, card detail, overdue, invite info and accept): each cell equals the matrix, every 403 leaves the data unchanged and the body free of resource data, a guest gets 200 on GET `/api/cards/<id>` and 403 on every write
     - Property tests: **Property 73: V11 permission matrix** (database part), **Property 13** (updated role set), **Property 47** (updated role set)
@@ -1838,14 +1838,14 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Correctness Properties 13, 47, 73, A15 (matrix)_
     - Depends on: 46.5, 46.7, 46.12, 46.13, 46.14, 46.2
 
-  - [ ] 46.17 Write database-level V11 schema tests
+  - [x] 46.17 Write database-level V11 schema tests
     - Against the test database after task 45.1: `information_schema` lists exactly the 9 tables; inserting `status = 'URGENT'` and `role = 'manager'` succeeds and `'urgent'` and `'owner'` fail; `ix_cards_due_date`, `ix_checklist_items_card_id_order`, and `ix_card_links_card_id` exist; named FKs exist; a failure message tells the user to review the hand-edited check constraints of task 45.1
     - Supersedes the 7-table and three-role schema tests of task 27.12; 27.12 stays as history
     - _Requirements: 2.15, 2.16, 44.1, 44.2, 44.3, 31.16_
     - _Design: Data Models (V11 migration table), Testing Strategy V11 additions_
     - Depends on: 45.1
 
-  - [ ] 46.18 Update the envelope, status code, and serialization tests for the V11 endpoints
+  - [x] 46.18 Update the envelope, status code, and serialization tests for the V11 endpoints
     - Supersedes the 33-row endpoint list of tasks 14.3 and 27.13; those stay as history
     - Parametrize over the 42 rows of design A11 and A21 plus 3a: exactly one top-level key, 201 only for the eight creating POSTs (register, boards, members, columns, cards, comments, checklist, links), 200 elsewhere (regenerate, accept, role change, overdue), each failure type maps to the right status, UUID and timestamp formats; extend the static scan for SQL built by string formatting and the log-capture test over the new checklist, link, overdue, and role-change code
     - Property tests: **Property 1**, **Property 2**, **Property 3** (updated)
@@ -1854,7 +1854,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A11, A21, Correctness Properties 1, 2, 3_
     - Depends on: 46.2, 46.4, 46.6, 46.9, 46.11
 
-- [ ] 47. V11 backend checkpoint
+- [x] 47. V11 backend checkpoint
   - Run `pytest -v` from `app/` against the test database after task 45.1: 0 failures and 0 errors, including the file-size test of task 15.1 (split any backend file over 300 lines)
   - Ensure all tests pass, ask the user if questions arise
   - Frontend V11 tasks (49 onward) depend on this checkpoint

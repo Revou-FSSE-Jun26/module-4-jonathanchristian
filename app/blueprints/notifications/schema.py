@@ -78,3 +78,21 @@ class NotificationPageSchema(Schema):
     per_page = fields.Integer()
     total = fields.Integer()
     unread_count = fields.Integer()
+
+
+class OverdueItemSchema(Schema):
+    """One overdue Card in GET /api/notifications/overdue (design A19)."""
+
+    card_id = UuidField()
+    title = fields.String()
+    due_date = fields.Date()
+    status = fields.String()
+    column_name = fields.String()
+    board_id = UuidField()
+    board_name = fields.String()
+    days_overdue = fields.Integer()
+
+
+class OverdueResultSchema(Schema):
+    items = fields.List(fields.Nested(OverdueItemSchema))
+    total = fields.Integer()

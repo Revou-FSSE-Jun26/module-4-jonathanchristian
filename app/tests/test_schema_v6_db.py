@@ -1,4 +1,4 @@
-"""Database-level V6 schema tests against the migrated test database (task 26.1)."""
+"""Database-level schema tests against the migrated test database (V6 columns; V11 values and tables)."""
 import uuid
 
 import pytest
@@ -8,8 +8,8 @@ from sqlalchemy.exc import IntegrityError
 pytestmark = pytest.mark.e2e
 
 REVIEW_HINT = (
-    "Review the hand-added check constraints (ck_cards_status, ck_board_memberships_role) "
-    "in app/migrations/versions/ (task 26.1) and run `flask db upgrade` on the test database."
+    "Review the hand-edited check constraints (ck_cards_status, ck_board_memberships_role) "
+    "in app/migrations/versions/ (task 45.1) and run `flask db upgrade` on the test database."
 )
 CHECK_VIOLATION, UNIQUE_VIOLATION = "23514", "23505"
 
@@ -54,13 +54,13 @@ def parents(make_board, make_column):
     return board, make_column(board)
 
 
-@pytest.mark.parametrize("status", ["DONE", "IN_PROGRESS", "NOT_STARTED"])
-def test_card_status_check_accepts_the_three_statuses(app, parents, status):
+@pytest.mark.parametrize("status", ["DONE", "IN_PROGRESS", "NOT_STARTED", "URGENT"])
+def test_card_status_check_accepts_the_four_statuses(app, parents, status):
     board, column = parents
     assert insert_card(app, board, column, status=status) is None, REVIEW_HINT
 
 
-@pytest.mark.parametrize("status", ["done", "UNKNOWN", "", "Done "])
+@pytest.mark.parametrize("status", ["done", "urgent", "Urgent", "UNKNOWN", "", "Done "])
 def test_card_status_check_rejects_anything_else(app, parents, status):
     board, column = parents
     assert insert_card(app, board, column, status=status) == CHECK_VIOLATION, REVIEW_HINT
@@ -97,12 +97,12 @@ def insert_membership(app, board, user, role):
     )
 
 
-@pytest.mark.parametrize("role", ["admin", "member", "guest"])
-def test_membership_role_check_accepts_the_three_roles(app, make_board, make_user, role):
+@pytest.mark.parametrize("role", ["admin", "manager", "member", "guest"])
+def test_membership_role_check_accepts_the_four_roles(app, make_board, make_user, role):
     assert insert_membership(app, make_board(), make_user(), role) is None, REVIEW_HINT
 
 
-@pytest.mark.parametrize("role", ["owner", "Guest", "viewer", ""])
+@pytest.mark.parametrize("role", ["owner", "Guest", "Manager", "viewer", ""])
 def test_membership_role_check_rejects_another_value(app, make_board, make_user, role):
     assert insert_membership(app, make_board(), make_user(), role) == CHECK_VIOLATION, REVIEW_HINT
 
@@ -142,7 +142,7 @@ def test_a_member_token_may_not_repeat_but_the_two_columns_are_independent(app, 
     assert execute(app, sql, id=uuid.uuid4(), **kwargs) == UNIQUE_VIOLATION
 
 
-def test_the_schema_has_exactly_the_seven_application_tables(app):
+def test_the_schema_has_exactly_the_nine_application_tables(app):
     from app.extensions import db
 
     with app.app_context():
@@ -152,6 +152,7 @@ def test_the_schema_has_exactly_the_seven_application_tables(app):
     tables = set(rows) - {"alembic_version"}
     assert tables == {
         "users", "boards", "board_memberships", "columns", "cards", "comments", "notifications",
+        "checklist_items", "card_links",
     }, f"Unexpected tables {sorted(tables)}. {REVIEW_HINT}"
 
 

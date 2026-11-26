@@ -13,6 +13,7 @@ from app.blueprints.boards.service.invite_service import (
     get_invite_links,
     regenerate_invite_link,
 )
+from app.blueprints.boards.service.role_service import change_role
 from app.blueprints.boards.service.member_service import (
     add_member,
     list_members,
@@ -22,6 +23,7 @@ from app.blueprints.boards.service.member_service import (
 __all__ = [
     "accept_invite",
     "add_member",
+    "change_role",
     "create_board",
     "delete_board",
     "find_board_by_token",

@@ -1,4 +1,4 @@
-"""pytest tests for Card_Status, completed_at, and the writer-only assignee rule (V6).
+"""pytest tests for Card_Status, completed_at, and the writer-only assignee rule (V11: four statuses).
 
 Property tests are in test_card_status_properties.py."""
 from datetime import datetime, timedelta, timezone
@@ -10,7 +10,7 @@ from helpers import assert_envelope
 
 pytestmark = pytest.mark.e2e
 
-STATUSES = ("NOT_STARTED", "IN_PROGRESS", "DONE")
+STATUSES = ("NOT_STARTED", "IN_PROGRESS", "URGENT", "DONE")
 
 
 @pytest.fixture
@@ -98,7 +98,7 @@ def test_cards_created_without_status_default_to_not_started(setup, make_card, f
 # --- PATCH validation -------------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("value", ["done", "Done", "in_progress", "", None, "UNKNOWN", " DONE", 5, ["DONE"]])
+@pytest.mark.parametrize("value", ["done", "Done", "urgent", "Urgent", "in_progress", "", None, "UNKNOWN", " DONE", 5, ["DONE"]])
 def test_invalid_status_on_patch_is_400_and_changes_nothing(
     client, setup, make_card, auth_header, fetch, value
 ):
@@ -153,7 +153,7 @@ def test_done_to_done_and_omitted_status_keep_completed_at(client, setup, make_c
 def test_not_started_and_in_progress_keep_null_completed_at(client, setup, make_card, auth_header):
     _board, admin, _member, column = setup
     card = make_card(column)
-    for status in ("IN_PROGRESS", "NOT_STARTED", "IN_PROGRESS"):
+    for status in ("IN_PROGRESS", "URGENT", "NOT_STARTED", "IN_PROGRESS"):
         data = assert_envelope(patch(client, auth_header(admin), card.card_id, {"status": status}), 200)
         assert data["completed_at"] is None
 

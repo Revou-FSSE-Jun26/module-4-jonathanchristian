@@ -205,14 +205,14 @@ def test_missing_deleted_or_malformed_board_is_404_and_unauthenticated_401(clien
     assert_envelope(client.get(url(board), headers=headers), 404)
 
 
-# Feature: kano, Property 46: Analytics equals a naive model (V6 definition)
+# Feature: kano, Property 46: Analytics equals a naive model (roles admin, manager, member)
 _card = st.fixed_dictionaries(
     {
-        "assignee": st.sampled_from([None, 0, 1, 2]),  # index 2 is a guest (seeded directly)
-        "status": st.sampled_from(["NOT_STARTED", "IN_PROGRESS", "DONE"]),
+        "assignee": st.sampled_from([None, 0, 1, 2, 3]),  # index 2 is a manager, 3 a guest
+        "status": st.sampled_from(["NOT_STARTED", "IN_PROGRESS", "URGENT", "DONE"]),
         "completed": st.sampled_from([None, "start-1s", "start", "now", "future", "old"]),
         "deleted": st.booleans(),
-        "comments": st.lists(st.tuples(st.sampled_from([0, 1, 2]), st.booleans()), max_size=3),
+        "comments": st.lists(st.tuples(st.sampled_from([0, 1, 2, 3]), st.booleans()), max_size=3),
     }
 )
 _column = st.fixed_dictionaries(
@@ -234,14 +234,17 @@ def test_property_analytics_equals_a_naive_model(
 
     reset_database()
     board = make_board()
-    users = [board.owner, make_member(board).member, make_member(board, role="guest").member]
+    users = [
+        board.owner, make_member(board).member, make_member(board, role="manager").member,
+        make_member(board, role="guest").member,
+    ]
     now, start = utcnow(), week_start()
     offsets = {
         None: None, "start-1s": start - timedelta(seconds=1), "start": start,
         "now": now, "future": now + timedelta(hours=1), "old": start - timedelta(days=3),
     }
     expected_cards, expected_done = {}, 0
-    expected_activity = {u.user_id: [0, 0] for u in users[:2]}  # guests are not listed
+    expected_activity = {u.user_id: [0, 0] for u in users[:3]}  # guests are not listed
     for spec in columns:
         column = make_column(board, spec["name"])
         if spec["deleted"]:
@@ -266,10 +269,10 @@ def test_property_analytics_equals_a_naive_model(
             live_cards += 1
             if card_spec["status"] == "DONE" and completed_at is not None and start <= completed_at <= now:
                 expected_done += 1
-            if assignee is not None and assignee in users[:2]:
+            if assignee is not None and assignee in users[:3]:
                 expected_activity[assignee.user_id][0] += 1
             for author_index, comment_deleted in card_spec["comments"]:
-                if not comment_deleted and author_index < 2:
+                if not comment_deleted and author_index < 3:
                     expected_activity[users[author_index].user_id][1] += 1
         if not spec["deleted"]:
             expected_cards[column.column_id] = live_cards

@@ -32,17 +32,17 @@ def column_url(column):
 
 
 def test_first_column_gets_order_1_and_later_ones_exceed_the_maximum(
-    client, make_board, make_member, auth_header
+    client, make_board, make_manager, auth_header
 ):
     board = make_board()
-    member = make_member(board).member
+    manager = make_manager(board).member
     first = assert_envelope(
         client.post(board_columns_url(board), json={"name": " To Do "}, headers=auth_header(board.owner)), 201
     )
     assert set(first) == {"column_id", "board_id", "name", "order"}
     assert (first["name"], first["order"], first["board_id"]) == ("To Do", 1.0, str(board.board_id))
     second = assert_envelope(
-        client.post(board_columns_url(board), json={"name": "Doing"}, headers=auth_header(member)), 201
+        client.post(board_columns_url(board), json={"name": "Doing"}, headers=auth_header(manager)), 201
     )
     assert second["order"] > first["order"]
 
@@ -107,13 +107,13 @@ def test_create_column_requires_authentication(client, make_board):
 # --- rename ----------------------------------------------------------------------------------------
 
 
-def test_member_renames_column(client, make_board, make_member, make_column, auth_header, fetch):
+def test_manager_renames_column(client, make_board, make_manager, make_column, auth_header, fetch):
     from app.blueprints.columns.schema import Column
 
     board = make_board()
     column = make_column(board, "Old")
-    member = make_member(board).member
-    data = assert_envelope(client.patch(column_url(column), json={"name": " New "}, headers=auth_header(member)), 200)
+    manager = make_manager(board).member
+    data = assert_envelope(client.patch(column_url(column), json={"name": " New "}, headers=auth_header(manager)), 200)
     assert data["name"] == "New" and data["column_id"] == str(column.column_id)
     assert fetch(Column, column.column_id).name == "New"
 

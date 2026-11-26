@@ -137,7 +137,7 @@ def test_removing_a_member_clears_assignments_on_that_board_only(client, world, 
 # --- membership uniqueness ignores soft-deleted rows for all three roles ----------------------------------
 
 
-@pytest.mark.parametrize("role", ["admin", "member", "guest"])
+@pytest.mark.parametrize("role", ["manager", "member", "guest"])  # V11: only the creator is admin
 def test_a_soft_deleted_membership_of_any_role_does_not_block_a_new_one(
     client, make_board, make_member, make_user, auth_header, count_rows, role
 ):
