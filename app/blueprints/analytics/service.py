@@ -8,7 +8,7 @@ from app.blueprints.columns.schema import Column
 from app.blueprints.comments.schema import Comment
 from app.blueprints.users.schema import User
 from app.extensions import db
-from app.permissions import ADMIN, MEMBER, require_board_admin
+from app.permissions import ADMIN, MANAGER, MEMBER, require_board_admin
 from app.soft_delete import active, start_of_week_utc, utcnow
 
 analytics_schema = AnalyticsSchema()
@@ -70,7 +70,7 @@ def _member_activity(board_id):
         .where(
             BoardMembership.board_id == board_id,
             active(BoardMembership),
-            BoardMembership.role.in_((ADMIN, MEMBER)),  # guests are not Board_Members
+            BoardMembership.role.in_((ADMIN, MANAGER, MEMBER)),  # guests are not Board_Members
         )
         .order_by(BoardMembership.created_at, BoardMembership.board_membership_id)
     ).all()

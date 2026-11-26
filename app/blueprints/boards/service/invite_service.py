@@ -19,7 +19,7 @@ from app.blueprints.boards.schema import (
 )
 from app.errors import NotFound
 from app.extensions import db
-from app.permissions import require_board_admin
+from app.permissions import require_board_manager
 from app.soft_delete import active
 
 INVITE_TOKEN_RE = re.compile(INVITE_TOKEN_PATTERN)
@@ -72,12 +72,12 @@ def _read_tokens(board_id):
 
 
 def get_invite_links(user, board_id):
-    """Admin only. Missing tokens (Boards created before V6) are created lazily.
+    """Admin or manager. Missing tokens (Boards created before V6) are created lazily.
 
     The UPDATE keeps an existing token (COALESCE), so two concurrent first requests end with
     one stored pair and both responses carry it.
     """
-    require_board_admin(board_id, user.user_id)
+    require_board_manager(board_id, user.user_id)
     member_token, guest_token = _read_tokens(board_id)
     if member_token is None or guest_token is None:
         fresh_member = generate_unique_token(db.session)
@@ -103,8 +103,8 @@ def get_invite_links(user, board_id):
 
 
 def regenerate_invite_link(user, board_id, load_role):
-    """Admin only (404 and 403 first), then the role (400). Replaces one token only."""
-    board, _membership = require_board_admin(board_id, user.user_id)
+    """Admin or manager (404 and 403 first), then the role (400). Replaces one token only."""
+    board, _membership = require_board_manager(board_id, user.user_id)
     role = load_role(role_schema)["role"]
     token = generate_unique_token(db.session)
     setattr(board, ROLE_COLUMNS[role], token)

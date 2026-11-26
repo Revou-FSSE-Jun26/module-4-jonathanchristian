@@ -1,62 +1,15 @@
-"""Card model and cards Marshmallow schemas."""
-import uuid
-
+"""Cards Marshmallow schemas (output and input)."""
 from marshmallow import RAISE, Schema, ValidationError, fields, pre_load, validate, validates_schema
-from sqlalchemy.dialects import postgresql
 
+from app.blueprints.cards.schema.card_model import CARD_STATUSES
+from app.blueprints.cards.schema.checklist_schemas import ChecklistItemSchema
+from app.blueprints.cards.schema.link_schemas import CardLinkSchema
 from app.blueprints.users.schema import UserRefSchema, clean_text_fields
 from app.errors import OrderField, UtcDateTime, UuidField
-from app.extensions import db
-from app.soft_delete import SoftDeleteMixin
-
-# Card_Status values (exact, case-sensitive); the rule that moves between them is
-# `cards/service/status.py`. Defined here so schema.py never imports a service module.
-CARD_STATUSES = ("NOT_STARTED", "IN_PROGRESS", "DONE")
 
 
-class Card(SoftDeleteMixin, db.Model):
-    __tablename__ = "cards"
-
-    card_id = db.Column(db.Uuid, primary_key=True, default=uuid.uuid4)
-    # board_id is denormalized from the Column; a Card never changes Board (design D11).
-    board_id = db.Column(
-        db.Uuid, db.ForeignKey("boards.board_id", name="fk_cards_boards"), nullable=False
-    )
-    column_id = db.Column(
-        db.Uuid, db.ForeignKey("columns.column_id", name="fk_cards_columns"), nullable=False
-    )
-    title = db.Column(db.String(200), nullable=False)
-    description = db.Column(db.Text, nullable=True)
-    due_date = db.Column(db.Date, nullable=True)
-    labels = db.Column(
-        postgresql.ARRAY(db.String(30)), nullable=False, default=list, server_default="{}"
-    )
-    assignee_id = db.Column(
-        db.Uuid, db.ForeignKey("users.user_id", name="fk_cards_users"), nullable=True
-    )
-    order = db.Column(db.Float, nullable=False)
-    # V6: Card_Status and the time the Card entered DONE (see cards/service/status.py).
-    status = db.Column(
-        db.String(20), nullable=False, default="NOT_STARTED", server_default="NOT_STARTED"
-    )
-    completed_at = db.Column(db.DateTime(timezone=True), nullable=True)
-
-    assignee = db.relationship("User", foreign_keys="Card.assignee_id", lazy="raise")
-
-    __table_args__ = (
-        db.CheckConstraint("char_length(description) <= 5000", name="ck_cards_description_len"),
-        db.CheckConstraint('"order" > 0', name="ck_cards_order_positive"),
-        db.CheckConstraint(
-            "status IN ('NOT_STARTED', 'IN_PROGRESS', 'DONE')", name="ck_cards_status"
-        ),
-        db.Index("ix_cards_column_id_order", "column_id", "order"),
-        db.Index("ix_cards_board_id", "board_id"),
-        db.Index("ix_cards_assignee_id", "assignee_id"),
-    )
-
-
-class CardSchema(Schema):
-    """Output schema for a Card. `assignee` must be loaded (joinedload) before dumping."""
+class CardBaseSchema(Schema):
+    """Card fields shared by every output. `assignee` must be loaded (joinedload) before dumping."""
 
     card_id = UuidField()
     board_id = UuidField()
@@ -73,11 +26,29 @@ class CardSchema(Schema):
     updated_at = UtcDateTime()
 
 
-class CardSearchResultSchema(CardSchema):
-    """A Card in search and My Tasks results, with its Board and Column names."""
+class CardSchema(CardBaseSchema):
+    """A Card in board detail and in the create, update, and position responses (design A18).
+
+    The service sets `checklist_done`, `checklist_total`, and `link_count` on the Card first.
+    """
+
+    checklist_done = fields.Integer()
+    checklist_total = fields.Integer()
+    link_count = fields.Integer()
+
+
+class CardSearchResultSchema(CardBaseSchema):
+    """A Card in search and My Tasks results, with its Board and Column names (no counts)."""
 
     board_name = fields.String()
     column_name = fields.String()
+
+
+class CardDetailSchema(CardSchema):
+    """GET /api/cards/<id>: the Card with its checklist and links (design A18)."""
+
+    checklist = fields.List(fields.Nested(ChecklistItemSchema))
+    links = fields.List(fields.Nested(CardLinkSchema))
 
 
 # --- input schemas ---------------------------------------------------------------------------

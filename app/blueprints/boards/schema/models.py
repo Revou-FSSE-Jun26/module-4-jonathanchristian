@@ -45,7 +45,7 @@ class BoardMembership(SoftDeleteMixin, db.Model):
 
     __table_args__ = (
         db.CheckConstraint(
-            "role IN ('admin', 'member', 'guest')", name="ck_board_memberships_role"
+            "role IN ('admin', 'manager', 'member', 'guest')", name="ck_board_memberships_role"
         ),
         db.Index(
             "uq_board_memberships_board_user_active",

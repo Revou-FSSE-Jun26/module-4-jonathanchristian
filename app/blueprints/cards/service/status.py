@@ -5,7 +5,7 @@ The rule itself touches no database, so it is unit and property testable.
 
 from app.blueprints.cards.schema import CARD_STATUSES  # exact and case-sensitive
 
-NOT_STARTED, IN_PROGRESS, DONE = CARD_STATUSES
+NOT_STARTED, IN_PROGRESS, URGENT, DONE = CARD_STATUSES
 
 
 def apply_status_change(old_status, old_completed_at, new_status, now):
@@ -14,7 +14,7 @@ def apply_status_change(old_status, old_completed_at, new_status, now):
     * not supplied, or unchanged (including DONE to DONE): nothing changes
     * any other value to DONE: `completed_at` becomes `now`
     * DONE to any other value: `completed_at` becomes None
-    * NOT_STARTED <-> IN_PROGRESS: `completed_at` stays (it is None for both)
+    * a move among NOT_STARTED, IN_PROGRESS, and URGENT: `completed_at` stays (None for all three)
     """
     if new_status is None or new_status == old_status:
         return old_status, old_completed_at

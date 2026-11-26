@@ -20,6 +20,8 @@ TABLES = {
     "cards": "card_id",
     "comments": "comment_id",
     "notifications": "notification_id",
+    "checklist_items": "checklist_item_id",
+    "card_links": "card_link_id",
 }
 SOFT_DELETE_COLUMNS = ("created_at", "updated_at", "deleted_at", "is_deleted")
 
@@ -42,7 +44,8 @@ def _index(table, name):
     return matches[0]
 
 
-def test_exactly_seven_tables(tables):
+def test_exactly_nine_tables(tables):
+    assert len(TABLES) == 9
     assert set(tables) == set(TABLES)
 
 
@@ -53,7 +56,7 @@ def test_primary_keys_are_named_uuid_columns(tables):
         assert isinstance(pk_columns[0].type, sa.Uuid)
 
 
-@pytest.mark.parametrize("table_name", ["columns", "cards"])
+@pytest.mark.parametrize("table_name", ["columns", "cards", "checklist_items"])
 def test_order_columns_are_not_null_floats(tables, table_name):
     order = tables[table_name].c["order"]
     assert isinstance(order.type, sa.Float)
@@ -82,6 +85,9 @@ def test_foreign_keys_follow_naming_pattern(tables):
         "fk_notifications_users",
         "fk_notifications_cards",
         "fk_notifications_boards",
+        "fk_checklist_items_cards",
+        "fk_card_links_cards",
+        "fk_card_links_users",
     } == names
 
 
@@ -125,7 +131,10 @@ def test_required_filter_and_order_indexes_exist(tables):
             "ix_cards_column_id_order": ["column_id", "order"],
             "ix_cards_board_id": ["board_id"],
             "ix_cards_assignee_id": ["assignee_id"],
+            "ix_cards_due_date": ["due_date"],
         },
+        "checklist_items": {"ix_checklist_items_card_id_order": ["card_id", "order"]},
+        "card_links": {"ix_card_links_card_id": ["card_id"]},
         "comments": {"ix_comments_card_id_created_at": ["card_id", "created_at"]},
         "notifications": {
             "ix_notifications_recipient_created": ["recipient_id", "created_at"],
@@ -168,11 +177,11 @@ def test_cards_status_and_completed_at_columns(tables):
     assert completed_at.type.timezone is True
 
 
-def test_card_status_check_allows_exactly_the_three_statuses(tables):
+def test_card_status_check_allows_exactly_the_four_statuses(tables):
     text = _checks(tables, "cards")["ck_cards_status"]
-    for value in ("NOT_STARTED", "IN_PROGRESS", "DONE"):
+    for value in ("NOT_STARTED", "IN_PROGRESS", "URGENT", "DONE"):
         assert f"'{value}'" in text
-    assert text.count("'") == 6
+    assert text.count("'") == 8
 
 
 @pytest.mark.parametrize("column", ["member_invite_token", "guest_invite_token"])
@@ -188,11 +197,11 @@ def test_board_invite_token_columns_are_nullable_and_unique(tables, column):
     assert [c.name for c in unique] == [f"uq_boards_{column}"]
 
 
-def test_membership_role_check_allows_admin_member_and_guest(tables):
+def test_membership_role_check_allows_the_four_roles(tables):
     text = _checks(tables, "board_memberships")["ck_board_memberships_role"]
-    for value in ("admin", "member", "guest"):
+    for value in ("admin", "manager", "member", "guest"):
         assert f"'{value}'" in text
-    assert text.count("'") == 6
+    assert text.count("'") == 8
 
 
 def test_relationships_use_lazy_raise_and_mappers_configure(app):
@@ -252,7 +261,8 @@ def test_schema_files_import_only_schema_modules_of_other_features():
     # Cross-feature imports from a schema.py are limited to other schema.py files
     # (models, shared field helpers); never a service.py or routes.py.
     for feature in FEATURES:
-        for path in (APP_DIR / "blueprints" / feature).glob("schema*.py"):
+        package = APP_DIR / "blueprints" / feature
+        for path in [*package.glob("schema*.py"), *package.glob("schema/*.py")]:
             for name in _imports(path):
                 other, module = _feature_of(name)
                 if other and other != feature:
@@ -260,7 +270,15 @@ def test_schema_files_import_only_schema_modules_of_other_features():
 
 
 def test_permissions_imports_schema_files_only():
-    for name in _imports(APP_DIR / "permissions.py"):
-        other, module = _feature_of(name)
-        if other:
-            assert module in (None, "schema"), f"permissions.py imports {name}"
+    paths = sorted((APP_DIR / "permissions").glob("*.py"))
+    assert paths, "app/permissions/ package is missing"
+    for path in paths:
+        for name in _imports(path):
+            other, module = _feature_of(name)
+            if other:
+                assert module in (None, "schema"), f"{path.name} imports {name}"
+
+
+def test_permissions_rules_module_is_pure():
+    names = _imports(APP_DIR / "permissions" / "rules.py")
+    assert not [n for n in names if n.startswith(("flask", "sqlalchemy", "app."))]

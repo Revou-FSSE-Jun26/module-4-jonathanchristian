@@ -16,7 +16,11 @@ from app.blueprints.boards.schema.invite_schemas import (
     InviteRoleSchema,
     InviteTokenSchema,
 )
-from app.blueprints.boards.schema.member_schemas import MemberAddSchema, MemberSchema
+from app.blueprints.boards.schema.member_schemas import (
+    MemberAddSchema,
+    MemberRoleSchema,
+    MemberSchema,
+)
 from app.blueprints.boards.schema.models import Board, BoardMembership
 
 __all__ = [
@@ -36,5 +40,6 @@ __all__ = [
     "InviteRoleSchema",
     "InviteTokenSchema",
     "MemberAddSchema",
+    "MemberRoleSchema",
     "MemberSchema",
 ]

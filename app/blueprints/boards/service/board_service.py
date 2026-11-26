@@ -12,6 +12,7 @@ from app.blueprints.boards.schema import (
 )
 from app.blueprints.boards.service import cascade, invite_service as invites
 from app.blueprints.cards.schema import Card
+from app.blueprints.cards.service.counts import NO_COUNTS, apply_counts, counts_for_board
 from app.blueprints.columns.schema import Column
 from app.extensions import db
 from app.permissions import ADMIN, require_board_admin, require_board_reader
@@ -61,7 +62,7 @@ def get_board_detail(user, board_id):
     """Board with Columns and Cards in a fixed number of queries.
 
     Query 1 (user lookup) runs in the JWT callback. Here: 2 board plus membership,
-    3 columns, 4 cards with the assignee joined.
+    3 columns, 4 cards with the assignee joined, 5 the checklist and link counts (design A18).
     """
     board, membership = require_board_reader(board_id, user.user_id)
     columns = db.session.execute(
@@ -75,8 +76,10 @@ def get_board_detail(user, board_id):
         .where(Card.board_id == board_id, active(Card))
         .order_by(Card.order, Card.created_at)
     ).scalars().all()
+    counts = counts_for_board(board_id)
     cards_by_column = defaultdict(list)
     for card in cards:
+        apply_counts(card, counts.get(card.card_id, NO_COUNTS))
         cards_by_column[card.column_id].append(card)
     for column in columns:
         column.cards = cards_by_column[column.column_id]

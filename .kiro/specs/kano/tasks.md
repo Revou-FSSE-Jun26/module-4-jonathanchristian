@@ -1584,8 +1584,8 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
   - _Requirements: 18.16, 18.17, 18.18, 18.19, 18.20, 27.11, 27.12, 33.17_
   - _Design: B15, Open issue 41_
 
-- [ ] 44. Phase 24 (V11): Backend models, schema, and permissions (code only)
-  - [ ] 44.1 Convert the `cards` schema, service, and routes into packages (no behaviour change)
+- [x] 44. Phase 24 (V11): Backend models, schema, and permissions (code only)
+  - [x] 44.1 Convert the `cards` schema, service, and routes into packages (no behaviour change)
     - Read `guidelines/backend.md` and `guidelines/database.md` first
     - `cards/schema/` (`card_model.py`, `card_schemas.py`; the checklist and link modules come in 44.3 and 44.4), `cards/service/` (`card_service.py`, `position_service.py`, `search_service.py`, `status.py`; keep the package from task 25.1 if it already exists), `cards/routes/` (`card_routes.py`, `search_routes.py`); each `__init__.py` keeps `routes`, `service`, and `schema` importable under those names (Requirement 30.7), and `boards` and `columns` keep importing `Card` from `cards/schema`
     - Pure refactor: every existing backend test still passes against the V6 database
@@ -1594,7 +1594,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A17 (file split plan), D20, Open issue 56_
     - Depends on: 28
 
-  - [ ] 44.2 Add the `URGENT` status and the due-date index to the Card model and schemas
+  - [x] 44.2 Add the `URGENT` status and the due-date index to the Card model and schemas
     - `CARD_STATUSES = ("NOT_STARTED", "IN_PROGRESS", "URGENT", "DONE")`; `CardUpdateSchema.status` keeps `validate.OneOf(CARD_STATUSES)` (exact, case-sensitive); `CardCreateSchema` still rejects `status`
     - Model: `ck_cards_status` now `status IN ('NOT_STARTED','IN_PROGRESS','URGENT','DONE')`; new `db.Index("ix_cards_due_date", "due_date")`
     - `apply_status_change` code is unchanged (its last branch already keeps `completed_at` for every move among the three non-completed values); analytics and overdue treat only `DONE` as completed
@@ -1603,28 +1603,28 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A16, A13 (V11 note), Data Models (V11)_
     - Depends on: 44.1
 
-  - [ ] 44.3 Define the `ChecklistItem` and `CardLink` models in `cards/schema/`
+  - [x] 44.3 Define the `ChecklistItem` and `CardLink` models in `cards/schema/`
     - `checklist_model.py` and `link_model.py` exactly as design Data Models (V11): PKs `checklist_item_id` and `card_link_id` (UUID), named FKs `fk_checklist_items_cards`, `fk_card_links_cards`, `fk_card_links_users`, check constraints (`ck_checklist_items_text_len`, `ck_checklist_items_order_positive`, `ck_card_links_url_len`, `ck_card_links_label_len`), indexes `ix_checklist_items_card_id_order` and `ix_card_links_card_id`, soft-delete mixin, no `ON DELETE CASCADE`, cross-package relationships by string name with `lazy="raise"`
     - `cards/schema/__init__.py` imports both modules so `create_app` registers them before `Migrate.init_app` and `flask db migrate` detects all 9 tables (Requirement 1.9)
     - _Requirements: 1.4, 1.8, 1.9, 2.2, 2.3, 2.4, 2.5, 41.1, 42.1, 44.2, 44.3_
     - _Design: Data Models (V11 models), D20_
     - Depends on: 44.1
 
-  - [ ] 44.4 Add the URL rule and the checklist, link, and card-detail schemas
+  - [x] 44.4 Add the URL rule and the checklist, link, and card-detail schemas
     - `cards/schema/url_rules.py`: pure `validate_link_url(raw)` (trim, 1 to 2048 characters, no whitespace or control character, scheme `http` or `https` in any letter case, non-empty hostname; `ValueError` on rejection) and `default_label(url)` (lower-case hostname cut to 100 characters, design Open issue 48)
     - `checklist_schemas.py`: `ChecklistCreateSchema` (`text` stripped, 1 to 200, not blank), `ChecklistUpdateSchema` (`text`, strict JSON boolean `is_done`, finite float `order` > 0, at least one field), `ChecklistItemSchema`; `link_schemas.py`: `CardLinkCreateSchema`, `CardLinkUpdateSchema` (at least one field; `label` 1 to 100 after trimming), `CardLinkSchema`; `CardDetailSchema`; all with `unknown = RAISE`
     - _Requirements: 41.2, 41.3, 41.6, 41.9, 42.2, 42.3, 42.5, 42.6, 4.9_
     - _Design: A17 (pure URL rule, schemas), Open issue 48_
     - Depends on: 44.3
 
-  - [ ] 44.5 Allow the role `manager` in the Board_Membership model and add `MemberRoleSchema`
+  - [x] 44.5 Allow the role `manager` in the Board_Membership model and add `MemberRoleSchema`
     - `boards/schema`: `ck_board_memberships_role` now allows `admin`, `manager`, `member`, `guest`; the partial unique index `uq_board_memberships_board_user_active` is unchanged; add `MemberRoleSchema` (`role` required string, validated before any permission check, Open issue 59) to `member_schemas.py`; split the schema package if it nears 300 lines
     - Supersedes the three-role check of task 25.2; 25.2 stays as history
     - _Requirements: 2.15, 43.5, 43.8, 44.1_
     - _Design: A15, A20, Data Models (V11 changed constraints)_
     - Depends on: 28
 
-  - [ ] 44.6 Extend `permissions.py` with the manager rank and the pure role-decision functions
+  - [x] 44.6 Extend `permissions.py` with the manager rank and the pure role-decision functions
     - `ROLE_RANK = {guest: 0, member: 1, manager: 2, admin: 3}` and `LEVEL_RANK = {reader: 0, writer: 1, manager: 2, admin: 3}` defined once (no second role table in another module); `role_allows` keeps its formula and returns False for None; `ASSIGNABLE_ROLES = ("guest", "member", "manager")`
     - Pure `decide_role_change(caller, target, new_role, target_is_owner)` and `decide_member_removal(caller, target, target_is_owner)` exactly as design A15: the owner check runs before the rank rule (admin who targets the owner gets `bad_request`, a manager gets `forbidden`), a new role outside the assignable set is `bad_request`, a caller rank not above the target rank or not above the new role rank is `forbidden`
     - If `permissions.py` nears 300 lines convert it to a package `app/permissions/` (`rules.py` pure, `helpers.py` queries) whose `__init__.py` re-exports every public name
@@ -1632,14 +1632,14 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A15, D19, Open issue 47_
     - Depends on: 28
 
-  - [ ] 44.7 Add the manager-level and new resource helpers to `permissions.py`
+  - [x] 44.7 Add the manager-level and new resource helpers to `permissions.py`
     - `require_board_manager(board_id, user_id)` (404, 403 without membership, 403 below manager), `get_column_for_manager(column_id, user_id)`, `get_card_for_reader` and `get_card_for_writer(card_id, user_id, lock=False)` (`lock=True` runs `SELECT ... FOR UPDATE` on the Card row for the cap checks, Open issue 54), `get_checklist_item_for_writer`, `get_card_link_for_writer`; one joined query each; check order 404, then 403 without membership, then 403 for role; generic 403 message with no resource data; `assert_assignee_is_writer` accepts `admin`, `manager`, `member` and rejects a guest (400)
     - `permissions.py` imports `ChecklistItem` and `CardLink` from `cards/schema` (models only, never a `service.py`)
     - _Requirements: 1.6, 28.10, 28.11, 28.14, 11.5, 11.22, 41.7, 41.8, 42.8, 43.2, 43.9_
     - _Design: A15 (helpers table)_
     - Depends on: 44.3, 44.6
 
-  - [ ] 44.8 Move the Column, add-member, and invite-link call sites to the manager helpers
+  - [x] 44.8 Move the Column, add-member, and invite-link call sites to the manager helpers
     - Create column, rename, delete, and reorder use `require_board_manager` or `get_column_for_manager` (so the role `member` gets 403 on all four, R10.11); `get_column_for_writer` stays only for creating a Card; POST members and the invite-links GET and regenerate use `require_board_manager`; analytics member activity lists roles `admin`, `manager`, and `member`; the analytics endpoint stays admin-only
     - V6 tests that assume a `member` manages Columns or that only the admin reads invite links are updated by 46.13, 46.14, 46.15, and 46.16, and are not expected to pass before those tasks
     - Supersedes the V6 writer-level Column guards and admin-only invite guards of tasks 25.4 and 27.8; those stay as history
@@ -1647,28 +1647,28 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A15 (endpoint-by-role matrix), A20, A12-V6 (V11 note)_
     - Depends on: 44.5, 44.7
 
-  - [ ] 44.9 Extend the soft-delete cascades to checklist items and links
+  - [x] 44.9 Extend the soft-delete cascades to checklist items and links
     - Board delete (`boards/service/cascade.py`), Column delete (`columns/service`), and Card delete (`cards/service/card_service.py`) also soft delete the Checklist_Items and Card_Links below with the same `deleted_at`, using the parent-id subquery pattern and `is_deleted = false` in each bulk UPDATE, inside the one transaction; a failure rolls back everything
     - Supersedes the cascade tables of tasks 8.1, 9.1, and 11.1; those stay as history
     - _Requirements: 2.9, 2.10, 2.11, 2.13_
     - _Design: A5 (cascade table), A17 (soft-delete cascades)_
     - Depends on: 44.1, 44.3
 
-  - [ ] 44.10 Implement the combined count query and the count fields
+  - [x] 44.10 Implement the combined count query and the count fields
     - `cards/service/counts.py`: one grouped query that left-joins a checklist subquery (`done`, `total`) and a links subquery (`n`) onto the non-deleted Cards of a Board (design A18), plus `counts_for_card(card_id)`; `CardSchema` gains `checklist_done`, `checklist_total`, `link_count` for board detail, create, update, and position responses; `CardSearchSchema` and the My Tasks output do not carry them (Open issue 58)
     - Supersedes the four-query board plan of task 8.1; 8.1 stays as history
     - _Requirements: 44.4, 44.5, 41.10, 42.15, 29.2_
     - _Design: A18, D21, Open issue 57_
     - Depends on: 44.3, 44.4
 
-  - [ ] 44.11 Update the model metadata tests for 9 tables, the new constraints, and the new indexes (no database)
+  - [x] 44.11 Update the model metadata tests for 9 tables, the new constraints, and the new indexes (no database)
     - Assert exactly 9 tables; `cards.status` check lists four values and `ix_cards_due_date` exists; `checklist_items` and `card_links` columns, named FKs, checks, and indexes; the four-role `ck_board_memberships_role`; no `ON DELETE CASCADE`; every new model has the four soft-delete columns; import-rule test still passes (no `routes.py` imported across features, `permissions.py` imports no `service.py`)
     - Supersedes the 7-table assertions of tasks 3.5 and 25.6; those stay as history
     - _Requirements: 1.4, 1.9, 2.2, 2.15, 2.16, 44.2, 44.3, 31.1_
     - _Design: Data Models (V11), Module dependency direction, Open issue 65_
     - Depends on: 44.2, 44.3, 44.5
 
-  - [ ] 44.12 Write property test for the four-value status rule (pure)
+  - [x] 44.12 Write property test for the four-value status rule (pure)
     - **Property 61: Four-value status state machine**
     - Hypothesis, at least 100 examples, over the four statuses, omitted or invalid new values, and increasing timestamps; assert `completed_at` set only on entering `DONE`, cleared only on leaving `DONE`, unchanged for every move among `NOT_STARTED`, `IN_PROGRESS`, `URGENT` and for `DONE` to `DONE`, and `completed_at is not None` iff status is `DONE`
     - Supersedes the three-value generator of task 25.7; 25.7 stays as history
@@ -1677,21 +1677,21 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Correctness Property 61_
     - Depends on: 44.2
 
-  - [ ] 44.13 Write property test for the role-change and removal decisions (pure)
+  - [x] 44.13 Write property test for the role-change and removal decisions (pure)
     - **Property 72: Role-change and removal decisions**, pure part: over every caller role (including none), target role, new role (including `admin` and invalid values), and owner flag, `decide_role_change` returns `ok` iff the caller is `admin` or `manager`, the new role is assignable, the target is not the owner, the caller rank is above the target rank and above the new role rank; `bad_request` for an invalid new role and for an admin who targets the owner; `forbidden` otherwise; `decide_member_removal` returns `ok` iff the caller is `admin` or `manager`, the target is not the owner, and the caller rank is above the target rank
     - **Validates: Requirements 43.5, 43.6, 43.7, 43.8, 9.6, 9.7**
     - _Requirements: 43.6, 43.7, 43.8, 31.23_
     - _Design: Correctness Property 72, A15_
     - Depends on: 44.6
 
-  - [ ] 44.14 Write property test for `validate_link_url` (pure)
+  - [x] 44.14 Write property test for `validate_link_url` (pure)
     - **Property 68: Link URL validation and cap**, pure part: Hypothesis over generated strings and generated scheme prefixes; accepted iff after trimming it has 1 to 2048 characters, no whitespace or control character, scheme `http` or `https` in any letter case, and a non-empty hostname; `javascript:`, `data:`, `file:`, scheme-less, `//host`, and `http:///x` rejected; `default_label` is the hostname cut to 100 characters
     - **Validates: Requirements 42.2, 42.5, 42.6**
     - _Requirements: 42.5, 42.6, 31.18_
     - _Design: Correctness Property 68, A17_
     - Depends on: 44.4
 
-  - [ ] 44.15 Write tests for `role_allows` and `resolve_accept` with the manager role (pure)
+  - [x] 44.15 Write tests for `role_allows` and `resolve_accept` with the manager role (pure)
     - **Property 73: V11 permission matrix**, pure part: `role_allows(role, level)` is true iff `ROLE_RANK[role] >= LEVEL_RANK[level]` over guest, member, manager, admin, and none and the four levels
     - **Property 75: Manager accept and invite links**, pure part: `resolve_accept` over existing role in {none, guest, member, manager, admin} and token role in {member, guest}: `create` iff none, `upgrade` to `member` iff guest and member token, otherwise the existing role is kept (a manager and an admin never lose rank)
     - Supersedes the three-role sets of tasks 25.8 and 25.9; those stay as history
@@ -1700,8 +1700,8 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Correctness Properties 73, 75_
     - Depends on: 44.6
 
-- [ ] 45. Phase 25 (V11): Manual database migration (user-owned)
-  - [ ] 45.1 [MANUAL] Run the V11 `flask db migrate` and `flask db upgrade` on the development and test databases
+- [x] 45. Phase 25 (V11): Manual database migration (user-owned)
+  - [x] 45.1 [MANUAL] Run the V11 `flask db migrate` and `flask db upgrade` on the development and test databases
     - NOT executed by the agent, and no agent-generated migration script. From `app/` with the venv active run `flask db migrate -m "v11 urgent manager checklist links"` against the development database
     - Review the generated script and add by hand what Alembic autogenerate does not detect: replace `ck_cards_status` (`op.drop_constraint("ck_cards_status", "cards")` then `op.create_check_constraint("ck_cards_status", "cards", "status IN ('NOT_STARTED','IN_PROGRESS','URGENT','DONE')")`) and replace `ck_board_memberships_role` the same way with `'admin','manager','member','guest'`, with the reverse steps in `downgrade()` (a downgrade fails while an `URGENT` row exists, so set those rows to another status first); confirm the generated index `ix_cards_due_date`, the tables `checklist_items` and `card_links` with their named FKs, check constraints, and indexes; no existing row changes
     - Run `flask db upgrade` on the development database, then with `DATABASE_URL` pointed at the `*_test` database; check that exactly the 9 tables exist and commit `app/migrations/` yourself

@@ -6,7 +6,7 @@ from app.blueprints.cards.schema import Card
 from app.blueprints.users.schema import User
 from app.errors import BadRequest, Conflict, NotFound
 from app.extensions import db
-from app.permissions import MEMBER, require_board_admin, require_board_reader
+from app.permissions import MEMBER, require_board_admin, require_board_manager, require_board_reader
 from app.soft_delete import active, soft_delete_where, utcnow
 
 member_schema = MemberSchema()
@@ -18,7 +18,7 @@ def serialize_member(member_user, role):
 
 
 def add_member(user, board_id, load_data):
-    require_board_admin(board_id, user.user_id)
+    require_board_manager(board_id, user.user_id)
     data = load_data()  # validated after the 404/403 checks
     target = db.session.execute(
         select(User).where(User.email == data["email"], active(User))

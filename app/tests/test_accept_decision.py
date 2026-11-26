@@ -15,7 +15,7 @@ from app.permissions import ROLE_RANK
 
 pytestmark = pytest.mark.unit
 
-EXISTING_ROLES = (None, "guest", "member", "admin")
+EXISTING_ROLES = (None, "guest", "member", "manager", "admin")
 TOKEN_ROLES = ("member", "guest")
 
 # The table of design A14, written out in full.
@@ -26,12 +26,14 @@ EXPECTED = {
     ("guest", "guest"): ("guest", "none"),
     ("member", "member"): ("member", "none"),
     ("member", "guest"): ("member", "none"),
+    ("manager", "member"): ("manager", "none"),
+    ("manager", "guest"): ("manager", "none"),
     ("admin", "member"): ("admin", "none"),
     ("admin", "guest"): ("admin", "none"),
 }
 
 
-# Feature: kano, Property 50: Accept decision never lowers a role
+# Feature: kano, Property 75: Manager accept and invite links (pure part), Property 50
 @settings(max_examples=100, deadline=None)
 @given(existing=st.sampled_from(EXISTING_ROLES), token_role=st.sampled_from(TOKEN_ROLES))
 def test_accept_decision_never_lowers_a_role(existing, token_role):
@@ -45,8 +47,8 @@ def test_accept_decision_never_lowers_a_role(existing, token_role):
         assert (role, action) == (existing, "none")
     if existing is not None:
         assert ROLE_RANK[role] >= ROLE_RANK[existing]
-    if existing == "admin":
-        assert role == "admin"
+    if existing in ("manager", "admin"):
+        assert role == existing  # a manager and an admin never lose rank
 
 
 def test_every_pair_is_covered_by_the_table():

@@ -46,7 +46,7 @@ def create_app(config_overrides=None):
     jwt.init_app(app)
 
     # Import every model-defining schema.py before migrate.init_app so that
-    # `flask db migrate` detects all 7 tables (G-DB-12). Migrations are user-owned.
+    # `flask db migrate` detects all 9 tables (G-DB-12). Migrations are user-owned.
     from app.blueprints.boards import schema as boards_schema  # noqa: F401
     from app.blueprints.cards import schema as cards_schema  # noqa: F401
     from app.blueprints.columns import schema as columns_schema  # noqa: F401

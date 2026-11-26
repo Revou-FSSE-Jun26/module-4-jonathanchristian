@@ -2,8 +2,9 @@
 from sqlalchemy import func, select
 from sqlalchemy.orm import joinedload
 
-from app.blueprints.cards.schema import Card, CardSchema
+from app.blueprints.cards.schema import Card, CardLink, CardSchema, ChecklistItem
 from app.blueprints.comments.schema import Comment
+from app.blueprints.cards.service.counts import NO_COUNTS, apply_counts, counts_for_card
 from app.blueprints.cards.service.status import apply_status_change
 from app.blueprints.notifications import service as notifications
 from app.extensions import db
@@ -15,14 +16,18 @@ card_schema = CardSchema()
 UPDATABLE_FIELDS = ("title", "description", "due_date", "labels", "assignee_id")
 
 
-def dump_card(card_id):
-    """Reload the Card with its assignee joined (relationships are `lazy="raise"`) and dump it."""
+def dump_card(card_id, counts=None):
+    """Reload the Card with its assignee joined (relationships are `lazy="raise"`) and dump it.
+
+    `counts` is `(checklist_done, checklist_total, link_count)`; one query computes it when None.
+    """
     card = db.session.execute(
         select(Card)
         .options(joinedload(Card.assignee))
         .where(Card.card_id == card_id)
         .execution_options(populate_existing=True)
     ).scalar_one()
+    apply_counts(card, counts if counts is not None else counts_for_card(card_id))
     return card_schema.dump(card)
 
 
@@ -52,7 +57,7 @@ def create_card(user, column_id, load_data):
     db.session.flush()
     _notify_assignment(card, assignee_id, user)
     db.session.commit()
-    return dump_card(card.card_id)
+    return dump_card(card.card_id, NO_COUNTS)  # a new Card has no items or links
 
 
 def update_card(user, card_id, load_data):
@@ -77,10 +82,14 @@ def update_card(user, card_id, load_data):
 
 
 def delete_card(user, card_id):
-    """Soft delete the Card and its Comments with one `deleted_at`."""
+    """Soft delete the Card and its Comments, checklist items, and links with one `deleted_at`."""
     get_card_for_writer(card_id, user.user_id)
     ts = utcnow()
     soft_delete_where(db.session, Comment, Comment.card_id == card_id, deleted_at=ts)
+    soft_delete_where(
+        db.session, ChecklistItem, ChecklistItem.card_id == card_id, deleted_at=ts
+    )
+    soft_delete_where(db.session, CardLink, CardLink.card_id == card_id, deleted_at=ts)
     soft_delete_where(db.session, Card, Card.card_id == card_id, deleted_at=ts)
     db.session.commit()
     return {"card_id": str(card_id)}

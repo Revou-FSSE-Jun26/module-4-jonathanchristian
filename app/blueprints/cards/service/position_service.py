@@ -25,4 +25,4 @@ def move_card(user, card_id, load_data):
     card.column_id = data["column_id"]
     card.order = data["order"]
     db.session.commit()
-    return dump_card(card_id)
+    return dump_card(card_id)  # dump_card adds the counts of this Card

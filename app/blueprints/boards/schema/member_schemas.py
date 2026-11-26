@@ -16,6 +16,19 @@ class MemberAddSchema(Schema):
         return clean_text_fields(data, "email")
 
 
+class MemberRoleSchema(Schema):
+    """PATCH /api/boards/<id>/members/<user_id>: `role` is a required string.
+
+    Only the type is checked here, before any permission check; `admin` and unknown values are
+    rejected with 400 by `decide_role_change` (design A20, Open issue 59).
+    """
+
+    class Meta:
+        unknown = RAISE
+
+    role = fields.String(required=True)
+
+
 class MemberSchema(Schema):
     """A member row: user fields plus the role (set on the object by the service)."""
 
