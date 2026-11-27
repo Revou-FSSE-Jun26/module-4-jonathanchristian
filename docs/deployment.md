@@ -46,17 +46,22 @@ Database migrations are **manual** and must be run from a local shell before ver
 
 ## 4. Verification Order
 
-1. **Deploy both projects** and apply the production database schema (`flask db upgrade`).
-2. **Set `CORS_ORIGINS`** on `kano-api` to the exact `kano-web` public URL (no trailing slash) and redeploy both projects.
-3. **Postman API check** against `kano-api`:
+> [!NOTE]
+> **V12 deployment order & environment:** Deploy `kano-api` first and `kano-web` second (a frontend deployed before the V12 API would render `undefined members`). V12 needs no `flask db upgrade`, no new environment variable, and no CORS or `next.config.ts` change.
+
+1. **Deploy `kano-api` first, then `kano-web`**, and apply the database schema (`flask db upgrade`) on initial setup.
+2. **Set `CORS_ORIGINS`** on `kano-api` to the exact `kano-web` public URL (no trailing slash) and redeploy both projects if needed.
+3. **Postman / API check** against `kano-api`:
    - `GET /api/health` (`200`, `{ "data": { "status": "ok" } }`)
    - `POST /api/auth/register` (`201`)
    - `POST /api/auth/login` (`200` with `access_token` and `refresh_token`)
    - One request for each of the eight endpoint groups (auth, boards, columns, cards, comments, notifications, analytics, users), verifying the `{ "data": ... }` envelope.
    - V11 endpoints: `GET /api/notifications/overdue`, `POST` and `PATCH` of a checklist item (`/api/cards/<id>/checklist`, `/api/checklist/<id>`) and a link (`/api/cards/<id>/links`, `/api/links/<id>`), `GET /api/cards/<id>`, and `PATCH /api/boards/<id>/members/<user_id>` with a second account.
+   - V12 counts: `GET /api/boards` on production returns `member_count` and `card_count` on every item (`POST /api/boards` returns `1` and `0`, `PATCH /api/boards/<id>` returns current counts, and `GET /api/boards/<id>` has neither).
 4. **Browser walk-through** at desktop (`1280 px`) and mobile (`375 px`):
    - Visit Dashboard, Board Detail, Card Detail Modal, My Tasks, Profile, Register, and Login with no console errors or failed network requests.
    - Verify touch drag-and-drop at `375 px` in browser DevTools device mode (300 ms long-press).
+   - V12 flows (with a test account): rename and delete a Board from the board toolbar, open a Card from My Tasks via its deep link, and check the Dashboard counts (`1 member`, `0 cards` on creation; `1 card` after adding a card).
 5. **Playwright E2E suite**:
    ```bash
    cd web

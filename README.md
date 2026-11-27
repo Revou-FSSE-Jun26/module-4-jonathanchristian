@@ -52,7 +52,7 @@ The server side was developed and validated using Claude Code. It managed the **
 ## Features
 
 - **JWT authentication with access and refresh tokens:** a 1-hour access token and a 7-day refresh token. The browser refreshes once on a 401, and the middleware renews the token for server rendering.
-- **Board management:** create, rename, and delete boards. Deletes are soft and cascade to columns, cards, and comments.
+- **Board management:** create boards from the Dashboard, where each board card shows its member count and card count, and rename or delete boards from the board toolbar as the board admin. Deletes are soft and cascade to columns, cards, and comments.
 - **Column management:** add, rename, reorder, and delete columns.
 - **Card management:** title, description, due date, deterministic label colors, and assignee. New cards are added with a title and then open in the detail modal.
 - **Card status:** Not started, In progress, Urgent, or Done, independent of the column. Done cards record a completion time.
@@ -64,7 +64,7 @@ The server side was developed and validated using Claude Code. It managed the **
 - **Comments:** add, edit, and delete your own comments on a card.
 - **Notifications and overdue alerts:** stored notifications on assignment and new comments (polled every 30 seconds), plus compute-on-read overdue notifications and card-face overdue badges.
 - **Card search:** debounced search across your boards or within one board.
-- **My Tasks view:** every card assigned to you, across boards.
+- **My Tasks view:** every card assigned to you across boards; clicking a task title opens that card directly on its board.
 - **User profile:** change your name and password. The email is fixed after registration.
 - **Board analytics:** cards per column, cards completed this week, and member activity, visible to admins.
 - **Welcome page:** a landing page for first-time visitors.
@@ -145,7 +145,7 @@ npm test
 
 1. Copy `web/.env.test.example` to `web/.env.test`. This file is git-ignored, so never commit it.
 2. Set `E2E_BASE_URL` to the frontend under test. This is the variable that holds the live Vercel frontend URL for the production run, or `http://localhost:3000` locally.
-3. Set `E2E_USER_EMAIL` and `E2E_USER_PASSWORD` to an account that **already exists** in the database behind that frontend. The suite logs in with it and does not create it.
+3. Set `E2E_USER_EMAIL` and `E2E_USER_PASSWORD` to an account that **already exists** in the database behind that frontend. The suite logs in with it and does not create it. Note: the V12 Dashboard counts scenario requires the V12 API (`member_count` and `card_count`).
 4. Install the browsers, run the suite, and open the report:
    ```powershell
    npx playwright install

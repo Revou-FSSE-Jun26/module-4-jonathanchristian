@@ -2455,8 +2455,8 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Testing Strategy V12 refinement (order of work, step 3)_
     - Depends on: 64.2
 
-- [ ] 65. Phase 39 (V12): README and documentation
-  - [ ] 65.1 Update `README.md` for V12
+- [x] 65. Phase 39 (V12): README and documentation
+  - [x] 65.1 Update `README.md` for V12
     - Read `guidelines/frontend.md` first; keep the look described in words only and name no example HTML file (Requirement 36.14)
     - Features list: the Board management entry says that a board is renamed and deleted from the board toolbar by its admin; the My Tasks entry says that a task title opens that Card on its board; the Board management or Dashboard entry says that each Board card shows its member count and card count. Test Steps keep `pytest -v`, `npm test`, and `npx playwright test` and state that the Dashboard counts scenario needs the V12 API; add no migration step (V12 has none); do not remove the owner's TODO placeholders of task 23.3; run `scripts/check_readme_links.py`
     - The design says that the V12 requirements add no README criterion (Part D V12 notes); this task keeps the README accurate, is a documentation-only change, and is listed as a gap in the V12 Notes
@@ -2464,14 +2464,14 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Part D (V12 notes), D3_
     - Depends on: 64.1
 
-  - [ ] 65.2 Update `docs/deployment.md` and review the other documents for V12 drift
+  - [x] 65.2 Update `docs/deployment.md` and review the other documents for V12 drift
     - Read `guidelines/backend.md` first
     - `docs/deployment.md` (section "Verification Order"): add the V12 checks of Part D: GET `/api/boards` on production returns `member_count` and `card_count`, rename and delete a Board with a test account, open a Card from My Tasks, and check the Dashboard counts; state that `kano-api` is deployed first and `kano-web` second, and that V12 needs no `flask db upgrade`, no new environment variable, and no CORS or `next.config.ts` change; check `docs/violation-report.md` and `docs/guideline-comparison.md` for statements that V12 makes outdated; search `guidelines/*.md` for statements about rename, delete, or the Board response and report each hit in the task result instead of editing (agents never modify `guidelines/`); re-run `scripts/check_repo_hygiene.py` and `scripts/check_readme_links.py`
     - _Requirements: 34.5, 35.1, 36.12, 48.7_
     - _Design: Part D (V12 notes, deployment order, environment, verification list)_
     - Depends on: 64.1
 
-- [ ] 66. V12 final checkpoint
+- [x] 66. V12 final checkpoint
   - Run `pytest -v` from `app/`, `npm test` and `npm run build` from `web/`, `scripts/check_file_size.py` over `app/` and `web/`, `scripts/check_repo_hygiene.py`, and `scripts/check_readme_links.py`; confirm that `docs/v12-baseline.md` lists the final zero-failure counts of `pytest`, `npm test`, and `npx playwright test`, and that no backend or frontend file is over 300 lines
   - Ensure all tests pass, ask the user if questions arise
   - Depends on: 59, 64.3, 65.1, 65.2
