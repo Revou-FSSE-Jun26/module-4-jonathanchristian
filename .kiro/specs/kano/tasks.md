@@ -2120,7 +2120,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Part D (V11 notes), Open issue 65_
     - Depends on: 47
 
-- [ ] 54. V11 final checkpoint
+- [x] 54. V11 final checkpoint
   - Run `pytest -v` from `app/`, `npm test` and `npm run build` from `web/`, `scripts/check_file_size.py` over `app/` and `web/`, `scripts/check_repo_hygiene.py`, and `scripts/check_readme_links.py`; confirm that no backend or frontend file is over 300 lines
   - Ensure all tests pass, ask the user if questions arise
   - Depends on: 47, 49.2, 49.3, 49.4, 49.5, 49.6, 49.7, 50.11, 51.5, 52.4, 53.1, 53.2
