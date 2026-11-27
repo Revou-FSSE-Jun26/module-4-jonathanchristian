@@ -2403,29 +2403,29 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Correctness Property 80, Testing Strategy V12 refinement (frontend files)_
     - Depends on: 61.4, 60.6
 
-- [ ] 63. Phase 37 (V12): Playwright
-  - [ ] 63.1 Create `web/e2e/v12Boards.spec.ts` with the rename and delete scenarios
+- [x] 63. Phase 37 (V12): Playwright
+  - [x] 63.1 Create `web/e2e/v12Boards.spec.ts` with the rename and delete scenarios
     - Read `guidelines/frontend.md` first; note `web/AGENTS.md`; model the spec on `web/e2e/kanban.spec.ts`
     - Credentials only through `requireCredentials()` of `web/e2e/support/credentials.ts`, no literal e-mail or password, no `waitForTimeout`, web-first assertions only; each scenario creates its own Board named `V12 <scenario> <Date.now()>` and touches no other Board. Scenario 1 (rename): create a Board, open it, "Rename board", enter a new name, see it in the toolbar `h1`, click "Boards" and find the new name on `/`, then `page.goBack()` and `page.goForward()` and still see it; delete the Board at the end through the UI. Scenario 2 (delete): create a Board, open it, "Delete board", confirm, expect `toHaveURL(/\/$/)` and the name absent from the Dashboard, then `page.goBack()` twice and the name is still absent
     - _Requirements: 48.3, 33.18, 33.6, 33.10, 45.6, 45.11, 45.12_
     - _Design: Testing Strategy V12 refinement (Playwright, scenarios 1 and 2), Open issue 76_
     - Depends on: 61.3, 61.7, 31.1
 
-  - [ ] 63.2 Add the My Tasks deep link scenario
+  - [x] 63.2 Add the My Tasks deep link scenario
     - Read `guidelines/frontend.md` first
     - Scenario 3 in `web/e2e/v12Boards.spec.ts`: create a Board, a Column, and a Card, assign the Card to the current user, open `/my-tasks`, click the task title, expect `toHaveURL(/\/boards\/[^?]+\?card=/)` and the CardDetailModal (role `dialog`) showing that title; close it and expect the URL without `card` with the board still shown; delete the Board at the end through the UI
     - _Requirements: 48.3, 33.18, 46.1, 46.3, 46.7_
     - _Design: Testing Strategy V12 refinement (Playwright, scenario 3), Open issue 76_
     - Depends on: 61.5, 61.6, 63.1
 
-  - [ ] 63.3 Add the Dashboard counts scenario
+  - [x] 63.3 Add the Dashboard counts scenario
     - Read `guidelines/frontend.md` first
     - Scenario 4 in `web/e2e/v12Boards.spec.ts`: create a Board and see "1 member" and "0 cards" on its Dashboard card; open it, add a Column and a Card, click "Boards" (a push navigation, Open issue 74), and see "1 card"; delete the Board at the end through the UI. This scenario needs the V12 backend; against a deployed frontend it runs only after task 67
     - _Requirements: 48.3, 48.7, 33.18, 47.5, 47.11, 47.12_
     - _Design: Testing Strategy V12 refinement (Playwright, scenario 4, ordering), Open issues 74 and 76_
     - Depends on: 58.2, 61.7, 63.2
 
-  - [ ] 63.4 Extend the no-literal-credentials check over the V12 spec
+  - [x] 63.4 Extend the no-literal-credentials check over the V12 spec
     - Read `guidelines/frontend.md` first
     - Confirm the scan of `web/e2e/` (task 31.9, Property 58, extended by task 52.4) covers `v12Boards.spec.ts` and fails on a literal e-mail address or a literal password passed to a fill; add a case that lists `v12Boards.spec.ts` and asserts it imports `requireCredentials`
     - Supersedes the file lists of tasks 31.9, 37.7, and 52.4; those stay as history
