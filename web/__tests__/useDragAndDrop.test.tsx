@@ -2,14 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { useDragAndDrop } from "@/hooks/useDragAndDrop";
-import type { Card, Column } from "@/lib/types";
+import type { BoardCard, Column } from "@/lib/types";
 
 const handleErrorMock = vi.fn();
 vi.mock("@/hooks/useErrorHandler", () => ({
   useErrorHandler: () => ({ handleError: handleErrorMock }),
 }));
 
-function makeCard(card_id: string, column_id: string, order: number): Card {
+function makeCard(card_id: string, column_id: string, order: number): BoardCard {
   return {
     card_id,
     board_id: "b1",
@@ -22,6 +22,9 @@ function makeCard(card_id: string, column_id: string, order: number): Card {
     status: "NOT_STARTED",
     completed_at: null,
     order,
+    checklist_done: 0,
+    checklist_total: 0,
+    link_count: 0,
     created_at: "2026-11-18T00:00:00Z",
     updated_at: "2026-11-18T00:00:00Z",
   };

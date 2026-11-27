@@ -38,6 +38,9 @@ function makeBoard(role: Role, status: CardStatus = "IN_PROGRESS"): BoardDetail 
             status,
             completed_at: status === "DONE" ? "2026-11-20T00:00:00Z" : null,
             order: 1,
+            checklist_done: 0,
+            checklist_total: 0,
+            link_count: 0,
             created_at: "2026-11-18T00:00:00Z",
             updated_at: "2026-11-18T00:00:00Z",
           },
@@ -104,7 +107,7 @@ describe("Board role gating and StatusBadge (Task 30.1)", () => {
 
         const cardEl = container.querySelector<HTMLElement>('[data-card-id="c1"]');
         expect(cardEl).not.toBeNull();
-        expect(within(cardEl!).getByText(STATUS_LABEL[status])).toBeInTheDocument();
+        expect(within(cardEl!).getByText(STATUS_LABEL(status))).toBeInTheDocument();
         expect(cardEl!.hasAttribute("draggable")).toBe(false);
         unmount();
       }),

@@ -16,7 +16,8 @@ export interface ColumnHeaderProps {
 
 /** Column header showing name, card count, and inline rename / delete controls. */
 export function ColumnHeader({ column, onRename, onDelete }: ColumnHeaderProps) {
-  const { canEdit } = useBoardRole();
+  const { can } = useBoardRole();
+  const canManageColumns = can("manage_columns");
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState(column.name);
   const [error, setError] = useState<string | null>(null);
@@ -101,7 +102,7 @@ export function ColumnHeader({ column, onRename, onDelete }: ColumnHeaderProps) 
               {column.cards.length}
             </span>
           </div>
-          {canEdit && (onRename || onDelete) ? (
+          {canManageColumns && (onRename || onDelete) ? (
             <div className="flex items-center gap-1 shrink-0">
               {onRename ? (
                 <BaseButton

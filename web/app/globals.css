@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @source "../components";
 @source "../hooks";
+@source "../lib";
 
 
 @theme {
@@ -63,6 +64,8 @@
     --color-label-teal-fg: #0b6b66;
     --color-label-pink-bg: #fce1ef;
     --color-label-pink-fg: #9c2a66;
+    --color-label-gray-bg: #e6e9ee;
+    --color-label-gray-fg: #3f4757;
 
     /* Radius */
     --radius-sm: 6px;

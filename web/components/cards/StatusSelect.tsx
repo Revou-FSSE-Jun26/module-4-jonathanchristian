@@ -31,7 +31,7 @@ export function StatusSelect({
       >
         {CARD_STATUSES.map((status) => (
           <option key={status} value={status}>
-            {STATUS_LABEL[status]}
+            {STATUS_LABEL(status)}
           </option>
         ))}
       </select>

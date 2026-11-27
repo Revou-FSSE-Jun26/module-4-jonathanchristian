@@ -1,19 +1,17 @@
 "use client";
 
 import { createContext, useContext, useMemo } from "react";
-import { canEdit as roleCanEdit, isAdmin as roleIsAdmin } from "@/lib/roles";
+import { can as roleCan, type Action } from "@/lib/roles";
 import type { Role } from "@/lib/types";
 
 export interface BoardRoleContextValue {
   role: Role;
-  canEdit: boolean;
-  isAdmin: boolean;
+  can: (action: Action) => boolean;
 }
 
 const BoardRoleContext = createContext<BoardRoleContextValue>({
   role: "member",
-  canEdit: true,
-  isAdmin: false,
+  can: (action) => roleCan("member", action),
 });
 
 export interface BoardRoleProviderProps {
@@ -21,13 +19,12 @@ export interface BoardRoleProviderProps {
   children: React.ReactNode;
 }
 
-/** Provides the current user's board role and derived permissions to the board component tree. */
+/** Provides the current user's board role and `can(action)` helper to the board component tree. */
 export function BoardRoleProvider({ role, children }: BoardRoleProviderProps) {
   const value = useMemo<BoardRoleContextValue>(
     () => ({
       role,
-      canEdit: roleCanEdit(role),
-      isAdmin: roleIsAdmin(role),
+      can: (action: Action) => roleCan(role, action),
     }),
     [role]
   );
@@ -35,7 +32,7 @@ export function BoardRoleProvider({ role, children }: BoardRoleProviderProps) {
   return <BoardRoleContext.Provider value={value}>{children}</BoardRoleContext.Provider>;
 }
 
-/** Read the current board role and derived capabilities (`canEdit`, `isAdmin`). */
+/** Read the current board role and `can(action)` capability helper. */
 export function useBoardRole(): BoardRoleContextValue {
   return useContext(BoardRoleContext);
 }

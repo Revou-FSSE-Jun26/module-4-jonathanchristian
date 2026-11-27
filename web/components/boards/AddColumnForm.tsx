@@ -16,14 +16,14 @@ export interface AddColumnFormProps {
 
 /** Inline form for adding a new column to a board. */
 export function AddColumnForm({ boardId, onAdded }: AddColumnFormProps) {
-  const { canEdit } = useBoardRole();
+  const { can } = useBoardRole();
   const { handleError } = useErrorHandler();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  if (!canEdit) {
+  if (!can("manage_columns")) {
     return null;
   }
 

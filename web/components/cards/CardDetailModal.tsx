@@ -1,37 +1,57 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useBoardRole } from "@/components/boards/BoardRoleContext";
 import { CardDetailForm } from "@/components/cards/CardDetailForm";
+import { ChecklistSection } from "@/components/cards/ChecklistSection";
+import { LinksSection } from "@/components/cards/LinksSection";
 import { CommentList } from "@/components/comments/CommentList";
 import { BaseModal } from "@/components/shared/BaseModal";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
 import { apiRequest } from "@/lib/apiClient";
+import { cn } from "@/lib/cn";
 import { diffCardFields, type CardEditableFields } from "@/lib/format";
+import { LABEL_CLASS, labelColor } from "@/lib/labelColor";
 import { showSuccess } from "@/lib/toast";
-import type { Card, CardStatus, Member } from "@/lib/types";
+import type {
+  BoardCard,
+  Card,
+  CardDetail,
+  CardLink,
+  CardStatus,
+  ChecklistItem,
+  Member,
+} from "@/lib/types";
 import { validateCardTitle } from "@/lib/validation";
 
+export interface CardCounts {
+  checklist_done: number;
+  checklist_total: number;
+  link_count: number;
+}
+
 export interface CardDetailModalProps {
-  card: Card | null;
+  card: BoardCard | Card | null;
   members: Member[];
   isNew?: boolean;
   onClose: () => void;
-  onUpdated: (card: Card) => void;
+  onUpdated: (card: BoardCard | Card) => void;
+  onCountsChanged?: (cardId: string, counts: CardCounts) => void;
   onDeleted: (cardId: string) => void;
 }
 
-/** Modal shell for viewing and editing a card's details, status, assignee, and comments. */
+/** Modal shell for viewing and editing a card's details, status, assignee, checklist, links, and comments. */
 export function CardDetailModal({
   card,
   members,
   isNew = false,
   onClose,
   onUpdated,
+  onCountsChanged,
   onDeleted,
 }: CardDetailModalProps) {
-  const { canEdit } = useBoardRole();
+  const { can } = useBoardRole();
   const { handleError } = useErrorHandler();
   const [title, setTitle] = useState(card?.title ?? "");
   const [description, setDescription] = useState(card?.description ?? "");
@@ -43,11 +63,53 @@ export function CardDetailModal({
   const [busy, setBusy] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
+  const [links, setLinks] = useState<CardLink[]>([]);
+  const [counts, setCounts] = useState<CardCounts>({
+    checklist_done: card && "checklist_done" in card ? card.checklist_done : 0,
+    checklist_total: card && "checklist_total" in card ? card.checklist_total : 0,
+    link_count: card && "link_count" in card ? card.link_count : 0,
+  });
+
+  useEffect(() => {
+    if (!card) {
+      return;
+    }
+    let cancelled = false;
+    setDetailLoading(true);
+    apiRequest<CardDetail>(`/api/cards/${card.card_id}`)
+      .then((detail) => {
+        if (!cancelled) {
+          setChecklist(detail.checklist ?? []);
+          setLinks(detail.links ?? []);
+          setCounts({
+            checklist_done: detail.checklist_done ?? 0,
+            checklist_total: detail.checklist_total ?? 0,
+            link_count: detail.link_count ?? 0,
+          });
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          handleError(err);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setDetailLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [card?.card_id, handleError]);
+
   if (!card) {
     return null;
   }
 
-  const readOnly = !canEdit;
+  const readOnly = !can("edit_cards");
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,7 +154,7 @@ export function CardDetailModal({
     setTitleError(null);
     setBusy(true);
     try {
-      const updated = await apiRequest<Card>(`/api/cards/${card.card_id}`, {
+      const updated = await apiRequest<BoardCard>(`/api/cards/${card.card_id}`, {
         method: "PATCH",
         body: diff,
       });
@@ -126,9 +188,37 @@ export function CardDetailModal({
     }
   };
 
+  const handleChecklistCountsChange = (done: number, total: number) => {
+    const next = { ...counts, checklist_done: done, checklist_total: total };
+    setCounts(next);
+    onCountsChanged?.(card.card_id, next);
+  };
+
+  const handleLinksCountChange = (linkCount: number) => {
+    const next = { ...counts, link_count: linkCount };
+    setCounts(next);
+    onCountsChanged?.(card.card_id, next);
+  };
+
   return (
     <>
       <BaseModal open={true} onClose={onClose} title="Card details" className="max-w-2xl">
+        {card.labels.length > 0 ? (
+          <div className="flex flex-wrap gap-1 mb-4">
+            {card.labels.map((label) => (
+              <span
+                key={label}
+                className={cn(
+                  "inline-flex items-center h-5 px-2 rounded-sm text-xs font-medium",
+                  LABEL_CLASS[labelColor(label)]
+                )}
+              >
+                {label}
+              </span>
+            ))}
+          </div>
+        ) : null}
+
         <CardDetailForm
           title={title}
           onTitleChange={setTitle}
@@ -152,6 +242,22 @@ export function CardDetailModal({
           }}
           onCancel={onClose}
           onRequestDelete={() => setConfirmDeleteOpen(true)}
+        />
+
+        <ChecklistSection
+          cardId={card.card_id}
+          initialItems={checklist}
+          loading={detailLoading}
+          readOnly={readOnly}
+          onCountsChange={handleChecklistCountsChange}
+        />
+
+        <LinksSection
+          cardId={card.card_id}
+          initialLinks={links}
+          loading={detailLoading}
+          readOnly={readOnly}
+          onCountChange={handleLinksCountChange}
         />
 
         <CommentList cardId={card.card_id} readOnly={readOnly} />

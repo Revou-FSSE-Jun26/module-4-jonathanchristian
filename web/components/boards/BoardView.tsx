@@ -13,8 +13,17 @@ import { BaseButton } from "@/components/shared/BaseButton";
 import { useDragAndDrop } from "@/hooks/useDragAndDrop";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
 import { apiRequest } from "@/lib/apiClient";
-import { canEdit, isAdmin as roleIsAdmin } from "@/lib/roles";
-import type { BoardDetail, Card, CardSearchResult, Column, Member } from "@/lib/types";
+import { can } from "@/lib/roles";
+import type { BoardCard, BoardDetail, Card, CardSearchResult, Column, Member } from "@/lib/types";
+
+function toBoardCard(card: Card | BoardCard): BoardCard {
+  return {
+    checklist_done: 0,
+    checklist_total: 0,
+    link_count: 0,
+    ...card,
+  };
+}
 
 export interface BoardViewProps {
   board: BoardDetail;
@@ -35,16 +44,18 @@ export function BoardView({ board }: BoardViewProps) {
   const [columns, setColumns] = useState<Column[]>(() => sortColumns(board.columns));
   const [members, setMembers] = useState<Member[]>([]);
   const [searchResults, setSearchResults] = useState<CardSearchResult[] | null>(null);
-  const [selectedCard, setSelectedCard] = useState<Card | null>(null);
+  const [selectedCard, setSelectedCard] = useState<BoardCard | null>(null);
   const [selectedCardIsNew, setSelectedCardIsNew] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
 
-  const userCanEdit = canEdit(board.my_role);
-  const isAdmin = roleIsAdmin(board.my_role);
+  const canEditCards = can(board.my_role, "edit_cards");
+  const canManageColumns = can(board.my_role, "manage_columns");
+  const canManageMembers = can(board.my_role, "manage_members");
+  const canViewAnalytics = can(board.my_role, "view_analytics");
 
   const { onDragStart, onDragOver, onDrop, onTouchStart, pendingIds, touchDrag } =
-    useDragAndDrop(columns, setColumns, { enabled: userCanEdit });
+    useDragAndDrop(columns, setColumns, { enabled: canEditCards });
 
   useEffect(() => {
     let cancelled = false;
@@ -97,27 +108,43 @@ export function BoardView({ board }: BoardViewProps) {
     [handleError]
   );
 
-  const handleCardAdded = useCallback((columnId: string, card: Card) => {
+  const handleCardAdded = useCallback((columnId: string, card: Card | BoardCard) => {
+    const boardCard = toBoardCard(card);
     setColumns((prev) =>
       prev.map((col) =>
         col.column_id === columnId
-          ? { ...col, cards: [...col.cards, card].sort((a, b) => a.order - b.order) }
+          ? { ...col, cards: [...col.cards, boardCard].sort((a, b) => a.order - b.order) }
           : col
       )
     );
-    setSelectedCard(card);
+    setSelectedCard(boardCard);
     setSelectedCardIsNew(true);
   }, []);
 
-  const handleCardUpdated = useCallback((updated: Card) => {
+  const handleCardUpdated = useCallback((updated: Card | BoardCard) => {
+    const boardCard = toBoardCard(updated);
     setColumns((prev) =>
       prev.map((col) => ({
         ...col,
-        cards: col.cards.map((c) => (c.card_id === updated.card_id ? updated : c)),
+        cards: col.cards.map((c) => (c.card_id === boardCard.card_id ? boardCard : c)),
       }))
     );
   }, []);
 
+  const handleCardCountsChanged = useCallback(
+    (cardId: string, counts: { checklist_done: number; checklist_total: number; link_count: number }) => {
+      setColumns((prev) =>
+        prev.map((col) => ({
+          ...col,
+          cards: col.cards.map((c) => (c.card_id === cardId ? { ...c, ...counts } : c)),
+        }))
+      );
+      setSelectedCard((prev) =>
+        prev && prev.card_id === cardId ? { ...prev, ...counts } : prev
+      );
+    },
+    []
+  );
   const handleCardDeleted = useCallback((cardId: string) => {
     setColumns((prev) =>
       prev.map((col) => ({
@@ -166,7 +193,7 @@ export function BoardView({ board }: BoardViewProps) {
                     <BaseButton
                       variant="secondary"
                       onClick={() => {
-                        setSelectedCard(card);
+                        setSelectedCard(toBoardCard(card));
                         setSelectedCardIsNew(false);
                       }}
                       className="self-start"
@@ -187,17 +214,17 @@ export function BoardView({ board }: BoardViewProps) {
                   touchDraggingCardId={touchDrag?.cardId ?? null}
                   pendingIds={pendingIds}
                   onSelectCard={(card) => {
-                    setSelectedCard(card);
+                    setSelectedCard(toBoardCard(card));
                     setSelectedCardIsNew(false);
                   }}
                   onDragStart={onDragStart}
                   onDragOver={onDragOver}
                   onDrop={onDrop}
                   onTouchStart={onTouchStart}
-                  onRenameColumn={userCanEdit ? handleRenameColumn : undefined}
-                  onDeleteColumn={userCanEdit ? handleDeleteColumn : undefined}
+                  onRenameColumn={canManageColumns ? handleRenameColumn : undefined}
+                  onDeleteColumn={canManageColumns ? handleDeleteColumn : undefined}
                   footer={
-                    userCanEdit ? (
+                    canEditCards ? (
                       <AddCardForm
                         columnId={column.column_id}
                         onAdded={(card) => handleCardAdded(column.column_id, card)}
@@ -206,7 +233,7 @@ export function BoardView({ board }: BoardViewProps) {
                   }
                 />
               ))}
-              {userCanEdit ? (
+              {canManageColumns ? (
                 <AddColumnForm
                   boardId={board.board_id}
                   onAdded={(col) => setColumns((prev) => sortColumns([...prev, col]))}
@@ -227,25 +254,36 @@ export function BoardView({ board }: BoardViewProps) {
             setSelectedCardIsNew(false);
           }}
           onUpdated={handleCardUpdated}
+          onCountsChanged={handleCardCountsChanged}
           onDeleted={handleCardDeleted}
         />
       ) : null}
 
-      {isAdmin ? (
-        <>
-          <MemberPanel
-            open={membersOpen}
-            onClose={() => setMembersOpen(false)}
-            boardId={board.board_id}
-            members={members}
-            onMembersChange={setMembers}
-          />
-          <AnalyticsView
-            open={analyticsOpen}
-            onClose={() => setAnalyticsOpen(false)}
-            boardId={board.board_id}
-          />
-        </>
+      {canManageMembers ? (
+        <MemberPanel
+          open={membersOpen}
+          onClose={() => setMembersOpen(false)}
+          boardId={board.board_id}
+          members={members}
+          onMembersChange={setMembers}
+          onMemberDemotedToGuest={(userId) => {
+            setColumns((prev) =>
+              prev.map((col) => ({
+                ...col,
+                cards: col.cards.map((c) =>
+                  c.assignee?.user_id === userId ? { ...c, assignee: null } : c
+                ),
+              }))
+            );
+          }}
+        />
+      ) : null}
+      {canViewAnalytics ? (
+        <AnalyticsView
+          open={analyticsOpen}
+          onClose={() => setAnalyticsOpen(false)}
+          boardId={board.board_id}
+        />
       ) : null}
       </div>
     </BoardRoleProvider>

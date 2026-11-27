@@ -16,7 +16,6 @@ export const FORBIDDEN_CLAIMS = [
   "websocket",
   "fuzzy",
   "threaded",
-  "checklist",
   "subtask",
   "KAN-",
 ] as const;

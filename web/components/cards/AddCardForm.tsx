@@ -16,14 +16,14 @@ export interface AddCardFormProps {
 
 /** Inline form in a column footer for creating a new card. */
 export function AddCardForm({ columnId, onAdded }: AddCardFormProps) {
-  const { canEdit } = useBoardRole();
+  const { can } = useBoardRole();
   const { handleError } = useErrorHandler();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  if (!canEdit) {
+  if (!can("edit_cards")) {
     return null;
   }
 

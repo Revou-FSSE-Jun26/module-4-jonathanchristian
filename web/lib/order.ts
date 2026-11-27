@@ -1,4 +1,4 @@
-import type { Card, Column } from "./types";
+import type { BoardCard, Column } from "./types";
 
 export const LONG_PRESS_MS = 300;
 export const MOVE_TOLERANCE_PX = 10;
@@ -65,7 +65,7 @@ export function moveCardInState(
   toColumnId: string,
   order: number
 ): Column[] {
-  let movedCard: Card | null = null;
+  let movedCard: BoardCard | null = null;
   const withoutCard = columns.map((col) => {
     const found = col.cards.find((c) => c.card_id === cardId);
     if (found) {
@@ -82,7 +82,7 @@ export function moveCardInState(
     return columns;
   }
 
-  const cardToInsert: Card = movedCard;
+  const cardToInsert: BoardCard = movedCard;
   return withoutCard.map((col) => {
     if (col.column_id !== toColumnId) {
       return col;

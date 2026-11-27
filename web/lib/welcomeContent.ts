@@ -39,7 +39,7 @@ export const FEATURES: readonly WelcomeFeature[] = [
     icon: "Tag",
     title: "Stay organized at a glance",
     description:
-      "Add labels, due dates, and a status (Not started, In progress, or Done) to every card.",
+      "Add labels, due dates, and a status (Not started, In progress, Urgent, or Done) to every card.",
   },
   {
     icon: "Users",

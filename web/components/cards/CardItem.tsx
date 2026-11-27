@@ -2,38 +2,40 @@
 
 import { Calendar, User as UserIcon } from "lucide-react";
 import { useBoardRole } from "@/components/boards/BoardRoleContext";
-import { BaseBadge } from "@/components/shared/BaseBadge";
-import { StatusBadge } from "@/components/shared/StatusBadge";
+import { CardMetaRow } from "@/components/cards/CardMetaRow";
 import { cn } from "@/lib/cn";
-import type { Card } from "@/lib/types";
+import type { BoardCard } from "@/lib/types";
 
 export interface CardItemProps {
-  card: Card;
+  card: BoardCard;
+  today?: string;
   isTouchDragging?: boolean;
   isPending?: boolean;
-  onSelect?: (card: Card) => void;
+  onSelect?: (card: BoardCard) => void;
   onDragStart?: (e: React.DragEvent, cardId: string) => void;
   onTouchStart?: (e: React.TouchEvent, cardId: string) => void;
 }
 
-/** Draggable Kanban task card with title, labels, due date, and assignee. */
+/** Draggable Kanban task card with labels, title, status, overdue/link/checklist indicators, and assignee. */
 export function CardItem({
   card,
+  today,
   isTouchDragging = false,
   isPending = false,
   onSelect,
   onDragStart,
   onTouchStart,
 }: CardItemProps) {
-  const { canEdit } = useBoardRole();
+  const { can } = useBoardRole();
+  const allowEditCards = can("edit_cards");
 
   return (
     <li
       data-card-id={card.card_id}
       data-column-id={card.column_id}
-      draggable={canEdit ? !isPending : undefined}
-      onDragStart={canEdit && onDragStart ? (e) => onDragStart(e, card.card_id) : undefined}
-      onTouchStart={canEdit && onTouchStart ? (e) => onTouchStart(e, card.card_id) : undefined}
+      draggable={allowEditCards ? !isPending : undefined}
+      onDragStart={allowEditCards && onDragStart ? (e) => onDragStart(e, card.card_id) : undefined}
+      onTouchStart={allowEditCards && onTouchStart ? (e) => onTouchStart(e, card.card_id) : undefined}
       onContextMenu={(e) => {
         if (isTouchDragging) {
           e.preventDefault();
@@ -54,21 +56,11 @@ export function CardItem({
         isPending && "opacity-60"
       )}
     >
-      <div className="flex flex-wrap items-center gap-1">
-        <StatusBadge status={card.status} />
-        {card.labels.slice(0, 3).map((label) => (
-          <BaseBadge key={label} variant="blue">
-            {label}
-          </BaseBadge>
-        ))}
-        {card.labels.length > 3 ? (
-          <BaseBadge variant="gray">+{card.labels.length - 3}</BaseBadge>
-        ) : null}
-      </div>
-
       <p className="text-sm font-medium text-ink line-clamp-3 break-words">
         {card.title}
       </p>
+
+      <CardMetaRow card={card} today={today} />
 
       {card.due_date || card.assignee ? (
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-ink-muted">

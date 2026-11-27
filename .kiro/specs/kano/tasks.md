@@ -1868,8 +1868,8 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
   - _Requirements: 39.5, 39.9, 39.10, 40.14, 43.15_
   - _Design: B17, Open issues 46, 62_
 
-- [ ] 49. Phase 27 (V11): Frontend libraries and shared pieces
-  - [ ] 49.1 Add the V11 types
+- [x] 49. Phase 27 (V11): Frontend libraries and shared pieces
+  - [x] 49.1 Add the V11 types
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first (read only); note `web/AGENTS.md`
     - `lib/types.ts`: `Role` includes `manager`, `CardStatus` includes `URGENT`, new `BoardCard` (Card plus `checklist_done`, `checklist_total`, `link_count`), `ChecklistItem`, `CardLink`, `CardDetail`, `OverdueItem`, `OverdueResult`, `MemberRoleUpdate`; `Column.cards` becomes `BoardCard[]`; search and My Tasks results stay `Card`; update fixtures and compile errors with minimal edits
     - Supersedes the V6 `Role` and `CardStatus` types of task 29.1; 29.1 stays as history
@@ -1877,7 +1877,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B20, B10_
     - Depends on: 47
 
-  - [ ] 49.2 Rewrite `lib/status.ts` for four statuses and update `StatusBadge`
+  - [x] 49.2 Rewrite `lib/status.ts` for four statuses and update `StatusBadge`
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first (read only); note `web/AGENTS.md`
     - `CARD_STATUSES` (four, in order), `STATUS_STYLE` with `label`, `variant` (`gray`, `blue`, `red`, `green`), and a complete static `className` string per status (no template-built classes), `STATUS_LABEL` as a function; `StatusBadge` renders `BaseBadge` with the variant; keep the old `STATUS_VARIANT` export only until every call site is migrated
     - Property test: **Property 62: Status style map** (four distinct labels, class strings, and variants; `URGENT` uses danger tokens and `DONE` success tokens; `className` and the `BaseBadge` variant agree; board face, modal, and My Tasks row use the same entry)
@@ -1887,7 +1887,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B17, Correctness Property 62_
     - Depends on: 49.1, 49.5, 48
 
-  - [ ] 49.3 Create `lib/labelColor.ts`
+  - [x] 49.3 Create `lib/labelColor.ts`
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first (read only); note `web/AGENTS.md`
     - `LABEL_KEYS` (eight), `normalizeLabel` (trim, NFC, lower case), `labelColor(text)` (FNV-1a 32 bit, no `Math.random`, no date), `LABEL_CLASS` with a complete static two-token class string per key
     - Property test: **Property 63: Label color** (always one of the eight keys, deterministic, invariant under case and surrounding whitespace, every key has a complete class string with no template placeholder, non-ASCII input handled)
@@ -1896,7 +1896,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B17, Correctness Property 63_
     - Depends on: 49.5, 48
 
-  - [ ] 49.4 Rewrite `lib/roles.ts` with `can`, `assignableRoles`, and `canActOnMember`
+  - [x] 49.4 Rewrite `lib/roles.ts` with `can`, `assignableRoles`, and `canActOnMember`
     - Read `guidelines/frontend.md` first. `ROLE_RANK`, `Action` (ten actions of Requirement 43.13), `can(role, action)`, `assignableRoles(role)` (admin: guest, member, manager; manager: guest, member; others none), `canActOnMember(role, targetRole)`, `ROLE_VARIANT` with four pairwise distinct variants; keep `canEdit`, `isAdmin`, and `isGuest` only until task 50.1 migrates every call site, then delete them
     - Property test: **Property 74: Frontend `can` and role controls**, pure part: a table test over every role and action against the Requirement 43 rule written independently in the test (not copied from the source table)
     - Supersedes the V6 `lib/roles.ts` and its tests of tasks 29.1 and 29.3; those stay as history
@@ -1905,7 +1905,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B16, D19, Correctness Property 74_
     - Depends on: 49.1
 
-  - [ ] 49.5 Add `@source "../lib"` and any missing tokens to `globals.css`
+  - [x] 49.5 Add `@source "../lib"` and any missing tokens to `globals.css`
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first (read only); note `web/AGENTS.md`
     - Add `@source "../lib";` next to the existing `@source` lines of `web/app/globals.css` (a superset of the folders listed in Requirement 15.2, design D23 and Open issue 45); add `@theme` tokens only for the pairs that `guidelines/design-system.md` defines and `globals.css` lacks (task 48)
     - New test `web/__tests__/tailwind-sources.test.ts`: `globals.css` scans `components`, `hooks`, and `lib`; every class string exported from `lib/status.ts` and `lib/labelColor.ts` is a complete literal with no `${`; search `web/__tests__/` for existing assertions on the `@source` list and update them
@@ -1913,7 +1913,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: D23, B17, Open issues 45, 46_
     - Depends on: 47, 48
 
-  - [ ] 49.6 Create `lib/overdue.ts` and `lib/progress.ts` with tests
+  - [x] 49.6 Create `lib/overdue.ts` and `lib/progress.ts` with tests
     - Read `guidelines/frontend.md` first. `todayUtc(now = new Date())` (ISO date, UTC), `isOverdue(due, status, today)` (`due` not null, `due < today`, status not `DONE`), `formatOverdue(n)` ("1 day overdue" for 1), `progressPercent(done, total)` (0 for total 0)
     - Property tests: **Property 65: Overdue chip and text** (pure part), **Property 66: Checklist rules** (progress part: `round(done / total * 100)` and text `done/total`, no indicator at 0)
     - **Validates: Requirements 40.11, 40.14, 41.16**
@@ -1921,7 +1921,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B18, B19, Open issue 51, Correctness Properties 65, 66_
     - Depends on: 49.1
 
-  - [ ] 49.7 Create `lib/linkProvider.ts` and the checklist and link validators
+  - [x] 49.7 Create `lib/linkProvider.ts` and the checklist and link validators
     - Read `guidelines/frontend.md` first. `providerKey(hostname)` returns `gdrive`, `onedrive`, `dropbox`, `notion`, or `generic` by exact host or subdomain suffix in any letter case; `lib/validation.ts` gains `validateLinkUrl` (mirror of `validate_link_url`) and `validateChecklistText` (1 to 200, non-blank)
     - Property tests: **Property 68** (client mirror: same accept and reject decisions as the server rule over a shared table of cases and generated strings), **Property 69: Provider icon key**, **Property 29** (re-run with the new validators)
     - Supersedes the V6 validator list of task 29.4 (additive); 29.4 stays as history
@@ -1930,8 +1930,8 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B18, Correctness Properties 29, 68, 69_
     - Depends on: 49.1
 
-- [ ] 50. Phase 28 (V11): Frontend components
-  - [ ] 50.1 Migrate the board gating to `can` and hide the Column controls for `member`
+- [x] 50. Phase 28 (V11): Frontend components
+  - [x] 50.1 Migrate the board gating to `can` and hide the Column controls for `member`
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first (read only); note `web/AGENTS.md`
     - `BoardRoleContext` provides `{ role, can }`; Column add, rename, delete, and reorder controls need `manage_columns` (admin and manager); add card, drag (`useDragAndDrop({ enabled: can(role, "edit_cards") })`), status, assignee, checklist, links, and comment form need `edit_cards`; the analytics link needs `view_analytics` (admin only); the guest badge and read-only behaviour stay; remove `canEdit`, `isAdmin`, `isGuest` from `lib/roles.ts` once no call site remains; keep every file at or below 300 lines (extract `BoardColumns.tsx` from `BoardView.tsx` if needed)
     - RTL tests: member sees no Column controls but can add and drag cards, manager and admin see the Column controls, guest sees nothing editable
@@ -1942,7 +1942,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B16 (gating table), B6-V6 (V11 note), Open issue 53_
     - Depends on: 49.1, 49.4
 
-  - [ ] 50.2 Rebuild the member panel with the role dropdown and manager access
+  - [x] 50.2 Rebuild the member panel with the role dropdown and manager access
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first (read only); note `web/AGENTS.md`
     - `MemberPanel` and `InviteLinksPanel` render for `manage_members` and `view_invite_links` (admin and manager); `MemberList` shows a role `BaseBadge` (`ROLE_VARIANT`) per row and, only when `canActOnMember(myRole, row.role)`, a new `RoleSelect.tsx` listing `assignableRoles(myRole)` and the remove control; a role change sends PATCH `/api/boards/<id>/members/<user_id>`, updates the row only after 200, and on an error keeps the old role and calls `handleError`; a change to `guest` clears that user's assignments in local board state; `BoardToolbar` shows the Members button for admin and manager and the Analytics link for the admin only
     - RTL tests: dropdown options for the admin and for a manager, no dropdown or remove control for an equal or higher rank, role change success and failure, manager sees both invite links, `member` sees neither
@@ -1952,7 +1952,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B16, B6-V6 (member panel), Correctness Property 74_
     - Depends on: 50.1, 49.4, 49.1
 
-  - [ ] 50.3 Add the Card face indicators (`CardMetaRow.tsx`)
+  - [x] 50.3 Add the Card face indicators (`CardMetaRow.tsx`)
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first (read only); note `web/AGENTS.md`
     - New `CardMetaRow.tsx` (one component, `flex flex-wrap gap-1`): label chips coloured by `labelColor`, `StatusBadge`, the "Overdue" chip with `bg-danger-soft text-danger-ink` iff `isOverdue(due_date, status, today)` (no request), the link chip with icon and `link_count` iff `link_count > 0`, and below the row the checklist text `done/total` with a thin bar (static colour classes, computed width through `style`) iff `checklist_total > 0`; `today` is passed in for testability; counts missing on search results hide the chips; `CardItem.tsx` stays at or below 300 lines and composes the row
     - RTL tests: chip rules, `3/5` and 60 percent, no indicator at 0, link chip hidden at 0, label colours stable across cards, guest sees the same face
@@ -1962,7 +1962,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B18 (card face), B21 (`CardMetaRow.tsx`)_
     - Depends on: 49.2, 49.3, 49.6, 50.1
 
-  - [ ] 50.4 Rebuild `CardDetailModal` for four statuses, card detail loading, and count updates
+  - [x] 50.4 Rebuild `CardDetailModal` for four statuses, card detail loading, and count updates
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first (read only); note `web/AGENTS.md`
     - `StatusSelect` offers the four options in `CARD_STATUSES` order with the current status preselected; on open the modal shows the card fields from board state at once (Requirement 23.1, within 300 ms) and sends `GET /api/cards/<id>` for the checklist and links, with a loading state per section and `handleError` on failure; `onCardUpdated` and a new `onCountsChanged(cardId, counts)` update the board state (Card face) without a reload; assignee options are the members whose role is not `guest` (so managers are offered); guests see a read-only view; keep every file at or below 300 lines
     - RTL tests: four options with the current one preselected, status-only PATCH body (`URGENT` included), badge update on the board and in My Tasks, failing PATCH keeps the modal and the previous status, guest view
@@ -1972,7 +1972,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B18 (CardDetailModal composition), B17, Correctness Properties 62, 74_
     - Depends on: 50.1, 50.3, 49.2, 49.7
 
-  - [ ] 50.5 Build the checklist section
+  - [x] 50.5 Build the checklist section
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first (read only); note `web/AGENTS.md`
     - `ChecklistSection.tsx`, `ChecklistItemRow.tsx`, `AddChecklistForm.tsx` and `hooks/useChecklist.ts`: checkbox, text with inline edit, delete control, add form with field errors (empty, blank, over 200 characters, no request), add control disabled at 50 items with the message "Limit of 50 items reached", optimistic toggle applied within 100 ms and restored with one `handleError` toast on failure, add, edit, and delete failures keep the list and the entered text, read-only for a guest; call `onCountsChanged` after every successful change; wire into `CardDetailModal`
     - RTL tests: progress after changes, optimistic toggle and revert, guest read-only, disabled add at 50
@@ -1982,7 +1982,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B18 (checklist), Correctness Property 67_
     - Depends on: 50.4, 49.6, 49.7
 
-  - [ ] 50.6 Build the workspace links section
+  - [x] 50.6 Build the workspace links section
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first (read only); note `web/AGENTS.md`
     - `LinksSection.tsx`, `LinkRow.tsx`, `LinkForm.tsx`: label, hostname beside every label (Open issue 55), a generic icon per `providerKey` from the design-system icon library, an anchor with `href` set to the stored URL, `target="_blank"`, and `rel="noopener noreferrer"`, the label rendered as text (no `dangerouslySetInnerHTML`), add form (URL and optional label) and edit and delete controls with field errors from `validateLinkUrl` and no request on invalid input, failures keep the list and the entered values and call `handleError`, read-only for a guest; call `onCountsChanged`; wire into `CardDetailModal`
     - RTL tests: invalid values blocked, anchor attributes, chip count updates, guest list only
@@ -1991,7 +1991,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B18 (links), Correctness Property 69_
     - Depends on: 50.5, 49.7
 
-  - [ ] 50.7 Build the overdue UI
+  - [x] 50.7 Build the overdue UI
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first (read only); note `web/AGENTS.md`
     - `hooks/useOverdue.ts` (`{ items, total, refresh }`): one request on the first mount of the Header while the AuthContext status is `authenticated` and one each time the notification list opens, never on a timer, a failed request keeps the previous items and shows no toast; `NotificationList` shows an "Overdue" group above the stored items (`OverdueItemRow.tsx`: red `BaseBadge` "Overdue", `formatOverdue(days_overdue)`, title, board name, selecting navigates to `/boards/<board_id>` and closes the list); the bell count stays the stored unread count; the empty state shows only when both lists are empty
     - RTL tests with fake timers: request on mount and on open, none after 10 minutes, bell count unchanged, empty-state rule, silent failure
@@ -2002,7 +2002,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B19, Open issues 50, 51_
     - Depends on: 49.6, 49.1
 
-  - [ ] 50.8 Show four roles and four statuses on the Dashboard and My Tasks
+  - [x] 50.8 Show four roles and four statuses on the Dashboard and My Tasks
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first (read only); note `web/AGENTS.md`
     - `BoardList` role badge uses the four `ROLE_VARIANT` entries and shows `manager`; `MyTasksList` renders `StatusBadge` for all four statuses (an `URGENT` Card stays in the list, `DONE` stays with the "Done" badge, no status filter); remove the old `STATUS_VARIANT` export and update remaining call sites
     - Supersedes the three-status badges and three-role badges of task 30.8; 30.8 stays as history
@@ -2010,7 +2010,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B16, B17_
     - Depends on: 49.2, 49.4
 
-  - [ ] 50.9 Update the Welcome_Page copy for the Urgent status
+  - [x] 50.9 Update the Welcome_Page copy for the Urgent status
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first (read only); note `web/AGENTS.md`
     - `lib/welcomeContent.ts`: the second feature card description becomes "Add labels, due dates, and a status (Not started, In progress, Urgent, or Done) to every card."; the preview sample statuses may include one "Urgent" chip; confirm `lib/forbiddenClaims.ts` has no "checklist" entry (the V8 list already lacks it; "subtask" stays forbidden) and the copy mentions no forbidden string; update the V8 Welcome_Page unit test expectation for the exact feature text
     - Supersedes the three-status feature copy of tasks 35.1 and 37.2; those stay as history
@@ -2020,14 +2020,14 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B20 (welcome copy), Open issue 60, Correctness Property 60_
     - Depends on: 47
 
-  - [ ] 50.10 Responsive pass for the V11 components
+  - [x] 50.10 Responsive pass for the V11 components
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first (read only); note `web/AGENTS.md`
     - Review the Card face chips, checklist, links, role dropdown, and overdue rows at 375 px against design B9: no horizontal overflow outside the Kanban container, `flex-wrap` and `min-w-0`, long URLs and hostnames use `break-all`, 44 px tap targets for the checkbox, delete, role dropdown, and add controls; add class-based RTL assertions where practical
     - _Requirements: 27.1, 27.2, 27.6, 41.12, 42.11, 43.14_
     - _Design: B9, B18_
     - Depends on: 50.2, 50.3, 50.5, 50.6, 50.7, 50.8, 50.9
 
-  - [ ] 50.11 Update the frontend repository-rule tests for the V11 files
+  - [x] 50.11 Update the frontend repository-rule tests for the V11 files
     - Read `guidelines/frontend.md` first; note `web/AGENTS.md`
     - Extend `web/__tests__/repo-rules.test.ts`: one component per file for `CardMetaRow`, `ChecklistSection`, `ChecklistItemRow`, `AddChecklistForm`, `LinksSection`, `LinkRow`, `LinkForm`, `RoleSelect`, `OverdueItemRow`; no native `<button` outside `BaseButton`; no `dangerouslySetInnerHTML`; `scripts/check_file_size.py` over `web/` (300 lines); split any failing file (`CardItem`, `BoardView`, `CardDetailModal`, `MemberPanel` are the likeliest)
     - Supersedes the file lists of tasks 30.11, 37.9, and 40.6; those stay as history

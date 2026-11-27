@@ -5,13 +5,25 @@ import { Bell } from "lucide-react";
 import { BaseButton } from "@/components/shared/BaseButton";
 import { NotificationList } from "@/components/notifications/NotificationList";
 import { useNotifications } from "@/hooks/useNotifications";
+import { useOverdue } from "@/hooks/useOverdue";
 import { formatBadge } from "@/lib/format";
 
-/** Bell button with unread badge and toggleable notification list. */
+/** Bell button with unread badge and toggleable notification + overdue list. */
 export function NotificationBell() {
   const { items, unreadCount, markRead } = useNotifications();
+  const { items: overdueItems, refresh: refreshOverdue } = useOverdue();
   const [open, setOpen] = useState(false);
   const badge = formatBadge(unreadCount);
+
+  const handleToggle = () => {
+    setOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        void refreshOverdue();
+      }
+      return next;
+    });
+  };
 
   return (
     <div className="relative">
@@ -19,7 +31,7 @@ export function NotificationBell() {
         variant="ghost"
         aria-label="Notifications"
         aria-expanded={open}
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={handleToggle}
         className="relative px-2"
       >
         <Bell className="size-5" aria-hidden="true" />
@@ -37,6 +49,7 @@ export function NotificationBell() {
         <div className="absolute right-0 mt-2 z-40">
           <NotificationList
             items={items}
+            overdueItems={overdueItems}
             onMarkRead={(id) => {
               void markRead(id);
             }}

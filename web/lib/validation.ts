@@ -109,6 +109,47 @@ export function validateCommentText(content: string): ValidationResult {
   return validateTrimmedLength(content, "Comment", 1, 2000);
 }
 
+/** Validate checklist item text (1 to 200 chars after trim). */
+export function validateChecklistText(text: string): ValidationResult {
+  return validateTrimmedLength(text, "Checklist item", 1, 200);
+}
+
+/** Validate a workspace link URL (trimmed, http/https, non-empty hostname, no whitespace, <= 2048 chars). */
+export function validateLinkUrl(raw: string): ValidationResult {
+  const trimmed = raw.trim();
+  if (trimmed.length === 0) {
+    return "URL is required";
+  }
+  if (trimmed.length > 2048) {
+    return "URL must be at most 2048 characters";
+  }
+  if (/\s/.test(trimmed)) {
+    return "URL must not contain whitespace";
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return "Enter a valid http or https URL";
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return "URL must start with http:// or https://";
+  }
+  if (!parsed.hostname) {
+    return "Enter a valid http or https URL";
+  }
+  return null;
+}
+
+/** Validate optional workspace link label (when non-empty after trim, at most 100 chars). */
+export function validateLinkLabel(raw: string): ValidationResult {
+  const trimmed = raw.trim();
+  if (trimmed.length > 100) {
+    return "Label must be at most 100 characters";
+  }
+  return null;
+}
+
 /** Validate profile update fields (name and email). */
 export function validateProfileFields(fields: {
   name: string;

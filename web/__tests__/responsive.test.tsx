@@ -6,6 +6,11 @@ import { InviteLinkRow } from "@/components/boards/InviteLinkRow";
 import { KanbanColumn } from "@/components/boards/KanbanColumn";
 import { BaseButton } from "@/components/shared/BaseButton";
 import { BaseModal } from "@/components/shared/BaseModal";
+import { RoleSelect } from "@/components/boards/RoleSelect";
+import { CardMetaRow } from "@/components/cards/CardMetaRow";
+import { ChecklistItemRow } from "@/components/cards/ChecklistItemRow";
+import { LinkRow } from "@/components/cards/LinkRow";
+import { OverdueItemRow } from "@/components/notifications/OverdueItemRow";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -84,5 +89,94 @@ describe("Responsive classes at 375 px (design B9)", () => {
     expect(urlInput.className).toContain("break-all");
     expect(urlInput.parentElement?.className).toContain("flex-col");
     expect(urlInput.parentElement?.className).toContain("md:flex-row");
+  });
+
+  it("enforces V11 responsive classes and 44px tap targets on RoleSelect, CardMetaRow, ChecklistItemRow, LinkRow, and OverdueItemRow", () => {
+    const { container } = render(
+      <div>
+        <RoleSelect
+          memberName="Alice"
+          value="member"
+          allowedRoles={["guest", "member", "manager"]}
+          onChange={vi.fn()}
+        />
+        <CardMetaRow
+          today="2026-11-27"
+          card={{
+            card_id: "c1",
+            board_id: "b1",
+            column_id: "col-1",
+            title: "Task",
+            description: null,
+            due_date: "2026-11-20",
+            labels: ["Design"],
+            assignee: null,
+            status: "URGENT",
+            completed_at: null,
+            order: 1,
+            checklist_done: 1,
+            checklist_total: 2,
+            link_count: 1,
+            created_at: "2026-11-18T00:00:00Z",
+            updated_at: "2026-11-18T00:00:00Z",
+          }}
+        />
+        <ul>
+          <ChecklistItemRow
+            item={{
+              checklist_item_id: "ci-1",
+              card_id: "c1",
+              text: "Step one",
+              is_done: false,
+              order: 1,
+            }}
+            readOnly={false}
+            onToggle={vi.fn()}
+            onEdit={vi.fn(async () => true)}
+            onDelete={vi.fn(async () => true)}
+          />
+          <LinkRow
+            link={{
+              card_link_id: "cl-1",
+              card_id: "c1",
+              url: "https://docs.google.com/document/d/very-long-id",
+              label: "Spec doc",
+              created_by: "u1",
+              created_at: "2026-11-18T00:00:00Z",
+            }}
+            readOnly={false}
+            onEdit={vi.fn(async () => true)}
+            onDelete={vi.fn(async () => true)}
+          />
+          <OverdueItemRow
+            item={{
+              card_id: "c1",
+              title: "Overdue task",
+              due_date: "2026-11-20",
+              status: "URGENT",
+              column_name: "To Do",
+              board_id: "b1",
+              board_name: "Roadmap",
+              days_overdue: 7,
+            }}
+          />
+        </ul>
+      </div>
+    );
+
+    const roleSelect = screen.getByLabelText("Role for Alice");
+    expect(roleSelect.className).toContain("min-h-[44px]");
+
+    const checkbox = screen.getByLabelText("Toggle Step one");
+    expect(checkbox.parentElement?.className).toContain("min-h-[44px]");
+    expect(checkbox.parentElement?.className).toContain("min-w-[44px]");
+
+    const specLink = screen.getByRole("link", { name: "Spec doc" });
+    expect(specLink.className).toContain("break-all");
+
+    const overdueLink = screen.getByRole("link", { name: /Overdue task/ });
+    expect(overdueLink.className).toContain("min-h-[44px]");
+
+    expect(container.querySelector(".flex-wrap")).toBeTruthy();
   });
 });

@@ -5,7 +5,7 @@ import { ArrowLeft, BarChart3, Users } from "lucide-react";
 import { CardSearchInput } from "@/components/boards/CardSearchInput";
 import { BaseBadge } from "@/components/shared/BaseBadge";
 import { BaseButton } from "@/components/shared/BaseButton";
-import { isAdmin, isGuest, ROLE_VARIANT } from "@/lib/roles";
+import { can, ROLE_VARIANT } from "@/lib/roles";
 import type { CardSearchResult, Role } from "@/lib/types";
 
 export interface BoardToolbarProps {
@@ -18,7 +18,7 @@ export interface BoardToolbarProps {
   onOpenAnalytics: () => void;
 }
 
-/** Board page toolbar with back link, title, role badge, search, and admin actions. */
+/** Board page toolbar with back link, title, role badge, search, and role-gated actions. */
 export function BoardToolbar({
   boardName,
   role,
@@ -28,8 +28,9 @@ export function BoardToolbar({
   onOpenMembers,
   onOpenAnalytics,
 }: BoardToolbarProps) {
-  const showAdminActions = isAdmin(role);
-  const roleLabel = isGuest(role) ? "Guest" : role;
+  const showMembers = can(role, "manage_members");
+  const showAnalytics = can(role, "view_analytics");
+  const roleLabel = role === "guest" ? "Guest" : role;
 
   return (
     <div
@@ -54,17 +55,17 @@ export function BoardToolbar({
           onResults={onSearchResults}
           onClear={onSearchClear}
         />
-        {showAdminActions ? (
-          <>
-            <BaseButton variant="secondary" onClick={onOpenMembers}>
-              <Users className="size-4" aria-hidden="true" />
-              <span>Members</span>
-            </BaseButton>
-            <BaseButton variant="secondary" onClick={onOpenAnalytics}>
-              <BarChart3 className="size-4" aria-hidden="true" />
-              <span>Analytics</span>
-            </BaseButton>
-          </>
+        {showMembers ? (
+          <BaseButton variant="secondary" onClick={onOpenMembers}>
+            <Users className="size-4" aria-hidden="true" />
+            <span>Members</span>
+          </BaseButton>
+        ) : null}
+        {showAnalytics ? (
+          <BaseButton variant="secondary" onClick={onOpenAnalytics}>
+            <BarChart3 className="size-4" aria-hidden="true" />
+            <span>Analytics</span>
+          </BaseButton>
         ) : null}
       </div>
     </div>

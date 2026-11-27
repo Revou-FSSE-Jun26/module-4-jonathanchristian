@@ -36,15 +36,16 @@ export function KanbanColumn({
   onDeleteColumn,
   footer,
 }: KanbanColumnProps) {
-  const { canEdit } = useBoardRole();
+  const { can } = useBoardRole();
+  const allowEditCards = can("edit_cards");
   const sortedCards = [...column.cards].sort((a, b) => a.order - b.order);
 
   return (
     <section
       data-column-id={column.column_id}
       aria-label={column.name}
-      onDragOver={canEdit ? onDragOver : undefined}
-      onDrop={canEdit && onDrop ? (e) => onDrop(e, column.column_id) : undefined}
+      onDragOver={allowEditCards ? onDragOver : undefined}
+      onDrop={allowEditCards && onDrop ? (e) => onDrop(e, column.column_id) : undefined}
       className={cn(
         "w-72 min-w-[240px] shrink-0 rounded-lg bg-sunken p-2 flex flex-col gap-2",
         isDragTarget && "outline-2 outline-dashed outline-primary-200"

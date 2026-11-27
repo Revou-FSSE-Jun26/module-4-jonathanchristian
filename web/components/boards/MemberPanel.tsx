@@ -11,7 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
 import { apiRequest } from "@/lib/apiClient";
 import { showSuccess } from "@/lib/toast";
-import type { Member } from "@/lib/types";
+import type { Member, MemberRoleUpdate } from "@/lib/types";
 
 export interface MemberPanelProps {
   open: boolean;
@@ -19,25 +19,52 @@ export interface MemberPanelProps {
   boardId: string;
   members: Member[];
   onMembersChange: (members: Member[]) => void;
+  onMemberDemotedToGuest?: (userId: string) => void;
 }
 
-/** Admin-only member management modal for listing, adding, removing members, and invite links. */
+/** Member management modal for listing, adding, changing roles, removing members, and invite links. */
 export function MemberPanel({
   open,
   onClose,
   boardId,
   members,
   onMembersChange,
+  onMemberDemotedToGuest,
 }: MemberPanelProps) {
-  const { isAdmin } = useBoardRole();
+  const { can } = useBoardRole();
   const { user } = useAuth();
   const { handleError } = useErrorHandler();
   const [busy, setBusy] = useState(false);
+  const [busyUserId, setBusyUserId] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<Member | null>(null);
 
-  if (!isAdmin) {
+  if (!can("manage_members")) {
     return null;
   }
+
+  const handleRoleChange = async (member: Member, nextRole: MemberRoleUpdate["role"]) => {
+    if (nextRole === member.role) {
+      return;
+    }
+    setBusyUserId(member.user_id);
+    try {
+      const updated = await apiRequest<Member>(
+        `/api/boards/${boardId}/members/${member.user_id}`,
+        { method: "PATCH", body: { role: nextRole } }
+      );
+      onMembersChange(
+        members.map((m) => (m.user_id === member.user_id ? updated : m))
+      );
+      if (updated.role === "guest") {
+        onMemberDemotedToGuest?.(member.user_id);
+      }
+      showSuccess(`Updated ${member.name}'s role to ${updated.role}.`);
+    } catch (err) {
+      handleError(err);
+    } finally {
+      setBusyUserId(null);
+    }
+  };
 
   const handleRemove = async () => {
     if (!confirmTarget) {
@@ -70,10 +97,14 @@ export function MemberPanel({
         <MemberList
           members={members}
           currentUserId={user?.user_id}
+          busyUserId={busyUserId}
+          onChangeRole={(member, role) => {
+            void handleRoleChange(member, role);
+          }}
           onRequestRemove={(member) => setConfirmTarget(member)}
         />
 
-        {open ? <InviteLinksPanel boardId={boardId} /> : null}
+        {open && can("view_invite_links") ? <InviteLinksPanel boardId={boardId} /> : null}
       </BaseModal>
 
       <ConfirmDialog

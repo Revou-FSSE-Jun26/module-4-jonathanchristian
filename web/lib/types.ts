@@ -1,6 +1,6 @@
-export type Role = "admin" | "member" | "guest";
+export type Role = "admin" | "manager" | "member" | "guest";
 
-export type CardStatus = "NOT_STARTED" | "IN_PROGRESS" | "DONE";
+export type CardStatus = "NOT_STARTED" | "IN_PROGRESS" | "URGENT" | "DONE";
 
 export interface User {
   user_id: string;
@@ -59,12 +59,60 @@ export interface Card {
   updated_at: string;
 }
 
+export interface BoardCard extends Card {
+  checklist_done: number;
+  checklist_total: number;
+  link_count: number;
+}
+
+export interface ChecklistItem {
+  checklist_item_id: string;
+  card_id: string;
+  text: string;
+  is_done: boolean;
+  order: number;
+}
+
+export interface CardLink {
+  card_link_id: string;
+  card_id: string;
+  url: string;
+  label: string;
+  created_by: string;
+  created_at: string;
+}
+
+export interface CardDetail extends BoardCard {
+  checklist: ChecklistItem[];
+  links: CardLink[];
+}
+
+export interface OverdueItem {
+  card_id: string;
+  title: string;
+  due_date: string;
+  status: CardStatus;
+  column_name: string;
+  board_id: string;
+  board_name: string;
+  days_overdue: number;
+}
+
+export interface OverdueResult {
+  items: OverdueItem[];
+  total: number;
+}
+
+export interface MemberRoleUpdate {
+  role: "guest" | "member" | "manager";
+}
+
 export interface Column {
   column_id: string;
   board_id: string;
   name: string;
   order: number;
-  cards: Card[];
+  cards: BoardCard[];
 }
 
 export interface BoardSummary {

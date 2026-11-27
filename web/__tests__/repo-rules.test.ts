@@ -70,6 +70,15 @@ describe("Frontend repository rules (G-FE-03, G-FE-04, G-FE-20, G-BE-18)", () =>
       "GithubIcon.tsx",
       "LinkedinIcon.tsx",
       "Footer.tsx",
+      "CardMetaRow.tsx",
+      "ChecklistSection.tsx",
+      "ChecklistItemRow.tsx",
+      "AddChecklistForm.tsx",
+      "LinksSection.tsx",
+      "LinkRow.tsx",
+      "LinkForm.tsx",
+      "RoleSelect.tsx",
+      "OverdueItemRow.tsx",
     ]) {
       expect(basenames.has(required)).toBe(true);
     }

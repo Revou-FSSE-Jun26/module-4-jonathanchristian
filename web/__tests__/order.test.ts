@@ -13,7 +13,7 @@ import {
   type TouchEv,
 } from "@/lib/order";
 import { CARD_STATUSES } from "@/lib/status";
-import type { Card, CardStatus, Column } from "@/lib/types";
+import type { BoardCard, CardStatus, Column } from "@/lib/types";
 
 function makeCard(
   card_id: string,
@@ -21,7 +21,7 @@ function makeCard(
   order: number,
   status: CardStatus = "NOT_STARTED",
   completed_at: string | null = null
-): Card {
+): BoardCard {
   return {
     card_id,
     board_id: "b1",
@@ -34,6 +34,9 @@ function makeCard(
     status,
     completed_at,
     order,
+    checklist_done: 0,
+    checklist_total: 0,
+    link_count: 0,
     created_at: "2026-11-18T00:00:00Z",
     updated_at: "2026-11-18T00:00:00Z",
   };
