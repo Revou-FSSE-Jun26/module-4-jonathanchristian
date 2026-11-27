@@ -825,3 +825,10 @@ Recommendation for the next requirements revision: reword Requirement 46 criteri
 - Tasks: new task 70.5. Tasks 70.2 to 70.4 stay open and must run after 70.5.
 - Breaking changes: none.
 - Open and unverified: dependency discovery. Dependencies are only in `app/requirements.txt`; if the next log shows a missing module, add a root `requirements.txt` with `-r app/requirements.txt`. Fallback for the entrypoint: a root `index.py`. If the fix fails, correct this entry, do not remove it.
+### V14 correction - 2026-11-28 (same version; V14 was never verified)
+- Result of the first V14 attempt: the deployment from commit `1b0bbe8` (which contained `pyproject.toml`) produced the same `ModuleNotFoundError: No module named 'app'` from `/var/task/wsgi.py` line 9. Vercel ignored `[tool.vercel] entrypoint`, or applied it without changing how `app/` was deployed. The `pyproject.toml` approach did not fix the bug.
+- Implementation change: deleted `pyproject.toml`. Added a root `index.py` (`from app.wsgi import app`) as the Vercel entrypoint, so `app/` is deployed as a package. Added a root `requirements.txt` (`-r app/requirements.txt`) so the dependencies are found from the root. `app/wsgi.py` and all application code are unchanged.
+- Design change: D10 (V14 refinement) and the `design.md` version header now describe the root `index.py` entrypoint. The failed `pyproject.toml` attempt is recorded as history in that row.
+- Docs: the `docs/deployment.md` entrypoint note is rewritten.
+- Tasks: 70.5 fallback marked done; new task 70.6.
+- Verification: local only. From the repository root, `import index` loads the app, and `GET /api/health` through the Flask test client returns `200 {"data":{"status":"ok"}}`. Not yet verified on Vercel (task 70.6, manual step).

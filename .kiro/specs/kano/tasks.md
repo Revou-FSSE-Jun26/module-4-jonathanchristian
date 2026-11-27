@@ -2713,7 +2713,14 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
 - [ ] 70.5 (V14) Add the root `pyproject.toml` with `[tool.vercel] entrypoint = "app.wsgi:app"`, because Vercel otherwise copies `app/` contents to `/var/task` and `from app import create_app` fails with `ModuleNotFoundError`
   - [x] Create `pyproject.toml` and update `docs/deployment.md` (done)
   - [ ] [MANUAL] Redeploy, call `GET /api/health`, and confirm the traceback is gone (rerun 70.2 and 70.3 checks after this task)
-  - [ ] [MANUAL] If it still fails: add a root `index.py` (`from app.wsgi import app`); if the log reports a missing dependency, add a root `requirements.txt` with `-r app/requirements.txt`; record the outcome in `docs/deployment.md`
+  - [x] [MANUAL] If it still fails: add a root `index.py` (`from app.wsgi import app`); if the log reports a missing dependency, add a root `requirements.txt` with `-r app/requirements.txt`; record the outcome in `docs/deployment.md` (it failed with the same traceback; the fallback is applied, see 70.6)
   - _Requirements: 34.1, 34.7_
   - _Design: D10 (V14 refinement)_
   - Depends on: 70.1
+- [ ] 70.6 (V14 correction) Replace the `pyproject.toml` entrypoint with a root entrypoint
+  - [x] Add a root `index.py` (`from app.wsgi import app`), add a root `requirements.txt` (`-r app/requirements.txt`), delete `pyproject.toml`, and update `docs/deployment.md` and D10 (V14 refinement)
+  - [x] Local check from the repository root: `import index` loads the app, and `GET /api/health` through the Flask test client returns `200 {"data":{"status":"ok"}}`
+  - [ ] [MANUAL] Commit, push, and redeploy `kano-api` without build cache; confirm that the build log installs the dependencies and that `GET /api/health` returns 200 on Vercel; then run the 70.2 and 70.3 checks
+  - _Requirements: 34.1, 34.7_
+  - _Design: D10 (V14 refinement)_
+  - Depends on: 70.5
