@@ -81,7 +81,7 @@ test("Kanban full journey (8 steps)", async ({ page }) => {
 
     await page.getByRole("button", { name: "Edit comment" }).click();
     await page.getByLabel("Edit comment text").fill("Edited comment");
-    await page.getByRole("button", { name: "Save" }).click();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
     await expect(page.getByText("Edited comment")).toBeVisible();
   });
 });

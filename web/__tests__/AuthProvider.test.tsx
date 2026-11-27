@@ -151,8 +151,8 @@ describe("AuthProvider", () => {
 
     await waitFor(() => {
       expect(screen.getByTestId("status")).toHaveTextContent("authenticated");
+      expect(screen.getByTestId("user")).toHaveTextContent("Ada:ada@example.com");
     });
-    expect(screen.getByTestId("user")).toHaveTextContent("Ada:ada@example.com");
   });
 
   it("clears cookies and redirects to /login on 401 restore failure", async () => {

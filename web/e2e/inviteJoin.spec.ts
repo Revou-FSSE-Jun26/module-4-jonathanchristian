@@ -51,7 +51,9 @@ test.describe("Board invitation links and V11 roles E2E", () => {
     await expect(memberPage.getByRole("button", { name: "Add a card" })).toBeVisible();
     await expect(memberPage.getByRole("button", { name: "Add column" })).toHaveCount(0);
 
-    // Creator promotes Invited Member to manager
+    // Creator reloads the board (the member list is loaded with the page) and promotes Invited Member to manager
+    await page.reload();
+    await page.getByRole("button", { name: "Members" }).click();
     await page.getByLabel("Role for Invited Member").selectOption("manager");
     await expect(page.getByText(/Updated Invited Member/)).toBeVisible();
 
@@ -82,7 +84,7 @@ test.describe("Board invitation links and V11 roles E2E", () => {
 
     await guestPage.getByRole("button", { name: "Join" }).click();
     await expect(guestPage).toHaveURL(/\/boards\//);
-    await expect(guestPage.getByText("Guest")).toBeVisible();
+    await expect(guestPage.getByText("Guest", { exact: true })).toBeVisible();
     await expect(guestPage.getByRole("button", { name: "Add column" })).toHaveCount(0);
     await expect(guestPage.getByRole("button", { name: "Add a card" })).toHaveCount(0);
     await guestCtx.close();

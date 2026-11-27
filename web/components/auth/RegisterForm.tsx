@@ -154,7 +154,7 @@ export function RegisterForm({ next = null }: RegisterFormProps) {
         Already have an account?{" "}
         <Link
           href={withNext("/login", validatedNext)}
-          className="text-primary-600 hover:text-primary-700 hover:underline"
+          className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] text-primary-600 hover:text-primary-700 hover:underline"
         >
           Log in
         </Link>

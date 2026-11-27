@@ -43,7 +43,7 @@ test.describe("Overdue card and notification list E2E", () => {
     await dialog.getByRole("button", { name: "Save changes" }).click();
 
     const card = col.locator("[data-card-id]", { hasText: "Past due card" });
-    await expect(card.getByText("Overdue")).toBeVisible();
+    await expect(card.getByText("Overdue", { exact: true })).toBeVisible();
     await expect(page.getByTestId("notification-badge")).toHaveCount(0);
 
     await page.goto("/");

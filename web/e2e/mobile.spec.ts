@@ -29,7 +29,7 @@ test.describe("Mobile viewport (375 px) checks", () => {
     page,
   }) => {
     await page.goto("/welcome");
-    await expect(page.getByRole("heading", { name: "Welcome to Kano" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Organize work smoothly, from idea to done" })).toBeVisible();
     await assertNoHorizontalOverflow(page);
     await assertTapTargets(page);
 
@@ -55,6 +55,7 @@ test.describe("Mobile viewport (375 px) checks", () => {
     await setWelcomeSeen(context, baseURL!);
 
     await page.goto("/register");
+    await page.waitForLoadState("networkidle");
     await page.getByLabel("Name").fill("Mobile User");
     await page.getByLabel("Email").fill(email);
     await page.getByLabel("Password").fill(password);

@@ -100,7 +100,7 @@ test.describe("V8 responsive layout E2E (R33.16)", () => {
       for (const colTitle of ["To do", "In progress"]) {
         await page.getByRole("button", { name: /add column/i }).click();
         await page.getByLabel(/column name/i).fill(colTitle);
-        await page.getByRole("button", { name: /^add$/i }).click();
+        await page.getByRole("button", { name: /^add column$/i }).click();
         await expect(page.getByRole("heading", { name: colTitle })).toBeVisible();
       }
 

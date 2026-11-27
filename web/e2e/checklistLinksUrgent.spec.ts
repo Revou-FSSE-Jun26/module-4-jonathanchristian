@@ -54,10 +54,10 @@ test.describe("Checklist, workspace links, and Urgent status E2E", () => {
     const card = col.locator("[data-card-id]", { hasText: "Urgent task" });
     await expect(card.getByText("1/1")).toBeVisible();
     await expect(card.getByLabel("1 links")).toBeVisible();
-    await expect(card.getByText("Urgent")).toBeVisible();
+    await expect(card.getByText("Urgent", { exact: true })).toBeVisible();
 
     await page.goto("/my-tasks");
     await expect(page.getByText("Urgent task")).toBeVisible();
-    await expect(page.getByText("Urgent")).toBeVisible();
+    await expect(page.getByText("Urgent", { exact: true })).toBeVisible();
   });
 });

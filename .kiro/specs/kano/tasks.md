@@ -2141,7 +2141,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
   - _Requirements: 34.3, 34.5, 34.6, 44.1_
   - _Design: Part D (V11 notes), Open issue 66_
 
-- [ ] 57. Phase 32 (V12): Baseline run before any change (run first, record, fix)
+- [x] 57. Phase 32 (V12): Baseline run before any change (run first, record, fix)
   - [x] 57.1 [MANUAL] Prepare the local stack and the E2E environment for the baseline
     - NOT executed by the agent. Start PostgreSQL with the development and test databases (task 4.3), then follow the README Local Run Steps: from `app/` with the venv active run `flask run`, and from `web/` run `npm run dev`; confirm `web/.env.test` holds `E2E_USER_EMAIL`, `E2E_USER_PASSWORD` (the E2E account of task 33.4) and `E2E_BASE_URL` (for example `http://localhost:3000`; `web/playwright.config.ts` loads `.env.test` and throws when `E2E_BASE_URL` is missing or not an absolute http or https URL), and that the E2E account exists in the development database; run `npx playwright install` once from `web/`
     - The baseline must run against the code as it is before V12 (the V11 state), so do not change any file before tasks 57.2 and 57.3 have run
@@ -2149,21 +2149,21 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Testing Strategy V12 refinement (order of work, step 1)_
     - Depends on: 54
 
-  - [ ] 57.2 Run the `pytest` and `npm test` baselines and record every failure
+  - [x] 57.2 Run the `pytest` and `npm test` baselines and record every failure
     - Read `guidelines/backend.md` and `guidelines/frontend.md` first; note `web/AGENTS.md`
     - Change no code and no test. From `app/` with the venv active run `pytest`; from `web/` run `npm test` (this is `vitest --run`). Create `docs/v12-baseline.md` with one section per command: the exact command, the date, the count of passed and failed tests, and for each failing test its file and test name, the first error line, and the cause class (V11 leftover, environment such as a missing `.env` value or database, or flaky). An all-green run is recorded as "no failures". The failures are a runtime result and are not predicted here (Requirement 48 criterion 4)
     - _Requirements: 48.4, 31.8, 32.10_
     - _Design: Testing Strategy V12 additions (run-first step), Testing Strategy V12 refinement (order of work)_
     - Depends on: 57.1
 
-  - [ ] 57.3 Run the `npx playwright test` baseline and record every failure
+  - [x] 57.3 Run the `npx playwright test` baseline and record every failure
     - Read `guidelines/frontend.md` first; note `web/AGENTS.md`
     - Change no code and no test. From `web/` with the stack of 57.1 running and `E2E_BASE_URL` set run `npx playwright test` (the config has two projects, `desktop` and `mobile`, and 2 retries; a test that passes only on a retry is recorded as flaky); append a `npx playwright test` section to `docs/v12-baseline.md` in the same format as 57.2. If the run cannot start because a server or a variable is missing, record that and repeat it after the user fixes the stack; do not skip the run
     - _Requirements: 48.4, 33.8, 33.10_
     - _Design: Testing Strategy V12 additions (run-first step), Testing Strategy V12 refinement (order of work)_
     - Depends on: 57.2
 
-  - [ ] 57.4 Fix the recorded failures that V12 does not cause
+  - [x] 57.4 Fix the recorded failures that V12 does not cause
     - Read `guidelines/backend.md`, `guidelines/database.md`, `guidelines/frontend.md`, and `guidelines/design-system.md` first (read only); note `web/AGENTS.md`
     - For each failure in `docs/v12-baseline.md` fix the cause (code, test, fixture, or environment) and note the fix next to the entry; never delete a test, skip a test, or weaken an assertion to make a command pass (Requirement 48 criterion 5). Failures that only the V12 changes will remove or change (the My Tasks link target and the Board card layout) are left to tasks 62.1 to 62.3 and are noted as such. Re-run the failing tests to confirm each fix
     - _Requirements: 48.4, 48.5, 32.10, 33.8, 31.8_
