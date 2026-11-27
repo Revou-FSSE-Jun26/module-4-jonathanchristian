@@ -17,6 +17,10 @@ Kano is a Trello-like task management app. Users create boards, organize work in
 | Kano_API | `PENDING: https://<kano-api>.vercel.app` |
 | Kano_Web | `PENDING: https://<kano-web>.vercel.app` |
 
+> [!NOTE]  
+> **Live Demo Status:** The current production deployment reflects the stable release at commit [`26d82f5`](https://github.com/jonathanch12/kano-app/commit/26d82f5ac5c9445256f41eeee29b68cb18dbbd10). 
+> Recent commits on the `main` branch contain unreleased updates and work-in-progress features that are not yet deployed.
+
 ## AI Workflow Summary
 
 ### How the project brief was written

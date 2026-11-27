@@ -796,3 +796,18 @@ Requirements V12, design V12, and tasks V12 were compared. No orphaned task, no 
 Recommendation for the next requirements revision: reword Requirement 46 criterion 8 as in Open issue 72, and update the names in Properties 76 and 78 (items 1 and 4). No change is needed before the tasks are executed.
 #### Implementation changes
 - None. No code was changed.
+
+## V13 - 2026-11-28
+### Changes
+- Design change: removed the root `vercel.json` (legacy `builds` and `routes` keys). The backend project relies on Vercel's Flask auto-detection of `app/wsgi.py`, with Framework Preset Flask and no build, install, or output overrides. Added D10 (V13 refinement) and a V13 note in the deployment section of `design.md`. The V12 D10 row and `vercel.json` block are kept as history.
+- Implementation change: deleted `vercel.json`; added root `.python-version` (`3.12`); updated `docs/deployment.md` (architecture table row, serverless risks).
+- Bug fix: production `kano-api` returned `404 NOT_FOUND` on every path. The Vercel build finished in 125 ms, the Resources tab showed only "Static Assets" (153 files from `app/`) and no function, and Observability showed no invocations. Cause as diagnosed: the legacy `builds` config prevented the Python function from being built. Not yet verified by a new deployment.
+- Not changed: requirements (version header only), application code, `app/wsgi.py`, `.vercelignore`, environment variables.
+### Reason
+- The deployed backend must serve `/api/health` (Requirements 34.1 and 34.7 are unchanged).
+### Impact
+- Requirements: none.
+- Design: D10 (superseded in part by D10 (V13 refinement)) and the Backend project text of the Vercel deployment section.
+- Tasks: new task 70 (70.1 done; 70.2 to 70.4 manual and open). Task 22.1 is unchanged and kept as history.
+- Breaking changes: none for the API. Anyone who relied on the root `vercel.json` must use Framework Preset Flask.
+- Open: the fix is unverified until 70.2 and 70.3 pass. If it fails, this entry must be corrected, not removed.

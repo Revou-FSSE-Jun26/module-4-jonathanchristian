@@ -8,7 +8,7 @@ This guide covers deploying the Kano monorepo as two separate Vercel projects (`
 
 | Project | Root Directory | Framework / Runtime | Build / Entry |
 |---|---|---|---|
-| `kano-api` | Repository root (`.`) | `@vercel/python` (via `vercel.json`) | `app/wsgi.py` |
+| `kano-api` | Repository root (`.`), Framework Preset **Flask** | Vercel Python runtime, auto-detected (no `vercel.json`) | `app/wsgi.py` |
 | `kano-web` | `web/` | Next.js | `npm run build` |
 
 > [!IMPORTANT]
@@ -76,7 +76,8 @@ Database migrations are **manual** and must be run from a local shell before ver
 
 - **Connection pooling**: On Vercel (`VERCEL` env var set), `app/config.py` configures SQLAlchemy with `NullPool` so serverless invocations do not hold idle connections. Use a **pooled** `DATABASE_URL` from your PostgreSQL provider.
 - **Cold starts & health check**: `/api/health` performs no database queries, but a Vercel cold start may exceed 500 ms on the first request after idle periods.
-- **Python 3.14 & `psycopg2-binary`**: The local virtual environment uses Python 3.14. If Vercel does not offer Python 3.14 or lacks a `psycopg2-binary` wheel, pin a supported version in a root `.python-version` file (e.g. `3.12`) or switch to `psycopg[binary]`.
+- **Python 3.14 & `psycopg2-binary`**: The local virtual environment uses Python 3.14. If Vercel does not offer Python 3.14 or lacks a `psycopg2-binary` wheel, pin a supported version in a root `.python-version` file (e.g. `3.12`) or switch to `psycopg[binary]`. The repository root now contains `.python-version` with `3.12`.
+- **No `vercel.json` (V13)**: The backend project relies on Vercel's Flask auto-detection of `app/wsgi.py`. A root `vercel.json` with the legacy `builds` and `routes` keys made Vercel deploy `app/` as static assets with no function (every path returned `404 NOT_FOUND`), so the file was removed. In the `kano-api` project set Framework Preset to **Flask**, leave Root Directory empty, and leave Build, Install, and Output Directory overrides off. After a deployment, the Resources tab must list a function for `app/wsgi.py`, and `GET /api/health` must return `200`.
 
 ---
 
