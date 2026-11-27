@@ -86,6 +86,12 @@ describe("Board role gating and StatusBadge (Task 30.1)", () => {
     rerender(<BoardView board={makeBoard("member")} />);
     expect(screen.queryByRole("button", { name: "Members" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Analytics" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add column" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Add a card" })).toHaveLength(2);
+
+    rerender(<BoardView board={makeBoard("manager")} />);
+    expect(screen.getByRole("button", { name: "Members" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Analytics" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Add column" })).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: "Add a card" })).toHaveLength(2);
   });

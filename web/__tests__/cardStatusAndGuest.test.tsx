@@ -70,6 +70,23 @@ describe("CardDetailModal V6 status and guest view", () => {
       if (url.endsWith("/comments")) {
         return Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200 }));
       }
+      if (url.endsWith("/cards/c1") && (!init?.method || init.method === "GET")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              data: {
+                ...card,
+                checklist_done: 0,
+                checklist_total: 0,
+                link_count: 0,
+                checklist: [],
+                links: [],
+              },
+            }),
+            { status: 200 }
+          )
+        );
+      }
       if (url.endsWith("/cards/c1") && init?.method === "PATCH") {
         return Promise.resolve(
           new Response(JSON.stringify({ data: { ...card, status: "DONE" } }), { status: 200 })
@@ -99,6 +116,7 @@ describe("CardDetailModal V6 status and guest view", () => {
     expect(Array.from(statusSelect.options).map((o) => o.text)).toEqual([
       "Not started",
       "In progress",
+      "Urgent",
       "Done",
     ]);
 
@@ -131,6 +149,23 @@ describe("CardDetailModal V6 status and guest view", () => {
       vi.fn((url: string, init?: RequestInit) => {
         if (url.endsWith("/comments")) {
           return Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200 }));
+        }
+        if (url.endsWith("/cards/c1") && (!init?.method || init.method === "GET")) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                data: {
+                  ...card,
+                  checklist_done: 0,
+                  checklist_total: 0,
+                  link_count: 0,
+                  checklist: [],
+                  links: [],
+                },
+              }),
+              { status: 200 }
+            )
+          );
         }
         if (url.endsWith("/cards/c1") && init?.method === "PATCH") {
           return Promise.resolve(

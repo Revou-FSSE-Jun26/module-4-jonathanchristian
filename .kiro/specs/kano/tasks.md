@@ -2035,8 +2035,8 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B21, Open issue 56_
     - Depends on: 50.10
 
-- [ ] 51. Phase 29 (V11): Frontend tests
-  - [ ] 51.1 Write the role and gating tests (`can`, dropdown, board views)
+- [x] 51. Phase 29 (V11): Frontend tests
+  - [x] 51.1 Write the role and gating tests (`can`, dropdown, board views)
     - Read `guidelines/frontend.md` first. Table test of `can(role, action)` over every combination; `assignableRoles`; the role dropdown and remove control only through `canActOnMember`; a board rendered as `member` shows no Column controls, member panel, invite links, or analytics link while keeping card editing; as `manager` shows Column controls, member panel, and both invite links but no analytics link; as `admin` everything
     - Property test: **Property 74: Frontend `can` and role controls**
     - **Validates: Requirements 43.13, 43.14, 43.15, 21.12, 21.13**
@@ -2044,7 +2044,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Testing Strategy V11 additions (frontend), Correctness Property 74_
     - Depends on: 50.1, 50.2
 
-  - [ ] 51.2 Write the checklist tests
+  - [x] 51.2 Write the checklist tests
     - Read `guidelines/frontend.md` first. `3/5` and a 60 percent bar for 3 done of 5, no indicator at 0, optimistic toggle within 100 ms and restore with one toast on failure, read-only checkboxes for a guest, add control disabled at 50, field errors without a request
     - Property tests: **Property 66** (progress and rules), **Property 67: Optimistic checklist toggle**
     - **Validates: Requirements 41.12 to 41.17**
@@ -2052,7 +2052,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Correctness Properties 66, 67_
     - Depends on: 50.5
 
-  - [ ] 51.3 Write the workspace link tests
+  - [x] 51.3 Write the workspace link tests
     - Read `guidelines/frontend.md` first. The add form rejects empty, `javascript:alert(1)`, `data:`, `file:`, and over-2048-character values without a request; every anchor has `target="_blank"` and `rel` containing `noopener` and `noreferrer`; the count chip is hidden at 0 and shown above 0; `providerKey` returns `generic` for an unknown host; a guest sees the list without add, edit, or delete controls
     - Property tests: **Property 68** (client side), **Property 69: Provider icon key**
     - **Validates: Requirements 42.11 to 42.16**
@@ -2060,7 +2060,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Correctness Properties 68, 69_
     - Depends on: 50.6
 
-  - [ ] 51.4 Write the overdue and status-map UI tests
+  - [x] 51.4 Write the overdue and status-map UI tests
     - Read `guidelines/frontend.md` first. The Card chip appears iff the due date is before the UTC date and the status is not `DONE`; "1 day overdue" and "N days overdue"; the overdue request is sent on load and when the list opens and never on a timer; overdue items are not counted by the bell; the empty state needs both lists empty; four status labels and classes, and the board Card and My Tasks row show the same badge
     - Property tests: **Property 65**, **Property 62** (component use)
     - **Validates: Requirements 40.10 to 40.15, 39.5, 39.6**
@@ -2068,15 +2068,15 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Correctness Properties 62, 65_
     - Depends on: 50.3, 50.7
 
-  - [ ] 51.5 Sweep and update the remaining tests invalidated by V11
+  - [x] 51.5 Sweep and update the remaining tests invalidated by V11
     - Read `guidelines/frontend.md` first; run the full `npm test` and fix every failure caused by V11 without weakening an assertion
     - Supersedes the V5 to V8 assertions that assume three statuses or three roles or a `member` with Column controls: the RTL tests of tasks 18.5, 18.7, 29.3, 29.9, 30.1, 30.2, 30.4, 30.8, 36.1, 37.2, and 37.3, plus every `Card` and `Role` test fixture; those tasks stay as history
     - _Requirements: 10.11, 21.13, 21.22, 23.17, 25.2, 43.15, 32.9, 32.10_
     - _Design: Correctness Property Amendments (V11 change notes)_
     - Depends on: 51.1, 51.2, 51.3, 51.4, 50.11
 
-- [ ] 52. Phase 30 (V11): Playwright updates
-  - [ ] 52.1 Update the invite-join and role scenario
+- [x] 52. Phase 30 (V11): Playwright updates
+  - [x] 52.1 Update the invite-join and role scenario
     - Read `guidelines/frontend.md` first. The pre-existing user (`requireCredentials()`, the Board creator and therefore `admin`) creates a Board and reads both links; a second generated account joins through the member link, sees card controls and no Column controls (no add-column control); the creator promotes it to manager through the role dropdown; after a reload the second account sees the Column controls and the member panel but no analytics link; a third account joins through the guest link and sees the "Guest" badge and no edit controls
     - Supersedes the member-sees-add-column expectation of task 31.7; 31.7 stays as history
     - No literal credentials, no `waitForTimeout`
@@ -2084,21 +2084,21 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Testing Strategy V11 additions (Playwright)_
     - Depends on: 50.2, 31.1, 46.16
 
-  - [ ] 52.2 Write the checklist, link, and Urgent status scenario
+  - [x] 52.2 Write the checklist, link, and Urgent status scenario
     - Read `guidelines/frontend.md` first. The Board creator adds a checklist item and a link in a card, sees `1/1` progress and the link chip on the Card face, and sets the status to "Urgent" and sees the red badge there and in `/my-tasks`
     - No literal credentials, no `waitForTimeout`
     - _Requirements: 39.6, 41.16, 42.15, 33.6, 33.10_
     - _Design: Testing Strategy V11 additions (Playwright)_
     - Depends on: 50.6, 50.4, 31.1
 
-  - [ ] 52.3 Write the overdue scenario
+  - [x] 52.3 Write the overdue scenario
     - Read `guidelines/frontend.md` first. Set a past due date on an assigned card through the modal, see the "Overdue" chip on the Card face, open the notification bell and see the overdue row with "N days overdue" and no change of the bell count, select it and land on the board
     - No literal credentials, no `waitForTimeout`
     - _Requirements: 40.10, 40.11, 40.12, 40.14, 33.6, 33.10_
     - _Design: Testing Strategy V11 additions (Playwright)_
     - Depends on: 50.7, 50.3, 31.1
 
-  - [ ] 52.4 Extend the no-literal-credentials check over the V11 specs
+  - [x] 52.4 Extend the no-literal-credentials check over the V11 specs
     - Confirm the scan of `web/e2e/` (task 31.9, Property 58) covers the new and updated specs of 52.1 to 52.3 and fails on a literal e-mail address or a literal password passed to a fill; add a case that lists the V11 spec files and asserts each imports `requireCredentials` or uses no credentials
     - Supersedes the file lists of tasks 31.9 and 37.7; those stay as history
     - **Validates: Requirements 33.10, 33.12**
@@ -2106,15 +2106,15 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Correctness Property 58_
     - Depends on: 52.1, 52.2, 52.3
 
-- [ ] 53. Phase 31 (V11): README and documentation
-  - [ ] 53.1 Update `README.md` for V11
+- [x] 53. Phase 31 (V11): README and documentation
+  - [x] 53.1 Update `README.md` for V11
     - Features list adds the Urgent status and label colors, overdue notifications, card checklists, workspace links (URLs only, no file upload), and the Manager role with its permissions; Local Run Steps state that the V11 schema changes need `flask db migrate` and `flask db upgrade` as a manual Migration_Step in which the user hand-edits the `cards.status` and `board_memberships.role` check constraints (the migration generator does not detect them); a sentence states that the role `member` no longer manages Columns; describe the look in words only and name no example HTML file (Requirement 36.14); run `scripts/check_readme_links.py`
     - Do not remove the owner's TODO placeholders of task 23.3
     - _Requirements: 36.15, 36.14, 36.12_
     - _Design: Part D (V11 notes), D3_
     - Depends on: 45.1, 50.9
 
-  - [ ] 53.2 Review the documentation and the guidelines for V11 drift
+  - [x] 53.2 Review the documentation and the guidelines for V11 drift
     - Update `docs/deployment.md` so the verification list also names GET `/api/notifications/overdue`, POST and PATCH of a checklist item and a link, GET `/api/cards/<id>`, and PATCH `/api/boards/<id>/members/<user_id>` with a second account; check `docs/violation-report.md` and `docs/guideline-comparison.md` for outdated "7 tables" or three-role statements; search `guidelines/*.md` for "admin only", "7 tables", and three-role statements and report each hit to the user in the task result instead of editing (agents never modify `guidelines/`); re-run `scripts/check_repo_hygiene.py` and `scripts/check_readme_links.py`
     - _Requirements: 34.5, 35.1, 36.12, 30.1_
     - _Design: Part D (V11 notes), Open issue 65_

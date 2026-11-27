@@ -99,7 +99,7 @@ describe("Board separator and toolbar placement (Task 37.3)", () => {
         expect(classes.some((c) => c === "border" || c.startsWith("border-t") || c.startsWith("border-b"))).toBe(false);
       }
 
-      if (role === "guest") {
+      if (role === "guest" || role === "member") {
         expect(screen.queryByRole("button", { name: /add column/i })).not.toBeInTheDocument();
       } else {
         const addColBtn = screen.getByRole("button", { name: /add column/i });

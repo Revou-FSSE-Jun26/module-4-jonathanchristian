@@ -71,4 +71,19 @@ describe("Playwright E2E conventions (G-FE-22, Property 58)", () => {
       }
     }
   });
+
+  it("ensures V11 spec files import requireCredentials and contain no literal credentials", () => {
+    const v11Specs = [
+      "inviteJoin.spec.ts",
+      "checklistLinksUrgent.spec.ts",
+      "overdue.spec.ts",
+    ];
+    for (const specName of v11Specs) {
+      const fullPath = path.join(E2E_DIR, specName);
+      expect(fs.existsSync(fullPath)).toBe(true);
+      const source = fs.readFileSync(fullPath, "utf8");
+      expect(findCredentialLiterals(source)).toEqual([]);
+      expect(source).toContain("requireCredentials");
+    }
+  });
 });

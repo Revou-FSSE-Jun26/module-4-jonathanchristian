@@ -54,13 +54,15 @@ The server side was developed and validated using Claude Code. It managed the **
 - **JWT authentication with access and refresh tokens:** a 1-hour access token and a 7-day refresh token. The browser refreshes once on a 401, and the middleware renews the token for server rendering.
 - **Board management:** create, rename, and delete boards. Deletes are soft and cascade to columns, cards, and comments.
 - **Column management:** add, rename, reorder, and delete columns.
-- **Card management:** title, description, due date, labels, and assignee. New cards are added with a title and then open in the detail modal.
-- **Card status:** Not started, In progress, or Done, independent of the column. Done cards record a completion time.
-- **Board members with roles:** admin, member, and guest. Guests are read-only.
-- **Board invitation links with the guest role:** one member link and one guest link per board, which the admin can regenerate.
+- **Card management:** title, description, due date, deterministic label colors, and assignee. New cards are added with a title and then open in the detail modal.
+- **Card status:** Not started, In progress, Urgent, or Done, independent of the column. Done cards record a completion time.
+- **Card checklists:** add, edit, toggle, and delete checklist items (up to 50 items per card) with a progress bar on the card face and in the modal.
+- **Workspace links:** attach external `http`/`https` URLs (URLs only, no file upload, up to 10 links per card) with provider icons and hostnames.
+- **Board members with roles:** admin, manager, member, and guest. Managers can manage columns, members, and invite links; members can edit cards and comments but no longer manage columns; only admins can rename or delete boards, grant the manager role, or view analytics; guests are read-only.
+- **Board invitation links with the guest role:** one member link and one guest link per board, which admins and managers can view and regenerate.
 - **Drag-and-drop with FLOAT ordering:** mouse and touch (300 ms long-press). A move stores one new order value without renumbering siblings.
 - **Comments:** add, edit, and delete your own comments on a card.
-- **Notifications:** on assignment and on new comments, with an unread badge polled every 30 seconds.
+- **Notifications and overdue alerts:** stored notifications on assignment and new comments (polled every 30 seconds), plus compute-on-read overdue notifications and card-face overdue badges.
 - **Card search:** debounced search across your boards or within one board.
 - **My Tasks view:** every card assigned to you, across boards.
 - **User profile:** change your name and password. The email is fixed after registration.
@@ -101,7 +103,7 @@ The server side was developed and validated using Claude Code. It managed the **
    ```powershell
    Copy-Item .env.example .env
    ```
-5. **Manual Migration_Step:** apply the schema with `flask db upgrade`. The migrations are created and applied by the project owner, never by the code. The V6 schema changes (card `status` and `completed_at`, the two invitation token columns, and the `guest` role) needed `flask db migrate` followed by `flask db upgrade`. Alembic does not detect check constraints, so `ck_cards_status` and the three-role `ck_board_memberships_role` were added to that migration by hand. In a fresh clone the migration already exists, so only the upgrade is needed:
+5. **Manual Migration_Step:** apply the schema with `flask db upgrade`. The migrations are created and applied by the project owner, never by the code. Both the V6 and V11 schema changes needed `flask db migrate` followed by `flask db upgrade` as a manual Migration_Step in which the user hand-edits the `cards.status` (`NOT_STARTED`, `IN_PROGRESS`, `URGENT`, `DONE`) and `board_memberships.role` (`admin`, `manager`, `member`, `guest`) check constraints because Alembic's migration generator does not detect check-constraint changes. In a fresh clone the migrations already exist, so only the upgrade is needed:
    ```powershell
    flask db upgrade
    ```

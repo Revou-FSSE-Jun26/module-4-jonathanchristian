@@ -1,8 +1,8 @@
 import { expect, test } from "@playwright/test";
 import { buildUniqueEmail, requireCredentials } from "./support/credentials";
 
-test.describe("Board invitation links and guest role E2E", () => {
-  test("member link grants edit controls and guest link grants read-only Guest view", async ({
+test.describe("Board invitation links and V11 roles E2E", () => {
+  test("member sees no column controls, admin promotes to manager, manager sees columns/members without analytics, guest is read-only", async ({
     browser,
     page,
   }) => {
@@ -19,6 +19,10 @@ test.describe("Board invitation links and guest role E2E", () => {
     await page.getByLabel("Board name").fill(boardName);
     await page.getByRole("dialog").getByRole("button", { name: "Create board" }).click();
     await page.getByRole("link", { name: new RegExp(boardName) }).click();
+
+    await page.getByRole("button", { name: "Add column" }).click();
+    await page.getByLabel("Column name").fill("To Do");
+    await page.getByRole("button", { name: "Add column" }).click();
 
     await page.getByRole("button", { name: "Members" }).click();
     const memberLink = await page.getByLabel("Member link: can edit").inputValue();
@@ -44,7 +48,18 @@ test.describe("Board invitation links and guest role E2E", () => {
 
     await memberPage.getByRole("button", { name: "Join" }).click();
     await expect(memberPage).toHaveURL(/\/boards\//);
+    await expect(memberPage.getByRole("button", { name: "Add a card" })).toBeVisible();
+    await expect(memberPage.getByRole("button", { name: "Add column" })).toHaveCount(0);
+
+    // Creator promotes Invited Member to manager
+    await page.getByLabel("Role for Invited Member").selectOption("manager");
+    await expect(page.getByText(/Updated Invited Member/)).toBeVisible();
+
+    // Reload as manager: sees column controls and Members, but no Analytics
+    await memberPage.reload();
     await expect(memberPage.getByRole("button", { name: "Add column" })).toBeVisible();
+    await expect(memberPage.getByRole("button", { name: "Members" })).toBeVisible();
+    await expect(memberPage.getByRole("button", { name: "Analytics" })).toHaveCount(0);
     await memberCtx.close();
 
     // Guest joins in third browser context
@@ -69,6 +84,7 @@ test.describe("Board invitation links and guest role E2E", () => {
     await expect(guestPage).toHaveURL(/\/boards\//);
     await expect(guestPage.getByText("Guest")).toBeVisible();
     await expect(guestPage.getByRole("button", { name: "Add column" })).toHaveCount(0);
+    await expect(guestPage.getByRole("button", { name: "Add a card" })).toHaveCount(0);
     await guestCtx.close();
   });
 });

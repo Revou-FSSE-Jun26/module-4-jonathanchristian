@@ -53,6 +53,7 @@ Database migrations are **manual** and must be run from a local shell before ver
    - `POST /api/auth/register` (`201`)
    - `POST /api/auth/login` (`200` with `access_token` and `refresh_token`)
    - One request for each of the eight endpoint groups (auth, boards, columns, cards, comments, notifications, analytics, users), verifying the `{ "data": ... }` envelope.
+   - V11 endpoints: `GET /api/notifications/overdue`, `POST` and `PATCH` of a checklist item (`/api/cards/<id>/checklist`, `/api/checklist/<id>`) and a link (`/api/cards/<id>/links`, `/api/links/<id>`), `GET /api/cards/<id>`, and `PATCH /api/boards/<id>/members/<user_id>` with a second account.
 4. **Browser walk-through** at desktop (`1280 px`) and mobile (`375 px`):
    - Visit Dashboard, Board Detail, Card Detail Modal, My Tasks, Profile, Register, and Login with no console errors or failed network requests.
    - Verify touch drag-and-drop at `375 px` in browser DevTools device mode (300 ms long-press).

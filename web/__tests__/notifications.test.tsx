@@ -62,31 +62,42 @@ describe("Notifications and formatBadge", () => {
   it("shows 1, 99, 99+ and hides badge at 0; polls every 30s and stops on unmount", async () => {
     vi.useFakeTimers();
     let unread = 0;
-    const fetchMock = vi.fn(() =>
-      Promise.resolve(
+    const fetchMock = vi.fn((url: string) => {
+      if (url.includes("/api/notifications/overdue")) {
+        return Promise.resolve(
+          new Response(JSON.stringify({ data: { items: [], total: 0 } }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          })
+        );
+      }
+      return Promise.resolve(
         new Response(
           JSON.stringify({
             data: { items: [], page: 1, per_page: 20, total: 0, unread_count: unread },
           }),
           { status: 200, headers: { "Content-Type": "application/json" } }
         )
-      )
-    );
+      );
+    });
     vi.stubGlobal("fetch", fetchMock);
+
+    const pollCalls = () =>
+      fetchMock.mock.calls.filter(([u]) => String(u).includes("/api/notifications?")).length;
 
     const { unmount } = render(<NotificationBell />);
     await act(async () => {
       await Promise.resolve();
     });
     expect(screen.queryByTestId("notification-badge")).not.toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(pollCalls()).toBe(1);
 
     unread = 1;
     await act(async () => {
       await vi.advanceTimersByTimeAsync(30_000);
     });
     expect(screen.getByTestId("notification-badge")).toHaveTextContent("1");
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(pollCalls()).toBe(2);
 
     unread = 99;
     await act(async () => {

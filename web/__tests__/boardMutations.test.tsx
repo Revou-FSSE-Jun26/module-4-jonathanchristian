@@ -22,7 +22,7 @@ function makeBoard(): BoardDetail {
   return {
     board_id: "b1",
     name: "Roadmap",
-    my_role: "member",
+    my_role: "manager",
     created_at: "2026-11-18T00:00:00Z",
     columns: [
       {
@@ -107,6 +107,35 @@ describe("BoardView column and card mutations", () => {
       }
       if (url.endsWith("/comments")) {
         return Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200 }));
+      }
+      if (url.endsWith("/cards/c1") && (!init?.method || init.method === "GET")) {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              data: {
+                card_id: "c1",
+                board_id: "b1",
+                column_id: "col-1",
+                title: "Write tests",
+                description: null,
+                due_date: null,
+                labels: [],
+                assignee: null,
+                status: "NOT_STARTED",
+                completed_at: null,
+                order: 1,
+                checklist_done: 0,
+                checklist_total: 0,
+                link_count: 0,
+                checklist: [],
+                links: [],
+                created_at: "2026-11-18T00:00:00Z",
+                updated_at: "2026-11-18T00:00:00Z",
+              },
+            }),
+            { status: 200 }
+          )
+        );
       }
       return Promise.reject(new Error("Unexpected call"));
     });
