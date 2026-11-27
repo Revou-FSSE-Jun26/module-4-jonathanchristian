@@ -1861,7 +1861,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
   - Depends on: 44.12, 44.13, 44.14, 44.15, 46.3, 46.5, 46.7, 46.8, 46.10, 46.12, 46.13, 46.14, 46.15, 46.16, 46.17, 46.18
   - _Requirements: 31.8, 30.6, 30.7_
 
-- [ ] 48. [MANUAL] Confirm the design-system tokens for statuses, label colors, and chips
+- [x] 48. [MANUAL] Confirm the design-system tokens for statuses, label colors, and chips
   - NOT executed by the agent, and `guidelines/` is never modified by an agent task. Compare `web/app/globals.css` and `guidelines/design-system.md` for: the four status chips (neutral gray, primary blue, danger red with `bg-danger-soft text-danger-ink`, success green with `bg-success-soft text-success-ink`), the eight label pairs `gray`, `blue`, `green`, `yellow`, `orange`, `red`, `purple`, `pink` (contrast at least 4.5:1), and the four role badge variants
   - If a pair is missing, add it to `guidelines/design-system.md` first (Requirement 39.10); then tell the agent, and task 49.5 adds the matching tokens to `web/app/globals.css`. If everything exists, just check this task
   - Depends on: 47

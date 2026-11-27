@@ -76,6 +76,8 @@ Stack: Next.js (App Router), React, TypeScript, Tailwind CSS v4.
 | `danger-ink` | `#A6262A` | Error text on `danger-soft` |
 | `danger-soft` | `#FDECEC` | Error banner/badge background |
 
+There is no separate `info` token. Info states use `primary-50/100/500/700`.
+
 #### Card label colors
 
 Nine fixed pairs for task labels/tags and avatars. Each is a soft background with a dark foreground of the same hue. Label chips get their color automatically from the label text through the pure function `labelColor(text)` (a stable hash over eight keys: `gray, blue, green, yellow, orange, red, purple, pink`), so the same text has the same color everywhere; never choose a color by meaning. `teal` is not a label key and stays available for avatars.
@@ -143,7 +145,7 @@ Do not use other steps (5, 7, 9, 10…) unless matching an existing element heig
 
 - Default: `border border-line` (1px). Form controls: `border-field`. Secondary buttons: `border-line-strong`.
 - Focus: **2px outline**, `outline-primary-500`, offset 2px (see §4). Never remove focus outlines.
-- No borders thicker than 1px except focus and the "drag-over" indicator (2px dashed `primary-500`).
+- No borders thicker than 1px except focus, the "drag-over" indicator (2px dashed `primary-200`, see §2.7 and §4.7), and the active tab underline (2px `primary-500`, §4.13).
 
 ### 2.6 Elevation
 
@@ -361,7 +363,7 @@ disabled:bg-sunken disabled:text-ink-subtle disabled:cursor-not-allowed
 - **Label**: above the field, `text-sm font-medium text-ink mb-1`. Never use placeholder as the label.
 - **Helper text**: `text-xs text-ink-muted mt-1`.
 - **Error**: `border-danger focus-visible:outline-danger` + message `text-xs text-danger-ink mt-1` with an icon. Set `aria-invalid` and link the message with `aria-describedby`.
-- Inline-edit fields (card title, list title) look like text until focused: `bg-transparent border-transparent hover:bg-sunken focus-visible:bg-surface focus-visible:border-primary-500`.
+- Inline-edit fields (card title, list title) look like text until focused: `bg-transparent border-transparent hover:bg-sunken focus-visible:bg-surface focus-visible:border-primary-500 focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-primary-500`.
 
 ### 4.3 Checkbox, radio, switch
 
@@ -401,7 +403,7 @@ Card status (one `StatusBadge`, defined once in `lib/status.ts` and used on the 
 
 ### 4.5 Avatar
 
-Circle, `rounded-full`, initials `font-medium`, background a soft `label-*-bg` with matching `label-*-fg` (derive the color from a hash of the user id so it is stable). Sizes: 24 (`size-6 text-xs`), 32 (`size-8 text-xs`), 40 (`size-10 text-sm`). Stacks overlap by 6px (4px for the 24px size) with a 2px ring matching the parent surface (`ring-2 ring-surface -ml-1.5`; `-ml-1` for 24px) so initials are never clipped. If more than 4, show a `+N` avatar in `bg-sunken text-ink-muted`.
+Circle, `rounded-full`, initials `font-medium`, background a soft `label-*-bg` with matching `label-*-fg` (derive the color from a hash of the user id so it is stable). Sizes: 24 (`size-6 text-xs`), 32 (`size-8 text-xs`), 40 (`size-10 text-sm`). Stacks overlap by 6px (4px for the 24px size) with a 2px ring matching the parent surface (`ring-2 ring-surface -ml-1.5`; `-ml-1` for 24px) so initials are never clipped. Show at most 4 avatars; if there are more people, show the first 4 followed by a `+N` avatar in `bg-sunken text-ink-muted`.
 
 ### 4.6 Task card
 
@@ -414,7 +416,7 @@ cursor-pointer transition-colors duration-150
 Anatomy, top to bottom, `gap-2`:
 1. Labels row (optional): up to 3 chips, then `+N`.
 2. Title: `text-sm font-medium text-ink`, `line-clamp-3`.
-3. Meta row (optional): `text-xs text-ink-muted flex flex-wrap gap-1`, in this order: label chips, status badge, due date chip, link-count chip (16px link icon + count, shown only when the count is above 0), comment count, avatar stack on the right.
+3. Meta row (optional): `text-xs text-ink-muted flex flex-wrap gap-1`, in this order: status badge, due date chip, link-count chip (16px link icon + count, shown only when the count is above 0), comment count, avatar stack on the right.
 4. Checklist progress (only when the card has checklist items): below the meta row, text `3/5` in `text-xs text-ink-muted` and a thin bar: track `h-1 rounded-full bg-sunken`, fill `h-1 rounded-full bg-primary-500` (`bg-success` at 100%); the fill width is the one computed inline style (`style={{ width: "60%" }}`).
 
 Due date chip: neutral by default; `bg-warning-soft text-warning-ink` when due within 24h; `bg-danger-soft text-danger-ink` when overdue; `bg-success-soft text-success` when completed (status Done). Always show the date text. A card is overdue when its due date is before today (UTC) and its status is not Done; Urgent is not done, and a card due today is not overdue. An overdue chip also includes the word "Overdue".
@@ -555,3 +557,4 @@ app/globals.css  # tokens (§3)
 
 - **v1.0**: initial system: tokens, Tailwind v4 theme, 17 component specs, accessibility and copy rules.
 - **v1.1**: added the `label-gray` pair (labels now use `labelColor` over eight keys), the four-value card status mapping (Urgent in danger colors), role badge variants, the compact card checklist bar, link-count and overdue chips, checklist, links, and overdue sections (§4.18 to §4.20), `@source "../lib"`, and the complete-static-class-string rule.
+- **v1.2**: aligned the document with `design-system.html`. Specification changes: drag-over color stated as `primary-200` in §2.5 (was `primary-500`, conflicting with §2.7 and §4.7); active tab underline listed as an allowed 2px border; label chips removed from the §4.6 meta-row order (they are row 1); inline-edit fields get a 2px focus outline; avatar stack shows at most 4 avatars before `+N`; no `info` token. Implementation changes in `design-system.html` (no spec change): teal removed from card labels, modal `max-w-2xl` (672px), 16px toast icons, dropdown `min-w-48`, "Overdue" word on all overdue chips, `gap-1` card meta row, checklist progress bar instead of a checklist icon chip, link icon for link counts, `px-2` due chip, `border-b` navbar, disabled inputs without extra border, `aria-describedby` on the error example, muted default icon color, loading button uses the disabled style, 2s skeleton pulse. New HTML samples: checklist progress bar, delete buttons, add form and limit text (§4.18), link open button and limit text (§4.19), overdue notification group (§4.20), version marker.

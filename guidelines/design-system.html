@@ -43,7 +43,8 @@
   a { color: var(--primary-600); text-decoration: none; }
   a:hover { color: var(--primary-700); text-decoration: underline; }
   svg.i { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
-  svg.i.lg { width: 20px; height: 20px; }
+  svg.i { color: var(--ink-muted); }
+  .btn svg.i, .banner svg.i, .due svg.i, .err svg.i, .dd .bar svg.i { color: inherit; }
   svg.i.xl { width: 48px; height: 48px; stroke-width: 1.25; }
 
   /* ============ Doc chrome ============ */
@@ -152,14 +153,14 @@
   .input::placeholder, .textarea::placeholder { color: var(--ink-subtle); }
   .input:hover, .select:hover, .textarea:hover { border-color: var(--ink-subtle); }
   .input:focus-visible, .select:focus-visible, .textarea:focus-visible { outline: 2px solid var(--primary-500); outline-offset: 0; border-color: var(--primary-500); }
-  .input:disabled { background: var(--sunken); color: var(--ink-subtle); cursor: not-allowed; border-color: var(--line); }
+  .input:disabled { background: var(--sunken); color: var(--ink-subtle); cursor: not-allowed; }
   .input.error { border-color: var(--danger); }
   .input.error:focus-visible { outline-color: var(--danger); }
   .help { font-size: 12px; line-height: 16px; color: var(--ink-muted); }
   .err { font-size: 12px; line-height: 16px; color: var(--danger-ink); display: flex; gap: 4px; align-items: center; }
   .inline-edit { width: 100%; height: 36px; padding: 0 8px; border-radius: var(--r-md); border: 1px solid transparent; background: transparent; font: inherit; font-size: 16px; line-height: 24px; font-weight: 600; color: var(--ink); }
   .inline-edit:hover { background: var(--sunken); }
-  .inline-edit:focus-visible { background: var(--surface); border-color: var(--primary-500); outline: none; }
+  .inline-edit:focus-visible { background: var(--surface); border-color: var(--primary-500); outline: 2px solid var(--primary-500); outline-offset: 0; }
   .check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
   .check > input { appearance: none; width: 16px; height: 16px; border: 1px solid var(--field); border-radius: var(--r-sm); background: var(--surface); display: grid; place-items: center; margin: 0; cursor: pointer; transition: background-color .15s, border-color .15s; }
   .check > input[type=radio] { border-radius: 50%; }
@@ -167,7 +168,7 @@
   .check > input:checked { background: var(--primary-500); border-color: var(--primary-500); }
   .check > input[type=checkbox]:checked::after { content: ""; width: 8px; height: 4px; border-left: 2px solid #fff; border-bottom: 2px solid #fff; transform: rotate(-45deg) translate(1px, -1px); }
   .check > input[type=radio]:checked::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #fff; }
-  .check > input:disabled { background: var(--sunken); border-color: var(--line); cursor: not-allowed; }
+  .check > input:disabled { background: var(--sunken); cursor: not-allowed; }
   .check > input:disabled + span { color: var(--ink-subtle); }
   .switch { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
   .switch input { appearance: none; position: absolute; inset: 0; margin: 0; border-radius: var(--r-full); background: var(--field); cursor: pointer; transition: background-color .15s; }
@@ -212,10 +213,10 @@
   .card.dragging { transform: rotate(2deg); box-shadow: var(--shadow-overlay); border-color: var(--primary-200); }
   .card .labels { display: flex; flex-wrap: wrap; gap: 4px; }
   .card .title { font-weight: 500; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-  .card .meta { display: flex; align-items: center; gap: 12px; font-size: 12px; line-height: 16px; color: var(--ink-muted); }
+  .card .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 12px; line-height: 16px; color: var(--ink-muted); }
   .card .meta .it { display: inline-flex; align-items: center; gap: 4px; }
   .card .meta .stack { margin-left: auto; }
-  .due { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 6px; border-radius: var(--r-sm); font-size: 12px; font-weight: 500; background: var(--sunken); color: var(--ink-muted); }
+  .due { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 8px; border-radius: var(--r-sm); font-size: 12px; font-weight: 500; background: var(--sunken); color: var(--ink-muted); }
   .due.soon { background: var(--warning-soft); color: var(--warning-ink); }
   .due.over { background: var(--danger-soft); color: var(--danger-ink); }
   .due.done { background: var(--success-soft); color: var(--success); }
@@ -233,7 +234,7 @@
   .column.drag-over { outline: 2px dashed var(--primary-200); }
 
   /* ============ App nav ============ */
-  .appnav { height: 56px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); display: flex; align-items: center; gap: 12px; padding: 0 16px; overflow: hidden; }
+  .appnav { height: 56px; background: var(--surface); border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 16px; padding: 0 16px; overflow: hidden; }
   .appnav .spacer { flex: 1; }
   .search { position: relative; width: 220px; }
   .search svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--ink-subtle); }
@@ -242,11 +243,11 @@
 
   /* ============ Overlays ============ */
   .modal-stage { background: color-mix(in srgb, var(--ink) 40%, transparent); border-radius: var(--r-lg); padding: 32px 16px; display: grid; place-items: center; }
-  .modal { width: 100%; max-width: 560px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow-overlay); padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+  .modal { width: 100%; max-width: 672px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow-overlay); padding: 24px; display: flex; flex-direction: column; gap: 16px; }
   .modal-head { display: flex; align-items: flex-start; gap: 8px; }
   .modal-head h4 { font-size: 20px; line-height: 28px; font-weight: 600; flex: 1; }
   .modal-foot { display: flex; justify-content: flex-end; gap: 8px; }
-  .menu { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow-overlay); padding: 4px; width: 208px; }
+  .menu { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--shadow-overlay); padding: 4px; min-width: 192px; width: 192px; }
   .menu .item { height: 32px; padding: 0 8px; border-radius: var(--r-md); display: flex; align-items: center; gap: 8px; color: var(--ink); cursor: pointer; transition: background-color .15s; }
   .menu .item:hover { background: var(--sunken); }
   .menu .item.danger { color: var(--danger-ink); }
@@ -285,7 +286,7 @@
   .progress .num { font-size: 12px; line-height: 16px; color: var(--ink-muted); width: 36px; text-align: right; }
   .empty { text-align: center; padding: 48px 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
   .empty > svg { color: var(--ink-subtle); margin-bottom: 4px; }
-  .skel { background: var(--sunken); border-radius: var(--r-md); animation: pulse 1.6s ease-in-out infinite; }
+  .skel { background: var(--sunken); border-radius: var(--r-md); animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
   @keyframes pulse { 50% { opacity: .5; } }
   @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } .card.dragging { transform: none; } }
 
@@ -321,6 +322,8 @@
     <symbol id="warn" viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3Z"/><path d="M12 10v4M12 17h.01"/></symbol>
     <symbol id="err" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></symbol>
     <symbol id="board" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 7v7M15 7v4"/></symbol>
+    <symbol id="link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></symbol>
+    <symbol id="ext" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4 10 14M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></symbol>
     <symbol id="chev" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
   </defs>
 </svg>
@@ -346,7 +349,7 @@
 <main>
   <div class="hero">
     <h1>Simple, flat, friendly.</h1>
-    <p>Visual reference for the Kano UI. Surfaces are separated by borders and tone, not shadows. One blue for action, soft colors for labels. Rules and class recipes live in <code>design-system.md</code>.</p>
+    <p>Visual reference for the Kano UI. Surfaces are separated by borders and tone, not shadows. One blue for action, soft colors for labels. Rules and class recipes live in <code>design-system.md</code>. Version 1.2.</p>
   </div>
 
   <!-- ================= COLOR ================= -->
@@ -472,7 +475,7 @@
       <div class="row gap-16">
         <button class="btn btn-primary"><svg class="i"><use href="#plus"/></svg>Create board</button>
         <button class="btn btn-secondary"><svg class="i"><use href="#cal"/></svg>Set due date</button>
-        <button class="btn btn-primary" aria-busy="true" disabled style="background:var(--primary-500);color:#fff;opacity:.85"><span class="spinner"></span>Saving…</button>
+        <button class="btn btn-primary" aria-busy="true" disabled><span class="spinner"></span>Saving…</button>
       </div>
 
       <span class="tag" style="margin-top:24px">States (hover and active are forced for display)</span>
@@ -517,7 +520,7 @@
     <div class="panel">
       <div class="grid g2" style="gap:24px">
         <div class="field"><label for="f1">Board name</label><input id="f1" class="input" placeholder="e.g. Website redesign"><span class="help">You can change this later.</span></div>
-        <div class="field"><label for="f2">Email</label><input id="f2" class="input error" value="john@example" aria-invalid="true"><span class="err"><svg class="i"><use href="#err"/></svg>Enter a valid email address.</span></div>
+        <div class="field"><label for="f2">Email</label><input id="f2" class="input error" value="john@example" aria-invalid="true" aria-describedby="f2-err"><span class="err" id="f2-err"><svg class="i"><use href="#err"/></svg>Enter a valid email address.</span></div>
         <div class="field"><label for="f3">Workspace</label><input id="f3" class="input" value="Personal" disabled></div>
         <div class="field"><label for="f4">Assignee</label>
           <select id="f4" class="select"><option>Unassigned</option><option>Alex Rivera</option><option>Mina Sato</option></select></div>
@@ -568,10 +571,10 @@
         <span class="label l-red">Urgent</span>
         <span class="label l-purple">Frontend</span>
         <span class="label l-blue">Planning</span>
-        <span class="label l-teal">Docs</span>
         <span class="label l-pink">Bug</span>
         <span class="label l-gray">Misc</span>
       </div>
+      <p class="caption" style="margin-top:8px">Eight label colors. The color comes from <code>labelColor(text)</code>, a hash of the label text, never from meaning. Teal is for avatars only.</p>
       <span class="tag" style="margin-top:24px">Status badges</span>
       <div class="row">
         <span class="badge b-neutral"><span class="dot"></span>Not started</span>
@@ -597,6 +600,7 @@
           <span class="avatar av-32 l-blue">JA</span>
           <span class="avatar av-32 l-green">MS</span>
           <span class="avatar av-32 l-orange">AR</span>
+          <span class="avatar av-32 l-pink">KT</span>
           <span class="avatar av-32" style="background:var(--sunken);color:var(--ink-muted)">+3</span>
         </span>
       </div>
@@ -620,18 +624,18 @@
             <span class="title">Build the board drag-and-drop interaction</span>
             <span class="meta">
               <span class="due soon"><svg class="i"><use href="#cal"/></svg>Nov 19</span>
-              <span class="it"><svg class="i"><use href="#check-sq"/></svg>2/5</span>
               <span class="it"><svg class="i"><use href="#msg"/></svg>3</span>
               <span class="stack"><span class="avatar av-24 l-blue">JA</span><span class="avatar av-24 l-green">MS</span></span>
             </span>
+            <span class="meta"><span>2/5</span><span class="bar-sm" style="flex:1"><span style="width:40%"></span></span></span>
           </button>
         </div>
         <div>
           <span class="tag">Selected</span>
           <button class="card selected">
-            <span class="labels"><span class="label l-teal">Docs</span></span>
+            <span class="labels"><span class="label l-gray">Docs</span></span>
             <span class="title">Document the REST API endpoints for boards, lists and cards</span>
-            <span class="meta"><span class="due"><svg class="i"><use href="#cal"/></svg>Nov 28</span><span class="it"><svg class="i"><use href="#clip"/></svg>1</span></span>
+            <span class="meta"><span class="due"><svg class="i"><use href="#cal"/></svg>Nov 28</span><span class="it"><svg class="i"><use href="#link"/></svg>1</span></span>
           </button>
         </div>
         <div>
@@ -666,17 +670,30 @@
           <span class="meta" style="flex-wrap:wrap;gap:4px">
             <span class="badge b-danger">Urgent</span>
             <span class="due over"><svg class="i"><use href="#cal"/></svg>Nov 12 · Overdue</span>
-            <span class="it"><svg class="i"><use href="#clip"/></svg>2</span>
+            <span class="it"><svg class="i"><use href="#link"/></svg>2</span>
           </span>
           <span class="meta"><span>3/5</span><span class="bar-sm" style="flex:1"><span style="width:60%"></span></span></span>
         </button>
       </div>
       <span class="tag" style="margin-top:24px">Checklist and workspace link rows (card detail)</span>
       <div class="panel" style="max-width:420px">
-        <div class="chk-row"><label class="check"><input type="checkbox" checked><span class="t">Write the agenda</span></label></div>
-        <div class="chk-row done"><label class="check"><input type="checkbox" checked><span class="t">Invite the team</span></label></div>
-        <div class="chk-row"><label class="check"><input type="checkbox"><span class="t">Share the slides</span></label></div>
-        <div class="link-row"><svg class="i"><use href="#clip"/></svg><a href="#cards" style="font-weight:500">Sprint notes</a><span class="host">notion.so</span></div>
+        <div class="progress" style="margin-bottom:8px"><div class="track"><div class="fill" style="width:67%"></div></div><span class="num">2/3</span></div>
+        <div class="chk-row"><label class="check"><input type="checkbox" checked><span class="t">Write the agenda</span></label><button class="btn btn-ghost icon sm" style="margin-left:auto" aria-label="Delete item"><svg class="i"><use href="#trash"/></svg></button></div>
+        <div class="chk-row done"><label class="check"><input type="checkbox" checked><span class="t">Invite the team</span></label><button class="btn btn-ghost icon sm" style="margin-left:auto" aria-label="Delete item"><svg class="i"><use href="#trash"/></svg></button></div>
+        <div class="chk-row"><label class="check"><input type="checkbox"><span class="t">Share the slides</span></label><button class="btn btn-ghost icon sm" style="margin-left:auto" aria-label="Delete item"><svg class="i"><use href="#trash"/></svg></button></div>
+        <div class="row" style="flex-wrap:nowrap;margin-top:8px"><input class="input" style="height:32px" placeholder="Add an item" aria-label="New checklist item"><button class="btn btn-primary sm">Add item</button></div>
+        <span class="help" style="display:block;margin-top:4px">Limit of 50 items reached (shown when full; the form is then disabled).</span>
+        <hr style="border:0;height:1px;background:var(--line);margin:16px 0">
+        <div class="link-row"><svg class="i"><use href="#link"/></svg><a href="#cards" style="font-weight:500">Sprint notes</a><span class="host">notion.so</span><button class="btn btn-ghost icon sm" style="margin-left:auto" aria-label="Open link"><svg class="i"><use href="#ext"/></svg></button></div>
+        <span class="help" style="display:block;margin-top:4px">At 10 links the add form is disabled: "Limit of 10 links reached".</span>
+      </div>
+      <span class="tag" style="margin-top:24px">Overdue group in the notification list</span>
+      <div class="panel" style="max-width:420px">
+        <h3 class="t-h3" style="margin-bottom:8px">Overdue</h3>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div style="display:flex;flex-direction:column;gap:4px"><div class="row"><span class="badge b-danger">Overdue</span><span class="caption">3 days overdue</span></div><div class="t-strong">Fix login redirect loop</div><div class="caption">Website redesign</div></div>
+          <div style="display:flex;flex-direction:column;gap:4px"><div class="row"><span class="badge b-danger">Overdue</span><span class="caption">1 day overdue</span></div><div class="t-strong">Add pagination to the activity feed</div><div class="caption">Website redesign</div></div>
+        </div>
       </div>
     </div>
   </section>
@@ -717,9 +734,9 @@
         <div class="column drag-over">
           <div class="col-head"><h4>In progress</h4><span class="count">2</span><button class="btn btn-ghost icon sm" aria-label="List options"><svg class="i"><use href="#more"/></svg></button></div>
           <div class="col-body">
-            <button class="card"><span class="labels"><span class="label l-purple">Frontend</span><span class="label l-red">Urgent</span></span><span class="title">Build drag-and-drop for cards</span><span class="meta"><span class="due soon"><svg class="i"><use href="#cal"/></svg>Nov 19</span><span class="it"><svg class="i"><use href="#check-sq"/></svg>2/5</span><span class="stack"><span class="avatar av-24 l-blue">JA</span></span></span></button>
+            <button class="card"><span class="labels"><span class="label l-purple">Frontend</span><span class="label l-red">Urgent</span></span><span class="title">Build drag-and-drop for cards</span><span class="meta"><span class="due soon"><svg class="i"><use href="#cal"/></svg>Nov 19</span><span class="stack"><span class="avatar av-24 l-blue">JA</span></span></span><span class="meta"><span>2/5</span><span class="bar-sm" style="flex:1"><span style="width:40%"></span></span></span></button>
             <div class="placeholder-card"></div>
-            <button class="card"><span class="labels"><span class="label l-orange">Backend</span></span><span class="title">Add pagination to the activity feed</span><span class="meta"><span class="due over"><svg class="i"><use href="#cal"/></svg>Nov 15</span></span></button>
+            <button class="card"><span class="labels"><span class="label l-orange">Backend</span></span><span class="title">Add pagination to the activity feed</span><span class="meta"><span class="due over"><svg class="i"><use href="#cal"/></svg>Nov 15 · Overdue</span></span></button>
           </div>
           <div class="col-foot"><button class="btn btn-ghost sm"><svg class="i"><use href="#plus"/></svg>Add a card</button></div>
         </div>
@@ -775,9 +792,9 @@
       <div>
         <span class="tag">Toasts</span>
         <div class="stage" style="display:flex;flex-direction:column;gap:8px;align-items:center">
-          <div class="toast"><svg class="i lg ic-success"><use href="#ok"/></svg><div><div class="t">Card moved</div><div class="d">Moved to “In progress”.</div></div><button class="btn btn-ghost icon sm x" aria-label="Dismiss"><svg class="i"><use href="#x"/></svg></button></div>
-          <div class="toast"><svg class="i lg ic-danger"><use href="#err"/></svg><div><div class="t">Couldn’t save changes</div><div class="d">Check your connection and try again.</div></div><button class="btn btn-ghost icon sm x" aria-label="Dismiss"><svg class="i"><use href="#x"/></svg></button></div>
-          <div class="toast"><svg class="i lg ic-info"><use href="#info"/></svg><div><div class="t">Sync paused</div><div class="d">We’ll resume when you’re back online.</div></div><button class="btn btn-ghost icon sm x" aria-label="Dismiss"><svg class="i"><use href="#x"/></svg></button></div>
+          <div class="toast"><svg class="i ic-success"><use href="#ok"/></svg><div><div class="t">Card moved</div><div class="d">Moved to “In progress”.</div></div><button class="btn btn-ghost icon sm x" aria-label="Dismiss"><svg class="i"><use href="#x"/></svg></button></div>
+          <div class="toast"><svg class="i ic-danger"><use href="#err"/></svg><div><div class="t">Couldn’t save changes</div><div class="d">Check your connection and try again.</div></div><button class="btn btn-ghost icon sm x" aria-label="Dismiss"><svg class="i"><use href="#x"/></svg></button></div>
+          <div class="toast"><svg class="i ic-info"><use href="#info"/></svg><div><div class="t">Sync paused</div><div class="d">We’ll resume when you’re back online.</div></div><button class="btn btn-ghost icon sm x" aria-label="Dismiss"><svg class="i"><use href="#x"/></svg></button></div>
         </div>
       </div>
     </div>
