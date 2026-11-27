@@ -705,7 +705,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Requirements: 33.6_
     - Depends on: 21.2, 21.3, 21.4
 
-- [ ] 22. Phase 10: Deployment
+- [x] 22. Phase 10: Deployment
   - [x] 22.1 Add deployment configuration files
     - Root `vercel.json` routing `/(.*)` to `app/wsgi.py` with `@vercel/python`; confirm `NullPool` is used when `VERCEL` is set; add a `.python-version` or runtime pin if the Python 3.14 and `psycopg2-binary` check shows Vercel does not support it
     - Ensure `app/.env.example` and `web/.env.example` list every variable read
@@ -720,7 +720,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: D1_
     - Depends on: 22.1
 
-  - [ ] 22.3 [MANUAL] Create the Vercel projects and the production database
+  - [x] 22.3 [MANUAL] Create the Vercel projects and the production database
     - NOT executed by the agent. Create a managed PostgreSQL database with a pooled `DATABASE_URL` (`sslmode=require`), the `kano-api` Vercel project (repository root) and the `kano-web` project (root `web/`), and set the environment variables of design D1 (`DATABASE_URL`, `JWT_SECRET_KEY`, `JWT_ACCESS_TOKEN_EXPIRES=3600`, `JWT_REFRESH_TOKEN_EXPIRES=604800`, `CORS_ORIGINS`, `NEXT_PUBLIC_API_BASE_URL`, `API_BASE_URL`)
     - Make both URLs reachable over HTTPS without a Vercel login
     - V6 note: nothing is deployed before the V6 features are complete. Deployment starts only after the V6 checkpoint (32), the V6 repository tasks 33.1 and 33.2, and the manual verification 33.3.
@@ -728,7 +728,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - Depends on: 22.2
     - _Requirements: 34.1, 34.7_
 
-  - [ ] 22.4 [MANUAL] Apply the schema to the production database
+  - [x] 22.4 [MANUAL] Apply the schema to the production database
     - NOT executed by the agent. Run `flask db upgrade` from a local shell with `DATABASE_URL` pointed at the production database, before verifying the deployed API
     - Until this is done, database endpoints return the generic 500 envelope
     - V6 note: the migration history in `app/migrations/` already contains the V6 migration of task 26.1 (new `boards` and `cards` columns, hand-added check constraints `ck_cards_status` and the three-role `ck_board_memberships_role`), so this single `flask db upgrade` creates the complete V6 schema on the empty production database. No separate V6 production migration exists.
@@ -736,37 +736,37 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - Depends on: 22.3
     - _Requirements: 34.3, 34.10_
 
-  - [ ] 22.5 [MANUAL] Set the CORS origin and redeploy
+  - [x] 22.5 [MANUAL] Set the CORS origin and redeploy
     - NOT executed by the agent. Set `CORS_ORIGINS` on `kano-api` to the exact public URL of `kano-web` (no trailing slash), set both API URLs on `kano-web`, and redeploy both projects
     - A blocked CORS request makes the verification fail until this is corrected
     - Depends on: 22.4
     - _Requirements: 34.7, 34.9_
 
-  - [ ] 22.6 [MANUAL] Verify the deployed API with Postman
+  - [x] 22.6 [MANUAL] Verify the deployed API with Postman
     - NOT executed by the agent. Against the public API URL: `GET /api/health` (200), `POST /api/auth/register` (201), `POST /api/auth/login` (200 with `access_token` and `refresh_token`), then one request for each of the eight groups (auth, boards, columns, cards, comments, notifications, analytics, users), each with the envelope body
     - Save the Postman run screenshot for task 23.4 (optional since V10: Requirement 36.10 needs at least three screenshots of any Kano_Web subjects)
     - V6 note: also call GET `/api/boards/<id>/invite-links` as the admin, GET `/api/invites/<token>` and POST `/api/invites/<token>/accept` with a second account, PATCH `/api/cards/<id>` with `status`, and PATCH `/api/users/me` with `current_password`; every response keeps the envelope.
     - Depends on: 22.5
     - _Requirements: 34.4, 34.5_
 
-  - [ ] 22.7 [MANUAL] Verify the deployed web app at desktop and mobile widths
+  - [x] 22.7 [MANUAL] Verify the deployed web app at desktop and mobile widths
     - NOT executed by the agent. Open Dashboard, Board Detail, Card Detail Modal, My Tasks, Profile, Register, and Login against the deployed API with no failed network requests and no console errors; run the full journey (register, login, board, columns, card, drag, comment add and edit, search, notification bell) at 1280 px and at 375 px without an error toast or error page
     - V6 note: the walk-through also covers the welcome page, the invite link join (member and guest) and the guest read-only board, card status, and the profile password change, at 1280 px and at 375 px.
     - Depends on: 22.6
     - _Requirements: 34.6, 34.8_
 
-  - [ ] 22.8 [MANUAL] Check touch drag in browser device mode
+  - [x] 22.8 [MANUAL] Check touch drag in browser device mode
     - NOT executed by the agent. In browser DevTools device mode at 375 px (and on a real phone if available) hold a Card for about 300 ms, drag to another Column, confirm the move persists after reload, and confirm that plain swipes still scroll the page and the board
     - Depends on: 22.7
     - _Requirements: 22.12, 22.13, 22.14, 22.15, 22.17, 27.8, 34.8_
 
-  - [ ] 22.9 [MANUAL] Run Playwright against the live URL and commit the report
+  - [x] 22.9 [MANUAL] Run Playwright against the live URL and commit the report
     - NOT executed by the agent (needs the live URL). Set `E2E_BASE_URL` to the Vercel frontend URL, run `npx playwright install` and `npx playwright test` from `web/`; all tests pass with exit code 0; commit `web/playwright-report/`; confirm `npx playwright show-report` opens it
     - V6 note: the run needs `web/.env.test` (copy of `web/.env.test.example`) with `E2E_BASE_URL` set to the Vercel frontend URL, `E2E_USER_EMAIL`, and `E2E_USER_PASSWORD` of an account that already exists on the production database (manual task 33.5). The V6 specs of tasks 31.2 to 31.9 run in this suite.
     - Depends on: 22.8, 21.5, 31.9, 33.4, 33.5
     - _Requirements: 33.1, 33.8, 33.9_
 
-- [ ] 23. Phase 11: Documentation and repository hygiene
+- [x] 23. Phase 11: Documentation and repository hygiene
   - [x] 23.1 Complete `docs/violation-report.md`
     - Review the generated code in `app/` and `web/` against the Guidelines; list at least 3 violations found, each with the violated guideline id, the file, and the fix applied; apply the fixes in code and re-run the affected tests
     - Record only violations that were actually found
@@ -780,7 +780,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Requirements: 30.4_
     - Depends on: 23.1
 
-  - [ ] 23.3 Write `README.md` (all sections except final screenshots)
+  - [x] 23.3 Write `README.md` (all sections except final screenshots)
     - Sections Overview (what Kano is in 1 to 5 sentences, the two public URLs), AI Workflow Summary (seven subsections of at least 3 sentences: project brief, Kiro specifications, Guidelines authoring and use, review against the Guidelines, violations, Antigravity, Claude Code tests and documentation, with links to `guidelines/`, `docs/violation-report.md`, `docs/guideline-comparison.md`), Features (all 12 feature entries), Technologies (full list incl. Railway as optional, Kiro, Antigravity, Claude Code), Local Run Steps (9 numbered steps in the required order, prerequisite versions, local URLs, `flask db upgrade` marked as a manual step), Test Steps (`pytest -v`, `npm test`, `npx playwright install`, `npx playwright test`, `npx playwright show-report`, and the `E2E_BASE_URL` variable), Security note (non-httpOnly access and refresh cookies, XSS exposure of both tokens, the 7-day refresh token raises the impact, stateless refresh tokens cannot be revoked on logout, mitigations)
     - The Antigravity subsection must describe how it was actually used; ask the user if this is unknown
     - _Requirements: 36.1, 36.2, 36.3, 36.4, 36.5, 36.6, 36.7, 36.8, 36.9, 36.11, 28.8, 6.15_
@@ -1327,12 +1327,12 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - Depends on: 32, 26.1
     - _Requirements: 37.15 to 37.20, 38.5 to 38.13, 34.8_
 
-  - [ ] 33.4 [MANUAL] Create `web/.env.test` and a local E2E account
+  - [x] 33.4 [MANUAL] Create `web/.env.test` and a local E2E account
     - NOT executed by the agent. Copy `web/.env.test.example` to `web/.env.test` (git-ignored, never commit it), set `E2E_USER_EMAIL` and `E2E_USER_PASSWORD`, create that account on the development database (register it through the app), and optionally run `npx playwright test` from `web/` against `E2E_BASE_URL` set to the local web URL as a smoke check
     - Depends on: 33.1, 32
     - _Requirements: 33.10, 33.14, 35.1_
 
-  - [ ] 33.5 [MANUAL] Create the E2E account on the production database and point `web/.env.test` at the live URL
+  - [x] 33.5 [MANUAL] Create the E2E account on the production database and point `web/.env.test` at the live URL
     - NOT executed by the agent. After the production schema exists, register the account named by `E2E_USER_EMAIL` on the deployed application and set `E2E_BASE_URL` in `web/.env.test` to the Vercel frontend URL
     - Depends on: 22.5, 33.1
     - _Requirements: 33.1, 33.10, 33.14_
