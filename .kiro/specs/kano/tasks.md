@@ -2435,14 +2435,14 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - Depends on: 63.3
 
 - [ ] 64. Phase 38 (V12): Full verification until every test passes
-  - [ ] 64.1 Run `pytest`, `npm test`, `npm run build`, and the repository checks until all pass
+  - [x] 64.1 Run `pytest`, `npm test`, `npm run build`, and the repository checks until all pass
     - Read `guidelines/backend.md` and `guidelines/frontend.md` first; note `web/AGENTS.md`
     - From `app/` run `pytest -v`; from `web/` run `npm test` and `npm run build` (`next build --webpack`, which also type-checks); from the repository root run `scripts/check_file_size.py` over `app/` and `web/`, `scripts/check_repo_hygiene.py`, and `scripts/check_readme_links.py`. Every failure is fixed at its cause, including the failures recorded in `docs/v12-baseline.md`; a test is never deleted, skipped (`skip`, `xfail`, `.only`), or weakened to make a command pass. Repeat until each command ends with zero failures and exit code 0, and note the final counts in `docs/v12-baseline.md` (section "After V12")
     - _Requirements: 48.4, 48.5, 32.10, 31.8, 30.6, 35.1_
     - _Design: Testing Strategy V12 refinement (order of work, step 3)_
     - Depends on: 59, 61.8, 62.1, 62.2, 62.3, 62.4, 62.5, 62.6, 62.7, 62.8, 63.4
 
-  - [ ] 64.2 [MANUAL] Restart the local API and the web app with the V12 code
+  - [x] 64.2 [MANUAL] Restart the local API and the web app with the V12 code
     - NOT executed by the agent. Stop the running `flask run` and `npm run dev`, then start `flask run` from `app/` and `npm run dev` from `web/` again so both run the V12 code (the counts scenario needs the V12 backend); keep the database and `E2E_BASE_URL` as in task 57.1. There is no `flask db upgrade` in V12
     - _Requirements: 48.4, 48.7, 33.8_
     - _Design: Testing Strategy V12 refinement (Ordering), Part D (V12 notes)_

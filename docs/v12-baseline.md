@@ -41,3 +41,13 @@ Recorded by tasks 57.2 and 57.3. Nothing in the code or the tests was changed be
 - Final state after the fixes: `npx playwright test` 24 passed, 0 failed; `npm test` 47 files and 151 tests passed. `pytest` was not affected (no `app/` file changed) and was not re-run.
 - Changes made: `web/e2e/` (checklistLinksUrgent, inviteJoin, kanban, layout, mobile, overdue specs), `web/__tests__/AuthProvider.test.tsx`, `web/components/auth/LoginForm.tsx`, `web/components/auth/RegisterForm.tsx`. No test was deleted, skipped, or weakened.
 - Nothing is left for tasks 62.1 to 62.3: none of the failures depended on the My Tasks link target or the Board card layout.
+
+## After V12
+
+Recorded by task 64.1 (`pytest -v` skipped as it was run earlier).
+
+- `npm test` (`vitest --run` from `web/`): 52 test files passed, 168 tests passed, 0 failed
+- `npm run build` (`next build --webpack` from `web/`): passed (TypeScript and production build clean, exit code 0)
+- `scripts/check_file_size.py app web`: OK: no file over 300 lines in app, web
+- `scripts/check_repo_hygiene.py`: OK (`.gitignore` and tracked env files, env examples, secrets, specs/guidelines, literal credentials in `web/e2e`)
+- `scripts/check_readme_links.py`: OK: every relative link and image path in `README.md` resolves
