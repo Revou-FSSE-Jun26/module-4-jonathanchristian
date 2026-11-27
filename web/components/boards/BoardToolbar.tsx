@@ -8,7 +8,7 @@ import { DeleteBoardControl } from "@/components/boards/DeleteBoardControl";
 import { RenameBoardModal } from "@/components/boards/RenameBoardModal";
 import { BaseBadge } from "@/components/shared/BaseBadge";
 import { BaseButton } from "@/components/shared/BaseButton";
-import { recordRename } from "@/hooks/useBoardPatches";
+import { recordRename, useBoardPatches } from "@/hooks/useBoardPatches";
 import { can, ROLE_VARIANT } from "@/lib/roles";
 import type { CardSearchResult, Role } from "@/lib/types";
 
@@ -32,8 +32,13 @@ export function BoardToolbar({
   onOpenMembers,
   onOpenAnalytics,
 }: BoardToolbarProps) {
+  const patches = useBoardPatches();
   const [displayName, setDisplayName] = useState(boardName);
   const [renameOpen, setRenameOpen] = useState(false);
+  const currentName =
+    displayName !== boardName
+      ? displayName
+      : (patches.renamed[boardId]?.name ?? boardName);
   const showMembers = can(role, "manage_members");
   const showAnalytics = can(role, "view_analytics");
   const showRename = can(role, "edit_board");
@@ -53,7 +58,7 @@ export function BoardToolbar({
           <ArrowLeft className="size-4" aria-hidden="true" />
           <span>Boards</span>
         </Link>
-        <h1 className="text-xl font-semibold text-ink break-words">{displayName}</h1>
+        <h1 className="text-xl font-semibold text-ink break-words">{currentName}</h1>
         <BaseBadge variant={ROLE_VARIANT[role]}>{roleLabel}</BaseBadge>
       </div>
 
@@ -82,14 +87,14 @@ export function BoardToolbar({
           </BaseButton>
         ) : null}
         {showDelete ? (
-          <DeleteBoardControl boardId={boardId} boardName={displayName} />
+          <DeleteBoardControl boardId={boardId} boardName={currentName} />
         ) : null}
       </div>
       {showRename ? (
         <RenameBoardModal
           open={renameOpen}
           boardId={boardId}
-          currentName={displayName}
+          currentName={currentName}
           onClose={() => setRenameOpen(false)}
           onRenamed={(updated) => {
             setDisplayName(updated.name);

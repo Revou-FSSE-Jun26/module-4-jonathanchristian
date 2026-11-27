@@ -2448,7 +2448,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Testing Strategy V12 refinement (Ordering), Part D (V12 notes)_
     - Depends on: 64.1
 
-  - [ ] 64.3 Run `npx playwright test` until every test passes
+  - [x] 64.3 Run `npx playwright test` until every test passes
     - Read `guidelines/frontend.md` first; note `web/AGENTS.md`
     - From `web/` with the stack of 64.2 running and `E2E_BASE_URL` set run `npx playwright test` (both projects, `desktop` and `mobile`). Every failure is fixed at its cause (code, selector, fixture, or environment); a test is never deleted, skipped, or given more retries to pass. Repeat until the command ends with every test passed and exit code 0, with no test that passes only on a retry, and append the final counts to `docs/v12-baseline.md` (section "After V12")
     - _Requirements: 48.4, 48.5, 33.8, 33.10, 33.18_

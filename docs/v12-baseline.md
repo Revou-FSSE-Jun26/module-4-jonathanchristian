@@ -51,3 +51,4 @@ Recorded by task 64.1 (`pytest -v` skipped as it was run earlier).
 - `scripts/check_file_size.py app web`: OK: no file over 300 lines in app, web
 - `scripts/check_repo_hygiene.py`: OK (`.gitignore` and tracked env files, env examples, secrets, specs/guidelines, literal credentials in `web/e2e`)
 - `scripts/check_readme_links.py`: OK: every relative link and image path in `README.md` resolves
+- `npx playwright test` (from `web/`, `desktop` and `mobile` projects against local Flask port 5000 and Next.js port 3000): 28 passed, 0 failed, 0 retries (17.0 s) — recorded by task 64.3
