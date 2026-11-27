@@ -678,3 +678,121 @@ Tasks 1 to 43, their checkboxes, text, and waves 0 to 85 are unchanged history. 
 - **Open issues handled.** Design Open issues 45 (task 49.5), 46 and 62 (task 48), 47 (46.11, 46.12), 48 (44.4, 46.7), 49 (46.2, 46.16), 50 and 51 (50.7, 49.6), 53 (50.1, 51.5, 52.1), 54 (46.4, 46.6), 55 (50.6), 56 (44.1, 50.3, 50.11), 57 and 58 (44.10, 46.2), 59 (46.11), 60 (50.9), 65 (44.11, 46.1, 53.2), 66 (the note on guideline mismatches in 53.2). Items 52, 61, 63, and 64 are accepted as designed.
 - **Inconsistencies reported (no requirement or design text changed):** R15.2 versus the `lib/` class strings; R39.10 versus the rule that agents never edit `guidelines/`; R43.6 versus R43.8 ordering; R11.15 versus R41.9 for guests; R42.2 default label length; R43 silent on same-role change and validation order; Requirement 33 has no V11 criteria; the CHANGELOG remark about removing "checklist" from the forbidden list does not match the current R38.19; the pending deployment waves 67 to 79 come before the new V11 waves because wave ids are append-only (recommendation in the V11 Notes).
 - **Classification.** Task planning only. No implementation change and no version bump beyond V11.
+
+## V12 - 2026-11-27
+Source: `improvements/improvement5.md` and the scope the user approved after a backend review. Only `requirements.md` (now V12) and this file are changed in this step. `design.md` and `tasks.md` stay at V11 and are revised in the following phases. Tasks 1 to 56 stay unchanged as history.
+
+### Changes
+#### Specification changes (`requirements.md`)
+- **New Part H** with Requirements 45 to 48. No existing requirement was renumbered, rewritten, or removed.
+  - **Requirement 45, board rename and delete (frontend only).** Rename and delete controls in the board toolbar for the Board_Admin only (existing `can(role, "edit_board")` and `can(role, "delete_board")`), a BaseModal rename form with validation, a ConfirmDialog for delete, errors through `useErrorHandler`, navigation to `/` after delete, and a Dashboard that shows the new name or omits the board afterwards. Existing PATCH and DELETE endpoints are used unchanged.
+  - **Requirement 46, My Tasks deep link (frontend only).** The task title links to `/boards/<board_id>?card=<card_id>`; the "Open board" link stays plain. The board page opens the CardDetailModal for a card that is in the board data, and ignores an unknown id without error. Decisions stated: the `card` parameter is removed from the URL when the modal closes (history entry replaced, no reload, no board refetch), the modal opens at most once per page load, the first of repeated values wins, an empty value counts as absent, a 403 or 404 board ignores the parameter, `decideRoute` and the `next` rule are unchanged. The page reads `searchParams` as a Promise, per the installed Next.js docs.
+  - **Requirement 47, member and card counts (small backend change).** `member_count` (non-deleted memberships of any role, guests included) and `card_count` (non-deleted cards) on every item of GET `/api/boards`, computed with grouped queries (at most 4 queries including the JWT user lookup, constant for 1 or 20 boards); POST returns 1 and 0; PATCH returns the current counts; `openapi.yaml`, `BoardSummary`, and the Board card text with singular and plural forms. Decision: GET `/api/boards/<id>` is unchanged. No table, column, or index is added, so there is no Migration_Step (the index on `cards.board_id` already exists in the model).
+  - **Requirement 48, tests and size limits.** Backend count tests, Vitest tests, four Playwright scenarios (rename, delete, deep link, counts), the rule to run `npm test` and `npx playwright test` first and fix every failing test found, updating the broken existing tests instead of deleting them, and a split of the new frontend logic into separate files because `BoardView.tsx` has 291 lines.
+- **Appended criteria in existing requirements (pointers, no rewording of old text):** 8.13, 20.9, 20.10, 21.29, 21.30, 25.8, 31.26, 32.31, 33.18, 44.7.
+- **Glossary:** added Board_Summary, Member_Count, Card_Count, and Card_Deep_Link.
+- **Version marker** set to V12; the V11 text of the marker is kept inside it.
+
+#### Design changes (`design.md`, step 2 of V12)
+- `design.md` is now V12 (append-only revision, V11 text kept in full). **V12 change summary** and decisions D24 to D27 added to the Overview.
+- **New backend section A22** (`boards/service/counts.py::counts_for_boards`/`counts_for_board`, `BoardSchema` fields, `BoardDetailSchema.Meta.exclude`, `list_boards`/`create_board`/`update_board` changes, `openapi.yaml` `Board` schema additions), placed after A21.
+- **New frontend sections B22 to B25**: B22 board rename and delete (`RenameBoardModal.tsx`, `DeleteBoardControl.tsx`, `BoardToolbar.tsx` and `BoardView.tsx` changes); B23 My Tasks deep link (`hooks/useCardDeepLink.ts`, `MyTasksList.tsx` link-target change); B24 reading `searchParams` in the board page (`web/app/(boards)/boards/[id]/page.tsx`); B25 `BoardSummary` type, `formatCount`, `BoardList.tsx` card text. Placed after B21, before Data Models.
+- **Correctness Properties 76 to 80** (board counts equal a naive model; constant query count; create/update counts; detail excludes counts; deep-link resolution and open-once rule), plus a V12 prework summary paragraph.
+- **Error Handling**: 11 new V12 rows.
+- **Testing Strategy**: V12 additions (the run-first-and-fix-failures step, backend count tests, frontend unit tests, four Playwright scenarios with deployment ordering).
+- **Part D**: new "V12 notes" subsection (no migration, deployment ordering, no README criterion).
+- **Traceability Matrix**: V12 table for Requirements 45 to 48 and an amended-requirements table for the appended criteria (8.13, 20.9, 20.10, 21.29, 21.30, 25.8, 31.26, 32.31, 33.18, 44.7).
+- **Open issues 67 to 70** added (`BoardDetailSchema` field exclusion mechanism; `BoardDetail`/`BoardSummary` TypeScript inheritance now implies unsent fields; PATCH query budget left unstated; `formatCount` as a deliberate second count-formatting function alongside `formatBadge`).
+- **"V12 change" notes** added in place at: the My Tasks per-task link target (B23, supersedes the plain board link described in the old B6-V6/B21 file lists), the `BoardSummary`/`BoardDetail` shape note (B25), and the board page `searchParams` addition (B24).
+- No requirement text was changed by this step; `requirements.md` stays V12 as set in step 1. `tasks.md` is not edited by this step.
+
+#### Implementation changes
+- None in this step.
+
+#### Bug fixes
+- None.
+
+#### Breaking changes
+- None. `member_count` and `card_count` are added fields in the board list, create, and update responses. The meaning of Requirement 25 criterion 2 changes only for the target of the per-task link (see criterion 25.8).
+
+### Reason
+- User request in `improvement5.md`: rename and delete board from the board page, open the card from My Tasks, member and card counts on the Dashboard, and a fully passing test suite.
+
+### Impact
+- **Requirements added:** 45, 46, 47, 48, and criteria 8.13, 20.9, 20.10, 21.29, 21.30, 25.8, 31.26, 32.31, 33.18, 44.7.
+- **Requirements superseded in part:** the target of the per-task link in 25.2 (now 25.8). Criteria 8.2 and 8.1 keep their text and gain the new fields through 8.13.
+- **Design components to revise next:** `boards` service `list_boards`, `serialize_board`, a new grouped count helper, `BoardSchema`, `openapi.yaml`, `BoardList`, `BoardToolbar`, `BoardView` split (291 lines), the board page `searchParams`, `MyTasksList`, rename and delete components, Dashboard freshness after rename and delete, `lib/types.ts`, Testing Strategy. **Resolved in this design step (A22, B22 to B25, D24 to D27).**
+- **Tasks to add next (below task 56):** backend count helper, schema, and tests; frontend components and tests; the run of both test commands first, then the fixes; Playwright scenarios; backend deployment before the live counts scenario. **Still pending; `tasks.md` is revised in the next phase.**
+
+### Requirement consistency check (development-workflow step 2)
+Checked against Requirements 8, 9, 16, 19, 21, 25, 26, 32, 33, 44, 29, 30, 43, and the design Traceability sections. No conflict that needs a decision. Resolved by appended criteria:
+- R8.1, R8.2, R8.4 list the fields of the Board responses: 8.13 adds the two counts. R8.3 (detail) and R8.5, R8.7, R8.12 stay valid and are reused by Requirement 45.
+- R44.4 and R29.2 (at most 5 queries) concern only GET `/api/boards/<id>`: 44.7 states it, and Requirement 47 criterion 4 gives the list its own budget.
+- R25.2 named a plain board link per task: 25.8 replaces that target and keeps the group "Open board" link.
+- R21.13, R21.20, and R21.24 list the hidden controls and toolbar content: 21.29 adds rename and delete without editing them. R43.3 and R43.13 already limit `edit_board` and `delete_board` to the Board_Admin.
+- R19.11 (`next` only for invite paths) and R17.12 (`decideRoute`): Requirement 46 criterion 10 keeps both unchanged, so a logged-out visit to a deep link goes to `/login` and then to `/`.
+- R16 (error handling) is reused through `useErrorHandler`; no edit.
+- R30.6 (300 lines): Requirement 48 criterion 6 covers `BoardView.tsx` (291 lines).
+- R32.10 and R33.8 already require passing suites: Requirement 48 criterion 4 adds the run-first step.
+- Traceability exists only in `design.md`: rows for Requirements 45 to 48 and the amended criteria are due in the design phase.
+
+Open points for the next phases (no requirement change needed):
+1. The Dashboard is a Server Component, so Requirement 45 criterion 12 (fresh list after rename or delete, including back navigation) needs a design decision on cache or refresh handling.
+2. The Next.js client router can keep an old board page; Requirement 46 criterion 7 requires removing the `card` parameter without a refetch, and the design must pick the documented mechanism (the History API integration in `linking-and-navigating.md`).
+3. The live Playwright scenario for counts needs the V12 backend deployed first (Requirement 48 criterion 7).
+
+### Design refinement after the code check (V12, step 2 completed; no version bump)
+The design step was interrupted after D24 to D27, A22, B22 to B25, Properties 76 to 80, the first V12 Error Handling, Testing Strategy, Part D, Traceability rows, and Open issues 67 to 70. The remaining work was finished append-only and the first V12 text was checked against the code (`board_service.py`, `board_schemas.py`, `cards/service/counts.py`, `openapi.yaml`, `BoardList.tsx`, `BoardView.tsx` 291 lines, `BoardToolbar.tsx`, `CreateBoardModal.tsx`, `ConfirmDialog.tsx`, `BaseModal.tsx`, `MyTasksList.tsx`, both board `page.tsx` files, `lib/roles.ts`, `lib/types.ts`, `web/__tests__`, `web/e2e`) and the installed Next.js 16.4.6 docs (`page.md`, `use-search-params.md`, `04-linking-and-navigating.md`, `use-router.md`, `staleTimes.md`, `04-glossary.md`). Places where the first V12 text was wrong carry a "V12 refinement" note; the first text stays.
+
+#### Design changes
+- **D24 (refined in place, old wording quoted in the note):** helper module `boards/service/board_counts.py` (the first name `counts.py` with `counts_for_board` would shadow the `counts_for_board` that `board_service.py` already imports from `cards/service/counts.py`); new `BoardSummarySchema(BoardSchema)`; `BoardSchema` and `BoardDetailSchema` unchanged.
+- **D25 (refined in place):** new file list; `BoardToolbar` owns the displayed name, so `BoardView.tsx` stays at most 298 lines.
+- **D27 refinement row (added; the first D27 row stays):** the installed docs say pages are reused on back/forward navigation, so `force-dynamic` alone does not satisfy R45.12; Board_Patches in `sessionStorage` merged by a pure function replace the first reasoning.
+- **A22:** refinement note plus new subsection **A22-R** (module, schema split, service changes, POST literals, 4-query budget, OpenAPI `BoardSummary` component, no migration).
+- **B22, B23:** refinement notes pointing to B27. **B25:** refinement bullets (`BoardBase` type split, OpenAPI cross-reference, Board card markup).
+- **New B26** (Dashboard freshness: `lib/boardPatches.ts`, `hooks/useBoardPatches.ts`, `BoardList` merge) and **new B27** (refined wiring: `BoardToolbar`, `RenameBoardModal`, `DeleteBoardControl` with the busy guard, `lib/deepLink.ts`, `hooks/useCardDeepLink.ts` returning `onModalClose`, `BoardView` line budget, board page, `MyTasksList`, file list).
+- **Correctness Properties 81 to 83** (deep-link parsing and URL rebuild, Board_Patch merge, count text) and a V12 amendment table (34, 74, 79 unchanged in substance; 80 clarified).
+- **Error Handling:** 7 V12 refinement rows. **Testing Strategy:** V12 refinement (run-first order for `npm test`, `npx playwright test`, and `pytest`; the existing tests to update; `app/tests/test_board_counts.py`; five new Vitest files; `web/e2e/v12Boards.spec.ts` with four scenarios, including back and forward checks). **Part D:** deployment order, environment, verification list. **Traceability:** V12 refinement rows for every criterion of Requirements 45 to 48 and for 8.13, 20.9, 20.10, 21.29, 21.30, 25.8, 31.26, 32.31, 33.18, 44.7.
+- **Open issues 71 to 77** (67 and 68 resolved; reading of R46.8; `sessionStorage` fallback; counts after back navigation; the pre-existing `BoardList` retry gap; Playwright cleanup; `useSearchParams` not used).
+
+#### Affected design components (complete V12 list)
+Backend: `app/blueprints/boards/service/board_counts.py` (new), `board_service.py` (`serialize_board`, `create_board`, `list_boards`, `update_board`), `boards/schema/board_schemas.py` (`BoardSummarySchema`), `boards/schema/__init__.py`, `app/openapi.yaml` (`BoardSummary`, GET list items, `BoardEnvelope`). Frontend: `components/boards/RenameBoardModal.tsx` (new), `DeleteBoardControl.tsx` (new), `hooks/useCardDeepLink.ts` (new), `hooks/useBoardPatches.ts` (new), `lib/deepLink.ts` (new), `lib/boardPatches.ts` (new), `BoardToolbar.tsx`, `BoardView.tsx`, `BoardList.tsx`, `components/cards/MyTasksList.tsx`, `app/(boards)/boards/[id]/page.tsx`, `lib/types.ts` (`BoardBase`, `BoardSummary`, `BoardDetail`), `lib/format.ts` (`formatCount`). Tests: `app/tests/test_board_counts.py` (new), updates to `test_boards.py`, `test_boards_roles.py`, `web/__tests__/dashboard.test.tsx`, `myTasksAndProfile.test.tsx`, and the `BoardView` test files (`next/navigation` mock), new `web/__tests__/v12*.test.ts(x)` files, `web/e2e/v12Boards.spec.ts`.
+
+#### Requirement consistency check (development-workflow step 2, after the design)
+Requirements V12, design V12, and tasks V11 were compared. No conflict needs a user decision.
+- Every criterion of Requirements 45 to 48 and every appended criterion has a Traceability row and at least one design section.
+- R46.8 versus the V11 modal load (R41.9, A18): resolved by reading (Open issue 72), with a recommended rewording for the next requirements revision; no requirement text changed.
+- R45.12 versus the Client Cache: resolved in design (D27 refinement, B26).
+- R47.13 (no counting in the browser) is kept: Board_Patches hold only server data.
+- Gap: `tasks.md` is still V11 and has no V12 tasks. This is expected; tasks are written in the next phase and must cover A22-R, B22 to B27, Properties 76 to 83, the run-first step, and the deployment order.
+
+#### Implementation changes
+- None. No code was changed.
+
+### Tasks revision (V12, step 3 completed; no version bump)
+`tasks.md` is now V12 (append-only revision). Tasks 1 to 56, every checkbox, and the waves 0 to 115 are unchanged. The only edited existing lines are the version marker (the V11 text is kept inside it) and the last V11 wave entry, which received a comma so the appended waves keep the JSON valid. A V12 revision paragraph was added after the V11 paragraph, and a `V12 Notes` section was appended at the end of the file. No code, no test, and no other document was changed in this step.
+#### Specification changes
+- None. `requirements.md` and `design.md` stay as in the previous V12 steps.
+#### Implementation tasks added (affected implementation tasks, all unchecked)
+- **57 Baseline run before any change:** 57.1 [MANUAL] prepare the local stack, database, and `web/.env.test` (`E2E_BASE_URL`, `E2E_USER_EMAIL`, `E2E_USER_PASSWORD`); 57.2 run `pytest` and `npm test` and record every failure in the new `docs/v12-baseline.md`; 57.3 run `npx playwright test` and record every failure; 57.4 fix the recorded failures that V12 does not cause (no deleted, skipped, or weakened test).
+- **58 Backend counts (no migration):** 58.1 `board_counts.py` (`board_counts`, `board_counts_one`); 58.2 `BoardSummarySchema` and the list, create, and update changes; 58.3 `openapi.yaml`; 58.4 update `test_boards.py` and `test_boards_roles.py`; 58.5 `test_board_counts.py`; 58.6 query budget test and Property 77; 58.7 Properties 76, 78, and 79. **59** backend V12 checkpoint.
+- **60 Frontend libraries and hooks:** 60.1 `BoardBase`, `BoardSummary`, `BoardDetail` types; 60.2 `formatCount`; 60.3 `lib/deepLink.ts`; 60.4 `lib/boardPatches.ts`; 60.5 `hooks/useBoardPatches.ts`; 60.6 `hooks/useCardDeepLink.ts`.
+- **61 Frontend components:** 61.1 `RenameBoardModal`; 61.2 `DeleteBoardControl`; 61.3 `BoardToolbar` wiring; 61.4 `BoardView` (at most 298 lines); 61.5 board page `searchParams`; 61.6 `MyTasksList` link; 61.7 `BoardList` counts and Board_Patches merge; 61.8 repository-rule tests for the V12 files.
+- **62 Frontend tests:** 62.1 dashboard tests; 62.2 My Tasks tests; 62.3 `next/navigation` mock in the six `BoardView` test files; 62.4 to 62.8 new `v12DeepLink`, `v12BoardPatches`, `v12Counts`, `v12RenameDelete`, `v12BoardDeepLink` tests with Properties 81, 82, 83, 74 (reused), and 80.
+- **63 Playwright:** 63.1 to 63.3 `web/e2e/v12Boards.spec.ts` with the four scenarios (rename, delete, My Tasks deep link, counts), each on its own uniquely named Board; 63.4 no-literal-credentials check over the new spec.
+- **64 Full verification:** 64.1 `pytest`, `npm test`, `npm run build`, and the repository checks until all pass; 64.2 [MANUAL] restart the local stack with the V12 code; 64.3 `npx playwright test` until every test passes.
+- **65 Documentation:** 65.1 `README.md` (Features and Test Steps); 65.2 `docs/deployment.md` verification list and a drift review of the other documents.
+- **66 Final checkpoint; 67 [MANUAL]** deploy the API first and verify the counts on production; **68 [MANUAL]** deploy the web app and run the end-to-end suite against production; **69 [MANUAL]** browser verification of rename, delete, deep link, and counts.
+- **Dependency graph:** waves 116 to 142 appended (append-only). Every incomplete task without subtasks appears in exactly one wave.
+#### Coverage
+- Requirements 45 to 48 and the appended criteria 8.13, 20.9, 20.10, 21.29, 21.30, 25.8, 31.26, 32.31, 33.18, 44.7 each map to at least one task (see the V12 Notes of `tasks.md`). Properties 76 to 83 are each assigned to one test task. Open issues 67 to 77 are resolved, applied, or accepted in the tasks.
+#### Requirement consistency check (development-workflow step 2, after the tasks)
+Requirements V12, design V12, and tasks V12 were compared. No orphaned task, no requirement without a task, and no contradiction that blocks work. Differences between documents, handled in the tasks without editing any specification text:
+1. Properties 76 and 78 in the design name `counts_for_boards` and `counts_for_board`, while A22-R renames them to `board_counts` and `board_counts_one`. Tasks use the A22-R names.
+2. The first text of B22 and B23 conflicts with B27. Tasks follow B27.
+3. Part D V12 notes say that no README change is designed, while the documentation was requested. Tasks 65.1 and 65.2 update the README Features and Test Steps and `docs/deployment.md`.
+4. Requirement 46 criterion 8 reads as "no GET `/api/cards/<id>` request", while the V11 modal always loads the Card. Tasks follow the reading of Open issue 72, and task 62.8 tests exactly that.
+5. Earlier tasks use no lint command, so `npm run lint` is not part of the V12 verification.
+Recommendation for the next requirements revision: reword Requirement 46 criterion 8 as in Open issue 72, and update the names in Properties 76 and 78 (items 1 and 4). No change is needed before the tasks are executed.
+#### Implementation changes
+- None. No code was changed.

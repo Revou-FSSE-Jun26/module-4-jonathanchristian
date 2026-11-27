@@ -1,6 +1,6 @@
 # Requirements Document
 
-**Version:** V11 (adds the URGENT card status and label colors, the overdue notification, the card checklist, workspace links, and the Manager role in the new Part G, with 9 tables, and removes Column management from the role `member`; V10 was a documentation-only change: Requirement 36.10 now asks for at least three screenshots stored in `docs/screenshots/`; V9 was a frontend-only change to the shared Footer: brand, portfolio text, and GitHub and LinkedIn links; V8 changed the Header logo, the Welcome_Page, and the board toolbar; no backend change)
+**Version:** V12 (adds Part H: board rename and delete controls on the board page, a My Tasks deep link that opens the CardDetailModal, and the `member_count` and `card_count` of each Board in the board list, which is the only backend change; V11 added the URGENT card status and label colors, the overdue notification, the card checklist, workspace links, and the Manager role in the new Part G, with 9 tables, and removes Column management from the role `member`; V10 was a documentation-only change: Requirement 36.10 now asks for at least three screenshots stored in `docs/screenshots/`; V9 was a frontend-only change to the shared Footer: brand, portfolio text, and GitHub and LinkedIn links; V8 changed the Header logo, the Welcome_Page, and the board toolbar; no backend change)
 
 ## Introduction
 
@@ -84,6 +84,10 @@ kano-app/
 - **Card_Link**: A URL (with a label) to an external work file, such as a Google Drive, OneDrive, Dropbox, or Notion document, attached to a Card; Kano stores only the URL.
 - **Overdue_Card**: A non-deleted Card of a non-deleted Board whose due date is earlier than the current UTC date and whose Card_Status is not `DONE`.
 - **Role_Rank**: The integer rank of a role on a Board: `guest` 0, `member` 1, `manager` 2, `admin` 3.
+- **Board_Summary**: One item of the list returned by GET `/api/boards`, and the Board returned by POST `/api/boards` and PATCH `/api/boards/<id>`, with the fields `board_id`, `name`, `my_role`, `created_at`, `updated_at`, `member_count`, and `card_count`.
+- **Member_Count**: The number of non-deleted Board_Memberships of a Board, of any role (`admin`, `manager`, `member`, and `guest`).
+- **Card_Count**: The number of non-deleted Cards of a Board.
+- **Card_Deep_Link**: A URL of the form `/boards/<board_id>?card=<card_id>` that opens the board page and the CardDetailModal of that Card.
 
 ## Requirements
 
@@ -244,6 +248,7 @@ kano-app/
 10. IF a Board creation request fails after the Board row is created but before the admin Board_Membership and the two Invite_Tokens (Requirement 37 criterion 3) are stored, THEN THE Kano_API SHALL roll back all of these records and return status 500 with the Response_Envelope.
 11. WHEN a Board_Guest sends GET `/api/boards/<id>`, THE Kano_API SHALL return the same Board detail as for a Board_Member (Columns and Cards ordered as in criterion 3), with `my_role` equal to `guest`.
 12. IF a Board_Guest sends PATCH or DELETE `/api/boards/<id>`, THEN THE Kano_API SHALL return status 403 and leave the Board unchanged.
+13. THE Kano_API SHALL return every Board of the responses of criteria 1, 2, and 4 as a Board_Summary with the added fields `member_count` and `card_count`, as defined in Requirement 47 criteria 1 to 6 (V12). The GET `/api/boards/<id>` response of criterion 3 stays unchanged (Requirement 47 criterion 7), and the PATCH and DELETE rules of criteria 4, 5, 7, and 12 stay unchanged, so that Requirement 45 needs no backend change.
 
 ### Requirement 9: Board Members and Roles
 
@@ -493,6 +498,8 @@ kano-app/
 6. WHEN a Board is selected, THE Kano_Web SHALL navigate to `/boards/<id>`.
 7. IF the User has no boards, THEN THE Kano_Web SHALL show an empty-state message and a create-board BaseButton that opens the create-board form.
 8. IF the GET `/api/boards` request fails with a status other than 401, THEN THE Kano_Web SHALL show an error message on the page with a retry BaseButton, and SHALL NOT show the empty-state message.
+9. THE Kano_Web SHALL show on each Board card of criterion 1 the Member_Count and the Card_Count, in addition to the name and the role badge, as defined in Requirement 47 criteria 10 to 13 (V12).
+10. WHEN the User returns to `/` after renaming or deleting a Board, THE Kano_Web SHALL list the Board under its new name or without the deleted Board, as defined in Requirement 45 criterion 12 (V12).
 
 ### Requirement 21: Board Detail Page
 
@@ -528,6 +535,8 @@ kano-app/
 26. WHILE the viewport width is between 375 px and 1920 px inclusive, THE Kano_Web SHALL show the separator of criterion 25 without overlapping any toolbar control or any Column, and without adding horizontal scrolling to the page, and WHEN the toolbar controls wrap onto more than one line at a narrow width, THE separator SHALL stay below the last line of controls.
 27. THE Kano_Web SHALL show the separator of criterion 25 for the Board_Admin, the Board_Member, and the Board_Guest views, and SHALL NOT show it in the access-denied and not-found states of criterion 15, which render no toolbar and no Column.
 28. THE Kano_Web SHALL NOT render any other separator line between the board toolbar and the Kanban columns area, so that the toolbar and the columns area are not divided by a second line (for example a border on both the toolbar and the columns area).
+29. WHERE the current User is the Board_Admin, THE Kano_Web SHALL show the rename-board and delete-board controls of Requirement 45 in the board toolbar of criterion 24, in addition to the controls named there, and THE controls SHALL be hidden for the roles `manager`, `member`, and `guest`, so that the list of hidden controls of criteria 13 and 20 includes them (V12).
+30. WHEN `/boards/<id>` is requested with the query parameter `card` of a Card_Deep_Link, THE Kano_Web SHALL open the CardDetailModal as defined in Requirement 46 criteria 3 to 8 (V12).
 
 ### Requirement 22: Drag and Drop
 
@@ -613,6 +622,7 @@ kano-app/
 5. IF the GET `/api/cards?assignee=me` request returns an ApiError, THEN THE Kano_Web SHALL show an error message on the page, trigger the useErrorHandler toast, and show no task list.
 6. WHEN a Card is soft deleted or its assignee is cleared, THE Kano_Web SHALL omit that Card the next time `/my-tasks` is loaded.
 7. THE Kano_Web SHALL keep Cards with the status `DONE` in the My Tasks list, marked with the "Done" badge, and SHALL NOT filter Cards by status.
+8. THE Kano_Web SHALL link the title of each task to the Card_Deep_Link `/boards/<board_id>?card=<card_id>` of that Card, as defined in Requirement 46 criteria 1 and 2 (V12), which replaces the plain Board target `/boards/<id>` of the per-task link of criterion 2 and leaves the Board-level "Open board" link of the Board group unchanged.
 
 ### Requirement 26: Profile Page
 
@@ -731,6 +741,7 @@ kano-app/
 23. THE Kano_API tests SHALL cover the rank rules of Requirement 43: a property-based test of the role-change decision over all combinations of caller role, target role, and new role, asserting that a change is allowed if and only if the Role_Rank of the caller is above the Role_Rank of the target and above the Role_Rank of the new role and the new role is not `admin`; a Board_Manager cannot change or remove a Board_Manager or the Board_Admin; the Board_Admin cannot be demoted or removed; only the Board_Admin can grant `manager`; and a change to `guest` clears the assignee of the Cards assigned to that User.
 24. THE Kano_API tests SHALL cover that a Board_Member whose role is `member` receives status 403 on every Column endpoint of Requirement 10 criterion 11 while keeping full Card, Checklist_Item, Card_Link, Comment, and status access, and that a Board_Manager and a Board_Admin succeed on the Column endpoints.
 25. THE Kano_API tests SHALL cover GET `/api/notifications/overdue`: a Card due yesterday and not `DONE` is returned with `days_overdue` 1, a Card due today is not returned, a `DONE` Card is not returned, an `URGENT` Card past due is returned, a Card assigned to another User is not returned to a User who is not its assignee, an unassigned Card is returned to the Board_Admin and the Board_Manager and not to a `member` or a `guest`, soft-deleted Cards and Boards are not returned, the response contains at most 100 items with the full `total`, and no Notification row is created.
+26. THE Kano_API tests SHALL cover the Member_Count and the Card_Count of Requirement 47 and SHALL keep the whole backend suite passing, as defined in Requirement 48 criterion 1 (V12).
 
 ### Requirement 32: Frontend Unit Tests
 
@@ -768,6 +779,7 @@ kano-app/
 28. THE Kano_Web SHALL provide tests for the Card_Links asserting: the add form rejects an empty value, `javascript:alert(1)`, `data:` and `file:` values, and a value longer than 2048 characters without sending a request, each link anchor carries `target` `_blank` and `rel` containing `noopener` and `noreferrer`, the count chip is hidden at 0 and shown above 0, the provider icon function returns the generic icon for an unknown hostname, and a Board_Guest sees the list without add, edit, or delete controls.
 29. THE Kano_Web SHALL provide tests for the overdue UI asserting: the card chip is shown if and only if the due date is before the current UTC date and the status is not `DONE`, an overdue item in the notification list shows the red "Overdue" tag and the text "N days overdue" ("1 day overdue" for 1), the overdue request is sent on page load and when the list opens and never on a timer, and overdue items are not counted in the NotificationBell count.
 30. THE Kano_Web SHALL provide tests asserting that the Board_Member whose role is `member` sees no column controls, member management controls, or analytics link, that the Board_Manager sees the column controls, the member panel, and both invitation links but no analytics link, and that the Welcome_Page copy passes the forbidden-string scan of Requirement 38 criterion 19 after V11.
+31. THE Kano_Web SHALL provide the Vitest tests of Requirement 48 criterion 2 for the board rename and delete controls, the Card_Deep_Link, and the Board_Summary counts, and SHALL update the existing tests that the V12 changes break, so that `npm test` still meets criterion 10 (V12).
 
 ### Requirement 33: End-to-End Tests
 
@@ -792,6 +804,7 @@ kano-app/
 15. WHEN the E2E_Suite runs the logo scenarios, THE E2E_Suite SHALL verify that an unauthenticated visitor who opens `/login` (with the `kano_welcome_seen` cookie set by that visit) and clicks the Header logo lands on `/welcome`, that an unauthenticated visitor on `/register` who clicks the logo lands on `/welcome`, and that a logged-in User on a board page who clicks the logo lands on `/` (the Dashboard) and not on `/welcome` or `/login`.
 16. WHEN the E2E_Suite runs the layout scenarios at viewport widths of 375 px and 1920 px, THE E2E_Suite SHALL verify for `/welcome` that the document has no horizontal scroll and that, at 375 px, the Header links and the three call-to-action buttons have a tap target of at least 44 px by 44 px, and for a board page that exactly one visible separator lies between the board toolbar and the Kanban columns area, with no overlap of the toolbar controls and no horizontal scroll of the page outside the Kanban board container.
 17. WHEN the E2E_Suite runs the footer scenario at viewport widths of 375 px and 1920 px on `/welcome` (unauthenticated) and on the Dashboard (logged in), THE E2E_Suite SHALL verify that the Footer shows the brand and the text "Portfolio project built in 2026 by JC", that the "Kano on GitHub" and "Kano on LinkedIn" links are visible with the `href` values `https://github.com` and `https://www.linkedin.com` and `target` `_blank`, that the document has no horizontal scroll, and that at 375 px each of the two links has a tap target of at least 44 px by 44 px. THE E2E_Suite SHALL NOT click through to the external sites. THE E2E_Suite SHALL scope the locators of the two links to the footer (the `contentinfo` role) or use exact name matching, because name matching is substring-based and "Kano on GitHub" and "Kano on LinkedIn" contain "Kano", and the logo scenarios of criterion 15 SHALL scope the logo locator to the `banner` role or use exact name matching.
+18. THE E2E_Suite SHALL provide the scenarios of Requirement 48 criterion 3 (rename board, delete board, My Tasks deep link, and Dashboard counts) and SHALL keep criteria 6, 8, 10, 11, and 12 satisfied by them (V12).
 
 ## Part E: Deployment and Documentation
 
@@ -1032,3 +1045,78 @@ kano-app/
 4. WHEN a client sends GET `/api/boards/<id>`, THE Kano_API SHALL obtain `checklist_done`, `checklist_total`, and `link_count` for every Card of the Board with one combined grouped query keyed by `card_id` that counts only non-deleted rows, so that the total number of database queries stays at most 5 (Requirement 29 criterion 2) and identical for a Board with 10 Cards and a Board with 500 Cards.
 5. THE Kano_API SHALL include `checklist_done`, `checklist_total`, and `link_count` (each 0 when none exist) in every Card of the board detail and in the Card of the create, update, and position responses.
 6. THE Kano_API SHALL keep the 8 Blueprint_Packages of Requirement 1 criterion 2 and SHALL keep every source file at or below 300 lines (Requirement 30 criterion 6) after adding the checklist and the links.
+7. THE query budget of criterion 4 and of Requirement 29 criterion 2 SHALL apply only to GET `/api/boards/<id>`, and the budget of GET `/api/boards` is defined in Requirement 47 criterion 4 (V12), so that the two budgets do not overlap.
+
+## Part H: V12 Improvements
+
+### Requirement 45: Board Rename and Delete on the Board Page
+
+**User Story:** As a Board_Admin, I want to rename and delete a Board from its page, so that I can keep my boards tidy without leaving the board.
+
+#### Acceptance Criteria
+
+1. WHERE `can(role, "edit_board")` of Requirement 43 criterion 13 is true for the current User, THE Kano_Web SHALL show a rename-board control in the board toolbar.
+2. WHERE `can(role, "delete_board")` of Requirement 43 criterion 13 is true for the current User, THE Kano_Web SHALL show a delete-board control in the board toolbar.
+3. WHERE the current User is a Board_Manager, a Board_Member whose role is `member`, or a Board_Guest, THE Kano_Web SHALL render neither the rename-board control nor the delete-board control, and SHALL use the existing `can` helper and the existing action names `edit_board` and `delete_board` without adding a new action name.
+4. WHEN the Board_Admin activates the rename-board control, THE Kano_Web SHALL show a BaseModal containing one name input that holds the current Board name and a submit BaseButton.
+5. IF the Board name in the rename form is empty after trimming whitespace or longer than 100 characters, THEN THE Kano_Web SHALL show a field-level error, SHALL NOT send the request, and SHALL keep the BaseModal open with the entered text retained.
+6. WHEN the Board_Admin submits a valid Board name that differs from the current name, THE Kano_Web SHALL send PATCH `/api/boards/<id>` with the trimmed name and, on status 200, close the BaseModal, show the new name in the board toolbar without a page reload, and show a success toast.
+7. WHEN the Board_Admin submits a Board name equal to the current name after trimming, THE Kano_Web SHALL close the BaseModal and SHALL NOT send a request.
+8. IF the PATCH `/api/boards/<id>` request of criterion 6 fails, THEN THE Kano_Web SHALL keep the BaseModal open with the entered text retained, SHALL leave the displayed Board name unchanged, and SHALL trigger the useErrorHandler toast.
+9. WHEN the Board_Admin activates the delete-board control, THE Kano_Web SHALL show a ConfirmDialog that names the Board and states that its Columns, Cards, and Comments are deleted with it.
+10. WHEN the Board_Admin cancels the ConfirmDialog of criterion 9, THE Kano_Web SHALL close it and SHALL NOT send a request.
+11. WHEN the Board_Admin confirms the ConfirmDialog of criterion 9, THE Kano_Web SHALL send DELETE `/api/boards/<id>`, disable the dialog buttons until the response arrives, and, on status 200, navigate to `/` and show a success toast.
+12. WHEN the User opens `/` after a successful rename or delete of criteria 6 and 11 in the same browser session, including through the browser back button, THE Kano_Web SHALL list the renamed Board under its new name or omit the deleted Board, without a manual reload.
+13. IF the DELETE `/api/boards/<id>` request of criterion 11 fails, THEN THE Kano_Web SHALL stay on the board page, SHALL leave the Board displayed unchanged, SHALL re-enable the ConfirmDialog buttons while keeping the ConfirmDialog open, and SHALL trigger the useErrorHandler toast.
+14. THE Kano_Web SHALL implement criteria 1 to 13 with the existing PATCH and DELETE `/api/boards/<id>` endpoints of Requirement 8 criteria 4, 5, 7, and 12 and with no change to the Kano_API, and SHALL treat the `can` result as a display rule only, because the Kano_API enforces the Board_Admin rule with status 403.
+
+### Requirement 46: My Tasks Deep Link to the Card Detail Modal
+
+**User Story:** As a user, I want to open an assigned task directly from My Tasks, so that I see the card details without searching the board.
+
+#### Acceptance Criteria
+
+1. THE Kano_Web SHALL render the title of each task on `/my-tasks` as a link whose target is the Card_Deep_Link `/boards/<board_id>?card=<card_id>`, built from the `board_id` and `card_id` of the Card in the GET `/api/cards?assignee=me` result.
+2. THE Kano_Web SHALL keep the "Open board" link in the header of each Board group with the target `/boards/<board_id>` and no query parameter.
+3. WHEN a User with a non-deleted Board_Membership requests `/boards/<id>` with a `card` query parameter equal to the `card_id` of a Card in the GET `/api/boards/<id>` response, THE Kano_Web SHALL render the board and open the CardDetailModal for that Card on the first render of the page, without a user interaction, as for a Card opened by a click (not as a new Card), including the read-only controls of a Board_Guest.
+4. IF the `card` query parameter equals no `card_id` in the GET `/api/boards/<id>` response (a malformed value, a soft-deleted Card, or a Card of another Board), THEN THE Kano_Web SHALL render the board as without the parameter, SHALL open no CardDetailModal, and SHALL show no error message and no toast.
+5. IF the `card` query parameter is empty or occurs more than once, THEN THE Kano_Web SHALL treat an empty value as absent and SHALL use the first value when it occurs more than once.
+6. IF the GET `/api/boards/<id>` request returns status 403 or 404, THEN THE Kano_Web SHALL show the access-denied or not-found state of Requirement 21 criterion 15 and SHALL ignore the `card` query parameter.
+7. WHEN the User closes the CardDetailModal that criterion 3 opened, THE Kano_Web SHALL remove the `card` parameter from the URL by replacing the current history entry (no new history entry), without a page reload and without a new GET `/api/boards/<id>` request, and SHALL keep the board displayed with its state unchanged.
+8. THE Kano_Web SHALL open the CardDetailModal for a given page load at most once from the `card` parameter, so that closing the modal does not reopen it, and SHALL send no GET `/api/cards/<id>` request to do so.
+9. THE Kano_Web SHALL read the `card` parameter of criterion 3 in the board page Server Component through its `searchParams` prop, which is a Promise in the installed Next.js version, and SHALL read the Next.js documentation in `web/node_modules/next/dist/docs/` (page file convention, `useSearchParams`, and linking and navigating) before specifying any API use in the design, as required by `web/AGENTS.md`.
+10. THE Kano_Web SHALL leave `decideRoute` of Requirement 17 criterion 12 and the `next` rule of Requirement 19 criterion 11 unchanged, so that an unauthenticated request for `/boards/<id>?card=<card_id>` redirects to `/login` as for any protected route and the `card` parameter is not carried through the login.
+
+### Requirement 47: Board Member Count and Card Count
+
+**User Story:** As a user, I want each board on the Dashboard to show how many members and cards it has, so that I can tell my boards apart at a glance.
+
+#### Acceptance Criteria
+
+1. WHEN an authenticated client sends GET `/api/boards`, THE Kano_API SHALL return every Board as a Board_Summary that contains, in addition to the existing fields `board_id`, `name`, `my_role`, `created_at`, and `updated_at`, the integer fields `member_count` and `card_count`.
+2. THE Kano_API SHALL set `member_count` to the Member_Count of the Board, which counts every non-deleted Board_Membership of the roles `admin`, `manager`, `member`, and `guest`.
+3. THE Kano_API SHALL set `card_count` to the Card_Count of the Board, which counts every non-deleted Card of the Board regardless of its Column, assignee, and status, and SHALL exclude every soft-deleted Board_Membership from `member_count` and every soft-deleted Card from `card_count`.
+4. WHEN a client sends GET `/api/boards`, THE Kano_API SHALL compute `member_count` and `card_count` for all returned Boards with grouped count queries over the Board ids, so that the total number of database queries, including the user lookup of the JWT callback, is at most 4 and identical for a User with 1 Board and a User with 20 Boards.
+5. WHEN a client sends POST `/api/boards` and the Board is created, THE Kano_API SHALL return the Board_Summary with `member_count` 1 and `card_count` 0.
+6. WHEN a Board_Admin sends PATCH `/api/boards/<id>` with a valid name, THE Kano_API SHALL return the Board_Summary with the current `member_count` and `card_count` of that Board.
+7. THE Kano_API SHALL leave the response of GET `/api/boards/<id>` unchanged, with no `member_count` and no `card_count`, and the Board detail SHALL keep its own schema, so that the query budget of Requirement 44 criterion 4 and the payload size of the Board detail are unaffected.
+8. THE Kano_API SHALL add no table, column, constraint, or index for the counts, so that the V12 change needs no Migration_Step and the database keeps its 9 tables.
+9. THE Kano_API SHALL document `member_count` and `card_count` in `app/openapi.yaml` for the Board_Summary of GET `/api/boards`, POST `/api/boards`, and PATCH `/api/boards/<id>`.
+10. THE Kano_Web SHALL declare `member_count` and `card_count` as numbers in the `BoardSummary` type in `web/lib/types.ts`.
+11. WHEN the Dashboard lists a Board, THE Kano_Web SHALL show on its Board card the text "<N> member" or "<N> members" and the text "<N> card" or "<N> cards", using the singular form when N is exactly 1 and the plural form for 0 and for every N above 1 (for example "1 member", "0 members", "2 members", "1 card", "0 cards").
+12. WHEN the create-board form of Requirement 20 criterion 4 succeeds, THE Kano_Web SHALL show the new Board with "1 member" and "0 cards", taken from the POST `/api/boards` response without a new list request.
+13. THE Kano_Web SHALL take the displayed counts only from the Board_Summary fields and SHALL NOT count Members or Cards in the browser, and the Board card SHALL stay one link to `/boards/<id>` (Requirement 20 criterion 6).
+
+### Requirement 48: V12 Tests and Size Limits
+
+**User Story:** As the project owner, I want the backend, unit, and end-to-end suites to pass after the V12 changes, so that the release is verified.
+
+#### Acceptance Criteria
+
+1. THE Kano_API tests SHALL assert, for GET `/api/boards`, POST `/api/boards`, and PATCH `/api/boards/<id>`: the exact `member_count` and `card_count`; that Board_Guests count as members; that a soft-deleted Board_Membership and a soft-deleted Card are not counted; that the Cards and Board_Memberships of another Board are not counted; that a Board with no Cards has `card_count` 0; that the number of database queries of GET `/api/boards` is at most 4 and identical for 1 Board and for several Boards; that GET `/api/boards/<id>` contains neither field; and the whole pytest suite SHALL pass.
+2. THE Kano_Web SHALL provide Vitest tests, with the network mocked, that assert: the rename and delete controls are rendered for the Board_Admin and absent for the roles `manager`, `member`, and `guest`; the rename form shows a field-level error without a request for an empty name, a whitespace-only name, and a name of 101 characters, and sends PATCH with the trimmed name for a valid name; a failing rename keeps the BaseModal open and the previous name; the delete flow sends no request on cancel, sends DELETE and navigates to `/` on confirm, and stays on the page with an error toast on failure; the My Tasks title link has the Card_Deep_Link target and the "Open board" link has no query; the board opens the CardDetailModal for a known `card` value, opens none for an unknown value, uses the first of two `card` values, removes the parameter on close, and does not reopen the modal; and the Board card text for 0, 1, and 2 members and cards uses the correct singular and plural forms.
+3. THE E2E_Suite SHALL provide Playwright scenarios for: renaming a Board and finding the new name on the board page and on the Dashboard; deleting a Board through the ConfirmDialog, landing on `/`, and not finding the Board on the Dashboard; opening a Card from the My Tasks title link, landing on `/boards/<board_id>?card=<card_id>` with the CardDetailModal open for that Card; and the Dashboard counts of a new Board ("1 member", "0 cards") and after adding one Card ("1 card"); each scenario SHALL create its own uniquely named Board and SHALL NOT modify or delete any other Board.
+4. THE project SHALL run `npm test` and `npx playwright test` from `web/` before changing any test, SHALL record every test that fails, including failures that are not caused by V12, and SHALL fix them so that both commands finish with every test passed and exit code 0 (Requirement 32 criterion 10 and Requirement 33 criterion 8); the set of failing tests is the result of that run and is not predicted in this document.
+5. THE project SHALL update the existing tests that the V12 changes break, including the My Tasks link target and the Board card layout, instead of deleting them.
+6. THE Kano_Web SHALL implement the rename form, the delete flow, and the Card_Deep_Link handling in separate files of one component or hook each, because `web/components/boards/BoardView.tsx` is close to the 300-line limit of Requirement 30 criterion 6, and SHALL keep every source file in `app/` and `web/` at or below 300 lines.
+7. WHERE the E2E_Suite runs against the deployed frontend, THE project SHALL deploy the Kano_API with the V12 counts before the Dashboard counts scenario of criterion 3 runs against the deployed site.

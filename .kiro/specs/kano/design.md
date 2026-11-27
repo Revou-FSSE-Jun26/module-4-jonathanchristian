@@ -1,6 +1,8 @@
 # Design Document
 
-**Version:** V11 (revised against requirements V11: the URGENT status and label colors, the overdue notification, the card checklist, workspace links, the Manager role, 9 tables; V10 was revised against requirements V10, documentation only: D3 screenshots; V9 was revised against requirements V9, frontend only: the shared Footer; V8 covered the Header logo, the Welcome_Page, and the board toolbar; initial design was V3)
+**Version:** V12 (revised against requirements V12: board rename and delete on the board page in new Part H (R45), a My Tasks deep link that opens the CardDetailModal (R46), `member_count` and `card_count` on every item of GET `/api/boards` (R47, the only backend change), and the V12 test and size rules (R48); V11 added the URGENT card status and label colors, the overdue notification, the card checklist, workspace links, and the Manager role in Part G, with 9 tables, and removed Column management from the role `member`; V10 was documentation-only: Requirement 36.10 screenshots; V9 was frontend-only: the shared Footer; V8 changed the Header logo, the Welcome_Page, and the board toolbar; initial design was V3)
+
+> **V12 change summary.** V12 adds, in Part H of the requirements: board rename and delete controls in the board toolbar for the Board_Admin (R45), a My Tasks title link that opens the CardDetailModal through a `card` query parameter (R46), `member_count` and `card_count` on every Board_Summary of GET, POST, and PATCH `/api/boards` (R47), and the V12 test and file-size rules (R48). The backend change is limited to `board_service.list_boards`, `create_board`, and `update_board` plus a new grouped count helper; `GET /api/boards/<id>` is unchanged (R47 criterion 7). The frontend adds a rename form, a delete flow, and the Card_Deep_Link handling in new files, because `BoardView.tsx` is 291 lines, and updates `BoardList`, `BoardToolbar`, `MyTasksList`, the Dashboard and board pages, and `lib/types.ts`. No table, column, index, or Migration_Step is added. No V11 text was deleted. Where V12 supersedes earlier text (the per-task My Tasks link target of B6-V6/B21, the `BoardSummary` shape of B10/B20, the Dashboard "no new list request" assumption), the old text stays and a "V12 change" note names the replacement. Index of V12 sections: decisions D24 to D27 (Overview), A22 (backend, placed after A21), B22 to B27 (frontend, placed after B21), Correctness Properties 76 to 83 and the V12 amendment table, Error Handling (V12 rows), Testing Strategy (V12 additions), Part D V12 notes, Traceability (V12 tables), Open issues 67 to 77. `tasks.md` is not edited by this revision. **V12 refinement after the code check (same version, no bump):** the first V12 text of D24, D25, D27, A22, B22, B23, and Open issues 67 and 68 was checked against the real code and the installed Next.js docs and corrected in place where it was wrong (the schema split in A22, the `BoardView.tsx` line budget in B22, the Dashboard freshness in D27 and B26, the module name in A22). Each corrected place carries a "V12 refinement" note, and the CHANGELOG V12 entry lists them.
 
 > **V11 change summary.** V11 adds, in Part G of the requirements: the fourth status `URGENT` and deterministic label colors (R39), a compute-on-read overdue endpoint in the `notifications` package (R40), the card checklist (R41) and workspace links (R42) inside the `cards` package, the Manager role with rank rules (R43), and the V11 schema, migration, and query budget (R44). No V10 text was deleted. Where V11 supersedes earlier text (the three-role helper matrix of A4-V6, the three-value status of A13 and `lib/status.ts`, the "7 tables" statements, "admin only" for columns, members, and invite links, the four-query board plan), the old text stays and a "V11 change" note or the V11 sections name the replacement. Index of V11 sections: decisions D19 to D23 (Overview), A15 to A21 (backend, placed before Data Models), B16 to B21 (frontend), Data Models "V11 data models and migration", Correctness Properties 61 to 75 and the amendment table, Error Handling (V11 rows), Testing Strategy (V11 additions), Part D V11 notes, Traceability (V11 table), Open issues 45 to 66. `requirements.md` and `tasks.md` are not edited by this revision.
 
@@ -58,6 +60,16 @@ Key design decisions:
 | D21 | **V11.** Per-card counts for the board payload come from one grouped query that left-joins two grouped subqueries (checklist, links) onto the board's cards. The board request stays at 5 queries. | R44.4, Property 25 (now 71). |
 | D22 | **V11.** Overdue items are computed on read in `notifications/service/overdue_service.py` and are never stored. The "today" value is passed in as a parameter, so the query and the pure `days_overdue` are testable with a fixed date. | R40.1 to R40.6. A deliberate exception to R13.4. |
 | D23 | **V11.** Status and label class strings are complete static strings in `lib/status.ts` and `lib/labelColor.ts`. Tailwind must scan `lib/`, so `globals.css` gains `@source "../lib";` (a superset of the folders R15.2 lists). | R39.5, R39.9. Without it the classes are never generated (see D18 and Open issue 45). |
+
+**V12 decisions.**
+
+| # | Decision | Rationale |
+|---|----------|-----------|
+| D24 | **V12.** `member_count` and `card_count` are computed in `board_service.list_boards`, `create_board`, and `update_board` by a new helper module `boards/service/board_counts.py` (**V12 refinement:** the first text said `counts.py`, which clashes with the existing `cards/service/counts.py` and its function `counts_for_board`) whose `counts_for_boards(board_ids)` runs two `GROUP BY board_id` queries (memberships, cards) over the given ids. A new `BoardSummarySchema(BoardSchema)` in `board_schemas.py` adds the two integer fields and is the schema of `serialize_board`; `BoardSchema` and `BoardDetailSchema` are unchanged, so GET `/api/boards/<id>` keeps its shape with no `Meta.exclude` (**V12 refinement:** the first text added the fields to `BoardSchema` and excluded them in the detail schema). `get_board_detail` does not call the helper. | R47.1 to R47.4, R47.7. Mirrors the A18 pattern at board level, keeps the 5-query budget of GET detail (D21) untouched, and gives the list its own budget. `BoardSummarySchema` matches the existing TypeScript name `BoardSummary` and the new OpenAPI schema `BoardSummary` (A22). |
+| D25 | **V12.** The rename form, the delete flow, and the Card_Deep_Link handling live in new files, one responsibility each: `components/boards/RenameBoardModal.tsx`, `components/boards/DeleteBoardControl.tsx` (button plus `ConfirmDialog`), `hooks/useCardDeepLink.ts`, `lib/deepLink.ts` (pure), `lib/boardPatches.ts` (pure) with `hooks/useBoardPatches.ts` (B26). `BoardToolbar.tsx` owns the displayed name and the rename and delete state, so `BoardView.tsx` gains only about 4 lines (291 to at most 296, B22 line budget). **V12 refinement:** the first text let `BoardView` hold `boardName` state and handlers, which would have taken it past 300 lines. | R48.6 (every file at most 300 lines; `BoardView.tsx` is 291). One component or hook per file matches D20's split rule. |
+| D26 | **V12.** The `card` query parameter is read once in the board page Server Component through its `searchParams` prop (a `Promise` in the installed Next.js 16.4.6, confirmed in `node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/page.md`) and passed down as a plain `string | null` prop to `BoardView`. Removing the parameter on modal close uses `window.history.replaceState` directly (the "Native History API" pattern documented in `node_modules/next/dist/docs/01-app/01-getting-started/04-linking-and-navigating.md`), not `router.replace`, so no new Server Component request and no Client Cache invalidation occurs (`router.refresh()` and `router.replace` are documented to re-fetch or clear the Client Cache; a direct `window.history.replaceState` call is documented to update the URL bar and any `usePathname`/`useSearchParams` reader without a request). | R46.7, R46.9. Keeps the deep-link open/close cycle to zero extra network requests, matching R46.8's "no GET `/api/cards/<id>` request" and R46.7's "no new GET `/api/boards/<id>` request". |
+| D27 | **V12.** The Dashboard stays a Server Component (`force-dynamic`, unchanged from B2). Freshness after rename, delete, and back navigation (R45.12) is achieved the same way the existing Dashboard already achieves freshness after create (B2: `router.refresh()` on retry only) and after any other Server Component navigation: `BoardToolbar`'s rename and delete handlers call `router.push("/")` (delete) or stay on the page (rename, no navigation), and the Dashboard's own `export const dynamic = "force-dynamic"` (already present, B2) forces a fresh server fetch of `GET /api/boards` on every request to `/`, including a browser back-button navigation, because `force-dynamic` opts the route out of the static and dynamic Client Cache periods described in `node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/staleTimes.md` (both `static` and `dynamic` `staleTimes` apply only to statically generated or fully prefetched segments; a `force-dynamic` page is always re-rendered on the server for a new navigation, and back/forward navigation to a dynamic page that was not prefetched issues a new request). No `router.refresh()` call is required on the Dashboard itself; the existing create-board flow already updates the in-memory list via `onCreated`, and a later navigation away and back re-fetches server-side. | R45.12. Reuses the existing `force-dynamic` export instead of adding `revalidatePath`, `revalidateTag`, or a new `router.refresh()` call, which would duplicate behavior `force-dynamic` already provides for a page-level navigation. |
+| D27 (V12 refinement) | **V12 refinement; supersedes the freshness reasoning of the D27 row above.** The installed docs contradict that row: `01-app/04-glossary.md` ("Client Cache") says pages "are reused during browser back/forward navigation", and `staleTimes.md` says the setting "doesn't change back/forward caching behavior". So a back navigation to `/` after a rename shows the old RSC payload. In addition, `BoardList` copies `initialBoards` into `useState` once, so even a fresh payload would not replace the list. Design (B26): a successful rename or delete records a Board_Patch in `sessionStorage` (`kano_board_patches`: renamed Boards as `{board_id, name, updated_at}` from the PATCH response, deleted Board ids). `BoardList` applies the stored patches to the list it renders with the pure function `applyBoardPatches(boards, patches)` in `lib/boardPatches.ts`: deleted ids are removed, and a rename replaces the name only when the listed Board's `updated_at` is older than the patch's (both are server timestamps, so a later rename by someone else wins). The function is idempotent, so a fresh list from the server is unchanged and a cached list from a back navigation is corrected, with no extra request and no clock comparison between browser and server. Delete navigates with `router.push("/")`: `staleTimes.dynamic` defaults to 0 for a page that is neither static nor fully prefetched, so a push renders `/` on the server. Rejected alternatives: a "stale" flag plus `router.refresh()` (the flag is consumed by the first Dashboard mount after a push, so the older cached entry reached by the back button still shows the old list); `revalidatePath` (needs a Server Action, and the app calls Flask from the browser); `bfcacheId` as a key (`use-router.md` calls it a last resort, and it keeps the state on back navigation, which is the stale case). | R45.12, R20.10. One pure function covers all three paths of R45.12 (link, push, back button) and is property-testable (Property 82). |
 
 Pure logic (ordering, validation boundaries, recipient computation, pagination, week boundaries, optimistic-move reducers, route-guard decisions, badge formatting) is isolated in side-effect-free functions so it can be tested with property-based tests. See Correctness Properties.
 
@@ -1546,6 +1558,125 @@ Rows 34 to 42 extend the A11 table (legend: `Manager` = admin or manager; `Parti
 
 Amended rows: rows 11 and 13 (add and remove member) are `Manager` with the rank rule; rows 14 to 17 (columns) are `Manager`; rows 30 and 31 (invite links) are `Manager`; rows 8, 18, 19, 21 return the three counts in the Card JSON (board detail, create, update, position responses); the legend row `Member` of V6 now includes `manager`. The card JSON gains `checklist_done`, `checklist_total`, `link_count` (board detail and the three Card writes only, R44.5). POST and DELETE status codes follow R4.3: rows 35 and 38 return 201, rows 37 and 40 return 200 with an object.
 
+## V12 Design: Backend (A22)
+
+> This section is new in V12 and sits after A21 so the V11 numbering stays stable.
+
+### A22. Board member and card counts (`boards/service/counts.py`, Requirements 47, 48.1)
+
+> **V12 refinement (read first).** The bullets below the code block are the first V12 text and stay as history. Subsection "A22-R. Refined backend design" at the end of A22 replaces them where they differ: the module is `board_counts.py` (not `counts.py`), the schema change is a new `BoardSummarySchema` (not new fields on `BoardSchema` with `Meta.exclude`), POST uses literal counts, and the OpenAPI change adds a `BoardSummary` schema.
+
+**V12 change.** GET, POST, and PATCH `/api/boards` now return `member_count` and `card_count` on every Board_Summary (R47.1); GET `/api/boards/<id>` is unchanged (R47.7, superseded nothing because `BoardDetailSchema` never gained the fields).
+
+```python
+# app/blueprints/boards/service/counts.py
+"""Member and card counts for the board list, create, and update responses (R47)."""
+from sqlalchemy import func, select
+from app.blueprints.boards.schema import Board, BoardMembership
+from app.blueprints.cards.schema import Card
+from app.extensions import db
+from app.soft_delete import active
+
+def counts_for_boards(board_ids):
+    """`{board_id: (member_count, card_count)}` for the given Board ids, 0 for ids with none."""
+    if not board_ids:
+        return {}
+    member_rows = db.session.execute(
+        select(BoardMembership.board_id, func.count())
+        .where(BoardMembership.board_id.in_(board_ids), active(BoardMembership))
+        .group_by(BoardMembership.board_id)
+    ).all()
+    card_rows = db.session.execute(
+        select(Card.board_id, func.count())
+        .where(Card.board_id.in_(board_ids), active(Card))
+        .group_by(Card.board_id)
+    ).all()
+    members = dict(member_rows)
+    cards = dict(card_rows)
+    return {bid: (members.get(bid, 0), cards.get(bid, 0)) for bid in board_ids}
+
+def counts_for_board(board_id):
+    """`(member_count, card_count)` of one Board (0, 0 when none)."""
+    return counts_for_boards([board_id])[board_id]
+```
+
+- **`list_boards` (GET `/api/boards`, query budget R47.4).** Query 1 is the JWT user lookup (callback). Query 2 is the existing `Board` join `BoardMembership` select. Queries 3 and 4 are `counts_for_boards`'s two grouped queries over the returned Board ids (not one query per Board), so the total is 4 for 1 Board and 4 for 20 Boards — constant and within the budget R47.4 sets. `serialize_board` gains a `counts` parameter; `board_schema.dump` sets `board.member_count, board.card_count = counts` before dumping (same pattern as A18's `apply_counts` for Cards).
+- **`create_board` (POST `/api/boards`).** No query is added: the creator's own membership makes `member_count = 1` and a fresh Board has `card_count = 0`, both literals (R47.5), not a call to `counts_for_board` (which would spend two queries establishing what is already known at creation time).
+- **`update_board` (PATCH `/api/boards/<id>`).** After the name update and commit, one call to `counts_for_board(board_id)` (two queries, scoped to a single Board) supplies the current counts (R47.6). The endpoint's existing query budget (R44.4 applies only to GET `/api/boards/<id>`, R44.7) is not constrained by Requirement 44, so the two extra queries are acceptable; no new Correctness Property budget is written for PATCH because R47 states no PATCH query cap.
+- **`BoardSchema` (`board_schemas.py`).** Gains `member_count = fields.Integer()` and `card_count = fields.Integer()`. `BoardDetailSchema(BoardSchema)` inherits the Meta/fields mechanism of Marshmallow but the service never sets `board.member_count` or `board.card_count` on a board object passed to `board_detail_schema.dump(...)`, so the two fields serialize as `None` unless excluded — to avoid emitting `member_count: null` on the detail response (which would violate R47.7's "no `member_count` and no `card_count`"), `BoardDetailSchema` declares `member_count = None` and `card_count = None` as `fields.Integer(dump_only=True, load_only=False)` is not suitable; instead `BoardDetailSchema` lists `class Meta: exclude = ("member_count", "card_count")` **(V12 change; this is the only way `BoardDetailSchema` differs from inheriting `BoardSchema` unchanged, and a backend test asserts the two keys are absent from the detail response, R48.1)**.
+- **No migration.** No table, column, constraint, or index is added (R47.8); `counts_for_boards` reuses the existing FK indexes on `board_memberships.board_id` and `cards.board_id`.
+- **`openapi.yaml` (R47.9).** The `Board` schema (used by `BoardEnvelope` for POST and PATCH, and by the GET `/api/boards` array response) gains:
+  ```yaml
+  member_count: { type: integer, minimum: 0, description: Count of non-deleted Board_Memberships of any role (V12) }
+  card_count: { type: integer, minimum: 0, description: Count of non-deleted Cards regardless of Column, assignee, or status (V12) }
+  ```
+  `BoardDetail` (an `allOf` over `Board`) gets a sibling note that it does **not** carry these two fields (R47.7), documented as `BoardDetail` overriding `Board` with `not: { required: [member_count, card_count] }` is unnecessary complexity for OpenAPI 3.0; instead the design keeps `BoardDetail`'s `allOf` as-is and adds a prose `description` on the `BoardDetail` schema stating the exclusion, because `BoardDetailSchema`'s `Meta.exclude` already enforces it at runtime and OpenAPI is documentation, not a runtime contract here.
+
+#### A22-R. Refined backend design (V12 refinement, checked against the code)
+
+Code read: `app/blueprints/boards/service/board_service.py` (103 lines), `app/blueprints/boards/schema/board_schemas.py` (40 lines), `app/blueprints/boards/schema/__init__.py`, `app/blueprints/boards/routes/board_routes.py`, `app/blueprints/cards/service/counts.py`, `app/soft_delete.py`, `app/openapi.yaml`, `app/tests/conftest.py` (`query_counter`), `app/tests/test_board_detail.py`.
+
+**Facts that change the first text.**
+- `board_service.py` already imports `counts_for_board` from `app.blueprints.cards.service.counts` (per-card counts for GET detail). A second function with the same name from a boards `counts.py` would shadow it in the same module. The new module is therefore `app/blueprints/boards/service/board_counts.py`, and its functions are `board_counts(board_ids)` and `board_counts_one(board_id)`.
+- `serialize_board` is called only by `create_board`, `list_boards`, and `update_board`; `get_board_detail` uses `board_detail_schema` directly. So the counts belong to the schema of `serialize_board` only.
+- `BoardDetailSchema(BoardSchema)` inherits every declared field. Adding the counts to `BoardSchema` would need `Meta.exclude` in the detail schema. A separate subclass is simpler and leaves the detail schema untouched.
+
+**Module `board_counts.py` (new, about 40 lines).**
+
+```python
+"""Member and card counts of Boards for the list, create, and update responses (R47, design A22-R)."""
+from sqlalchemy import func, select
+from app.blueprints.boards.schema import BoardMembership
+from app.blueprints.cards.schema import Card
+from app.extensions import db
+from app.soft_delete import active
+
+def _grouped(model, board_ids):
+    rows = db.session.execute(
+        select(model.board_id, func.count())
+        .where(model.board_id.in_(board_ids), active(model))
+        .group_by(model.board_id)
+    ).all()
+    return dict(rows)
+
+def board_counts(board_ids):
+    """`{board_id: (member_count, card_count)}`; two grouped queries for any number of ids, none for []."""
+    if not board_ids:
+        return {}
+    members, cards = _grouped(BoardMembership, board_ids), _grouped(Card, board_ids)
+    return {bid: (members.get(bid, 0), cards.get(bid, 0)) for bid in board_ids}
+
+def board_counts_one(board_id):
+    return board_counts([board_id])[board_id]
+```
+
+`BoardMembership` rows of every role count (R47.2); soft-deleted memberships and Cards are excluded by `active` (R47.3). A Card of a soft-deleted Column is already soft deleted by the cascade (A5, A17), so no Column join is needed. `boards/service` importing `cards/schema` follows D3 and D4 (models only from another package's `schema`).
+
+**Schema (`board_schemas.py`, +8 lines).**
+
+```python
+class BoardSummarySchema(BoardSchema):
+    """Board_Summary of GET, POST, and PATCH /api/boards (R47.1): BoardSchema plus the two counts."""
+    member_count = fields.Integer()
+    card_count = fields.Integer()
+```
+
+`BoardSchema` and `BoardDetailSchema` are unchanged, so GET `/api/boards/<id>` keeps exactly its current keys (R47.7) with no `Meta.exclude`. `schema/__init__.py` exports `BoardSummarySchema`.
+
+**Service (`board_service.py`, about +10 lines, stays far below 300).**
+- `board_schema = BoardSummarySchema()`; `serialize_board(board, role, counts)` sets `board.my_role = role` and `board.member_count, board.card_count = counts` before dumping.
+- `create_board`: `serialize_board(board, ADMIN, (1, 0))`. The creator's membership is the only one and a new Board has no Card, inside the same transaction, so literals are exact and cost no query (R47.5).
+- `list_boards`: after the existing select, `counts = board_counts([b.board_id for b, _ in rows])` and `serialize_board(board, role, counts[board.board_id])`.
+- `update_board`: after `commit`, `serialize_board(board, membership.role, board_counts_one(board_id))` (R47.6). The commit expires `board`, so dumping reloads it with one primary-key select; PATCH has no stated budget (Open issue 69).
+
+**Query budget of GET `/api/boards` (R47.4).** 1 the JWT user lookup, 2 the Board and role select, 3 the membership counts, 4 the card counts. Total 4 for 1 Board and for 20 Boards. A User with 0 Boards runs 2 queries (the helper returns early); R47.4 compares 1 and 20 Boards only, so this is allowed and the test compares 1 against several Boards.
+
+**OpenAPI (`openapi.yaml`, R47.9).** A new component `BoardSummary` (`allOf: [Board, {member_count: integer >= 0, card_count: integer >= 0, both required}]`) with descriptions from R47.2 and R47.3. The GET `/api/boards` array items (now `$ref: BoardSummary`, line 238 today) and `BoardEnvelope.data` (line 1614, used by POST line 215 and PATCH line 297) point to `BoardSummary`. `Board` and `BoardDetail` (`allOf: [Board, ...]`) stay unchanged, so the documented detail shape has no counts, matching the runtime.
+
+**No migration (R47.8).** No model, column, constraint, or index change. `board_memberships.board_id` and `cards.board_id` are already indexed (Requirement 29 criterion 3, Data Models).
+
+**Routes.** `board_routes.py` is unchanged; it already passes the service result to `ok(...)`.
+
 ## V11 Design: Frontend (B16 to B21)
 
 ### B16. Roles, `can(role, action)`, and the member panel (Requirements 21.12, 21.13, 37.17, 43.13 to 43.15)
@@ -1659,6 +1790,178 @@ export interface MemberRoleUpdate { role: "guest" | "member" | "manager" }
 ### B21. Files added or changed in the V11 frontend (B1 tree note)
 
 New: `lib/labelColor.ts`, `lib/overdue.ts`, `lib/progress.ts`, `lib/linkProvider.ts`, `hooks/useChecklist.ts`, `hooks/useOverdue.ts`, `components/cards/ChecklistSection.tsx`, `ChecklistItemRow.tsx`, `AddChecklistForm.tsx`, `LinksSection.tsx`, `LinkRow.tsx`, `LinkForm.tsx`, `components/boards/RoleSelect.tsx`, `components/notifications/OverdueItemRow.tsx`. Changed: `lib/roles.ts`, `lib/status.ts`, `lib/types.ts`, `lib/validation.ts` (`validateLinkUrl`, `validateChecklistText`), `components/boards/BoardView.tsx`, `KanbanColumn.tsx`, `ColumnHeader.tsx`, `AddColumnForm.tsx`, `MemberPanel.tsx`, `MemberList.tsx`, `InviteLinksPanel.tsx` (gating by `can`), `components/cards/CardItem.tsx`, `CardDetailModal.tsx`, `StatusSelect.tsx`, `components/shared/StatusBadge.tsx`, `NotificationBell.tsx`, `NotificationList.tsx`, `app/globals.css` (`@source "../lib";`). `CardItem.tsx` and `BoardView.tsx` are already near 300 lines, so the meta row moves to `CardMetaRow.tsx` (one component) and any search-result list stays in `SearchResultList.tsx` (V8 plan). No page, route, or `proxy.ts` change.
+
+## V12 Design: Frontend (B22 to B25)
+
+> These sections are new in V12 and sit after B21 so the V11 numbering stays stable.
+
+### B22. Board rename and delete controls (Requirements 45, 48.6)
+
+> **V12 refinement.** Where this section and B27 differ, B27 wins: the displayed name lives in `BoardToolbar` (not in `BoardView`), `DeleteBoardControl` calls `router.push("/")` itself, both success paths record a Board_Patch (B26), and the ConfirmDialog ignores Escape and backdrop while the request runs.
+
+**New files (D25), one component or hook per file, none over 300 lines.**
+
+- **`components/boards/RenameBoardModal.tsx`** (new, one component). Props: `open`, `boardId`, `currentName`, `onClose`, `onRenamed(newName: string)`. Internals mirror `CreateBoardModal.tsx` closely: a `BaseModal` with one text input pre-filled with `currentName`, `validateBoardName` from `lib/validation.ts` (reused unchanged, R45.5 uses the same 1-to-100-trimmed rule as board creation), a submit `BaseButton`. On submit: if the trimmed name equals `currentName.trim()`, close with no request (R45.7); otherwise `apiRequest<BoardSummary>(PATCH /api/boards/${boardId}, { body: { name } })`, and on success call `onRenamed(data.name)`, `showSuccess("Board renamed.")`, and close; on failure keep the modal open with the entered text and call `handleError` (R45.8), matching `CreateBoardModal`'s existing error handling shape.
+- **`components/boards/DeleteBoardControl.tsx`** (new, one component). Props: `boardId`, `boardName`, `onDeleted()`. Renders a `BaseButton` ("Delete board") that opens a `ConfirmDialog` (reused unchanged from `components/shared/ConfirmDialog.tsx`, already used for "destructive actions such as deleting boards" per its own doc comment) with `message` naming the Board and stating Columns, Cards, and Comments are deleted with it (R45.9). Cancel closes with no request (R45.10). Confirm sets `busy` (disables the dialog's own buttons through `ConfirmDialog`'s existing `busy` prop, R45.11), sends `DELETE /api/boards/${boardId}`, and on 200 calls `onDeleted()` and `showSuccess("Board deleted.")`; on failure clears `busy`, keeps the `ConfirmDialog` open (R45.13), and calls `handleError`.
+- **`BoardToolbar.tsx` (changed).** Adds two props, `onBoardRenamed: (name: string) => void` and `boardId` is already a prop. Computes `showRename = can(role, "edit_board")` and `showDelete = can(role, "delete_board")` (R45.1 to R45.3, reusing the existing `can` helper and action names, no new `Action` value added to `lib/roles.ts`). Renders a "Rename" `BaseButton` (opens `RenameBoardModal`, local `renameOpen` state) and `DeleteBoardControl` next to the existing Members/Analytics buttons, visible only for the roles that satisfy `edit_board`/`delete_board` (currently only `admin`, matching the V11 `MIN_RANK` table — R45.3 is therefore already satisfied by the existing rank table and needs no change to `lib/roles.ts`). On `RenameBoardModal`'s `onRenamed`, `BoardToolbar` calls the new `onBoardRenamed` prop so `BoardView` can update the displayed name without a page reload (R45.6).
+- **`BoardView.tsx` (changed, stays at or below 291 + a few lines).** Adds a `boardName` local state initialized from `board.name`, passed to `BoardToolbar` as `boardName={boardName}` instead of `board.name` directly, and an `onBoardRenamed={setBoardName}` handler passed to `BoardToolbar`. On successful delete (`DeleteBoardControl`'s `onDeleted`), calls `router.push("/")` (Next.js client-side navigation to the Dashboard, which is `force-dynamic`, D27). These are the only two `BoardView.tsx` changes; the rename/delete UI itself lives in the two new files (D25), keeping the net line growth of `BoardView.tsx` under ten lines.
+- **Display-only gating (R45.14).** As with every other `can(...)` check in the codebase (B16), hiding the two controls for non-admins is cosmetic; the existing PATCH/DELETE `/api/boards/<id>` endpoints already return 403 to a non-admin (A9's `require_board_admin`), so no backend change accompanies this section.
+
+### B23. My Tasks deep link (Requirements 46, 48.6)
+
+> **V12 refinement.** Where this section and B27 differ, B27 wins: the hook returns `{ onModalClose }` instead of `void` (the first text named a `clearDeepLinkParam` callback but gave a `void` signature), the parsing and matching move to the pure module `lib/deepLink.ts`, the URL is rebuilt with `URLSearchParams` so other query parameters and the hash survive, and the dependency array is complete with a ref guard instead of an omitted dependency.
+
+- **`MyTasksList.tsx` (changed).** The per-task `<Link href={`/boards/${card.board_id}`}>` around `card.title` (current behavior) becomes `<Link href={`/boards/${card.board_id}?card=${card.card_id}`}>` **(V12 change: supersedes the plain per-task board link; the group-level "Open board" link right above it, `href={`/boards/${group.board_id}`}`, is unchanged, R46.2)**. No new file is needed for this one-line target change; it stays inside `MyTasksList.tsx` because it is a single JSX attribute, not new logic, so it does not count against the "separate files" rule of R48.6, which names the rename form, delete flow, and deep-link *handling* (the board-side modal-opening logic), not the one-line link on the My Tasks side.
+- **`hooks/useCardDeepLink.ts`** (new, one hook, D25). Pure-ish hook, not a pure function, because it manages one-shot modal-open state and a `window.history.replaceState` side effect:
+  ```ts
+  export function useCardDeepLink(
+    initialCardId: string | null,
+    columns: Column[],
+    openCard: (card: BoardCard) => void
+  ): void {
+    const openedRef = useRef(false);
+    useEffect(() => {
+      if (openedRef.current || !initialCardId) return;
+      openedRef.current = true; // at most once per page load (R46.8)
+      const found = columns.flatMap((c) => c.cards).find((c) => c.card_id === initialCardId);
+      if (found) openCard(found); // not as a new card; same path as a click (R46.3)
+      // an unknown id (R46.4): no modal, no error, no toast — simply do nothing further
+    }, [initialCardId]); // columns and openCard intentionally excluded: a later column refresh must not re-trigger
+  }
+  ```
+  `BoardView` calls `useCardDeepLink(initialCardId, columns, (card) => { setSelectedCard(toBoardCard(card)); setSelectedCardIsNew(false); })` once, passing the same `setSelectedCard`/`setSelectedCardIsNew` path a click already uses (R46.3). Because `columns` is read once from the ref-guarded effect's closure at the first run only (the dependency array omits `columns`), a card that arrives only after the members fetch or a later re-render is still matched against the `columns` prop as it was on mount; this is acceptable because `columns` comes from the initial `board.columns` server payload and does not change shape before the effect runs (React runs effects after the first paint of the same render that already has `columns` populated).
+- **Closing the modal removes the parameter (R46.7, D26).** `BoardView`'s existing `onClose` handler for `CardDetailModal` (`() => { setSelectedCard(null); setSelectedCardIsNew(false); }`) gains one line: if the card being closed is the one the deep link opened (tracked by a `deepLinkCardIdRef` inside `useCardDeepLink`, exposed as a returned `clearDeepLinkParam()` callback), call `window.history.replaceState(null, "", window.location.pathname)` to strip the `card` parameter, matching the documented "Native History API" `replaceState` example of stripping/changing a query parameter without a new history entry and without a Next.js request (D26). A card closed that was opened by a click (not the deep link) does not touch the URL, because it never had a `card` parameter to remove.
+- **Malformed, soft-deleted, or cross-board id (R46.4), empty or repeated values (R46.5).** `useCardDeepLink`'s `.find(...)` naturally returns `undefined` for any id absent from the board's own non-deleted Cards (a soft-deleted or cross-board Card is already excluded from `board.columns` by the existing `active(Card)` filter in `get_board_detail`, A9), so no extra backend check is needed; the hook simply does nothing when `found` is `undefined`. Parsing an empty or repeated `card` value into "the first non-empty value, or null" happens one layer up, in B24 below, not inside this hook, keeping the hook's input a single resolved `string | null`.
+- **403/404 board (R46.6).** Unaffected: the board page already renders `BoardAccessMessage` before `BoardView` (and therefore before `useCardDeepLink`) mounts at all when the GET `/api/boards/<id>` request throws a 403/404 `ApiError` (existing `web/app/(boards)/boards/[id]/page.tsx` catch block), so the `card` parameter is already ignored in that path with no code change.
+
+### B24. Reading `searchParams` in the board page (Requirement 46 criterion 9, D26)
+
+**V12 change** to `web/app/(boards)/boards/[id]/page.tsx` (supersedes nothing structural; the file had no `searchParams` prop before V12).
+
+```tsx
+export default async function BoardDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ card?: string | string[] }>;
+}) {
+  const { id } = await params;
+  const resolvedSearchParams = await searchParams;
+  const rawCard = resolvedSearchParams.card;
+  const cardParam = Array.isArray(rawCard) ? rawCard[0] : rawCard; // first value wins (R46.5)
+  const initialCardId = cardParam && cardParam.length > 0 ? cardParam : null; // empty counts as absent (R46.5)
+  // ...unchanged token/apiRequest/error-handling logic...
+  return <BoardView board={board} initialCardId={initialCardId} />;
+}
+```
+
+This follows the documented `page.md` `searchParams` convention read in `node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/page.md` ("A promise that resolves to an object containing the search parameters of the current URL"; `{ [key: string]: string | string[] | undefined }`), confirming R46.9's requirement to consult that file before specifying the API. `BoardView` gains one new prop, `initialCardId: string | null`, consumed only by `useCardDeepLink` (B23). `decideRoute` (R17.12) and the `next` rule (R19.11) are untouched: an unauthenticated request for `/boards/<id>?card=<card_id>` still 401s at `getServerToken`/`apiRequest`, triggers the existing `redirect("/login?expired=1")` branch, and the query string is not part of that redirect target, so it is dropped exactly as R46.10 requires **(V12 change note: this is the same pre-existing redirect branch, not a new one; nothing in `proxy.ts` or `decideRoute.ts` changes)**.
+
+### B25. Board_Summary counts, types, and Board card text (Requirements 47.10 to 47.13, 48.2, 48.6)
+
+- **`lib/types.ts` (changed).** `BoardSummary` gains two required fields:
+  ```ts
+  export interface BoardSummary {
+    board_id: string;
+    name: string;
+    my_role: Role;
+    created_at: string;
+    updated_at?: string;
+    member_count: number; // V12
+    card_count: number;   // V12
+  }
+  ```
+  `BoardDetail extends BoardSummary` would now inherit the two fields even though the backend never sends them on the detail response (R47.7); the design accepts this one documented divergence between the TypeScript shape and the wire shape **(V12 change; open issue, see Open issue 68)** rather than breaking the existing `BoardDetail extends BoardSummary` inheritance that the rest of the codebase (`BoardView`, `BoardAccessMessage`, every board test) relies on for the shared fields `board_id`, `name`, `my_role`.
+- **Board card text (`BoardList.tsx`, changed).** A new pure function in `lib/format.ts`, `formatCount(n: number, noun: string): string`, returns `` `${n} ${noun}${n === 1 ? "" : "s"}` `` (R47.11's rule: singular only for exactly 1; 0 and every value above 1 use the plural). `BoardList.tsx`'s `<li>` gains a line below the existing name/badge row: `<p className="text-xs text-ink-muted mt-1">{formatCount(board.member_count, "member")} · {formatCount(board.card_count, "card")}</p>`. The Board card stays exactly one `<Link>` wrapping the whole card (R47.13; unchanged from the existing structure, which already wraps name and badge in one anchor).
+- **Create flow (R47.12).** `CreateBoardModal.tsx`'s existing `onCreated(board)` callback already receives the full POST response and prepends it to `BoardList`'s local `boards` state with no new list request; because `create_board` now always returns `member_count: 1, card_count: 0` (A22), this flow needs no code change beyond the type update above — the new Board immediately shows "1 member · 0 cards".
+- **No client-side counting (R47.13).** No component sums `columns[].cards.length` or `members.length` for display; the Dashboard only ever reads `board.member_count`/`board.card_count` off the `BoardSummary` the server already sent.
+- **`openapi.yaml` / `BoardSummary` cross-reference.** See A22's `openapi.yaml` paragraph; the TypeScript `BoardSummary` interface above matches the `Board` schema's new `member_count`/`card_count` properties field-for-field. **V12 refinement:** it matches the new OpenAPI `BoardSummary` component of A22-R, not `Board`.
+- **V12 refinement (types).** `BoardDetail` stops extending `BoardSummary`. A new `BoardBase` holds `board_id`, `name`, `my_role`, `created_at`, `updated_at?`; `BoardSummary extends BoardBase` adds the two counts and `BoardDetail extends BoardBase` adds `columns`. `grep` over `web/` finds `BoardDetail` only in the board page, `BoardView`, and tests, and no place passes a `BoardDetail` where a `BoardSummary` is expected, so the change compiles without other edits and the type matches the wire shape (R47.7). This resolves Open issue 68.
+- **V12 refinement (Board card markup).** The counts line is `<p className="mt-1 text-xs text-ink-muted">` inside the existing single `<Link>`, with the two texts as two `<span>` elements separated by an `aria-hidden` dot, so tests can find "1 member" and "0 cards" as separate texts. `formatCount` handles only non-negative integers; the server guarantees that (A22-R).
+
+### B26. Dashboard freshness after rename and delete (Requirements 45.12, 20.10; D27 refinement)
+
+Docs read: `01-app/04-glossary.md` (Client Cache: pages are not cached by default but are reused during back and forward navigation), `01-app/03-api-reference/05-config/01-next-config-js/staleTimes.md` (`dynamic` default 0 s; does not change back/forward caching), `01-app/03-api-reference/04-functions/use-router.md` (`push`, `refresh`, `bfcacheId`), `01-app/01-getting-started/04-linking-and-navigating.md` (client-side transitions, Native History API). `next.config.ts` does not enable `cacheComponents` or `staleTimes`.
+
+**`lib/boardPatches.ts` (pure, new).**
+
+```ts
+export interface BoardPatches { renamed: Record<string, { name: string; updated_at: string }>; deleted: string[] }
+export const EMPTY_PATCHES: BoardPatches = { renamed: {}, deleted: [] };
+export const BOARD_PATCHES_KEY = "kano_board_patches";
+export function parsePatches(raw: string | null): BoardPatches          // invalid or missing JSON -> EMPTY_PATCHES
+export function withRename(p: BoardPatches, id: string, name: string, updatedAt: string): BoardPatches
+export function withDelete(p: BoardPatches, id: string): BoardPatches   // also drops a rename of that id
+export function applyBoardPatches(boards: BoardSummary[], p: BoardPatches): BoardSummary[]
+// keeps the order; removes ids in p.deleted; for a renamed id sets name and updated_at only when
+// the listed updated_at is missing or older than the patch's (ISO strings from the server, compared as Date)
+```
+
+**`hooks/useBoardPatches.ts` (new, one hook).** `useBoardPatches(): BoardPatches` reads `sessionStorage[BOARD_PATCHES_KEY]` through `useSyncExternalStore` (subscribe to `storage` events and to an in-tab event the writers dispatch; server snapshot `null`, so hydration renders the server list and the client re-renders with the patches). Two writer functions in the same file, `recordRename(id, name, updatedAt)` and `recordDelete(id)`, read, update with `withRename`/`withDelete`, write back, and dispatch the in-tab event. A `sessionStorage` failure (private mode, quota) is caught and ignored: the Dashboard then falls back to the server list, which is fresh on every push navigation.
+
+**`BoardList.tsx` (changed).** `const patches = useBoardPatches(); const shown = applyBoardPatches(boards, patches);` and the list, the empty state, and the counts render from `shown`. `CreateBoardModal`'s `onCreated` still prepends to `boards` (R47.12). The data in the patches is what the server returned to the PATCH request or the id that DELETE removed, so no count or name is computed in the browser (R47.13).
+
+**Flows.** Rename then the toolbar "Boards" link (`<Link href="/">`, push): the server renders `/` with the new name; the patch is a no-op. Delete: `router.push("/")` renders `/` fresh; the deleted Board is absent; the patch is a no-op. Either flow then the browser back button to an older Dashboard entry: the cached payload still has the old data and `applyBoardPatches` corrects it before paint after hydration. The patches live for the browser tab session (`sessionStorage`) and are small (one entry per renamed or deleted Board).
+
+### B27. Refined frontend wiring (V12 refinement of B22 to B24, checked against the code)
+
+Code read: `web/components/boards/BoardView.tsx` (291 lines), `BoardToolbar.tsx` (80), `BoardList.tsx` (87), `CreateBoardModal.tsx` (98), `components/shared/ConfirmDialog.tsx`, `components/shared/BaseModal.tsx`, `components/cards/MyTasksList.tsx`, `components/cards/CardDetailModal.tsx`, `web/app/(boards)/page.tsx`, `web/app/(boards)/boards/[id]/page.tsx`, `lib/roles.ts`, `lib/types.ts`, `lib/validation.ts`, `lib/format.ts`, `lib/toast.ts`, `web/__tests__/dashboard.test.tsx`, `boardRoles.test.tsx`, `myTasksAndProfile.test.tsx`, `web/e2e/kanban.spec.ts`, `web/e2e/support/credentials.ts`.
+
+**Facts from the code.**
+- `lib/roles.ts` already has `edit_board: 3` and `delete_board: 3`, so only the admin sees the controls (R45.1 to R45.3) with no change to `roles.ts`.
+- `ConfirmDialog` already has a `busy` prop that disables both buttons, but its `BaseModal` calls `onCancel` on Escape and on a backdrop click whatever `busy` is.
+- `CardDetailModal` sends `GET /api/cards/<id>` on every open (V11, A18, line 81), for a click and for a deep link alike.
+- `BoardView` repeats `setSelectedCard(toBoardCard(card)); setSelectedCardIsNew(false);` in two places (search results, Kanban columns).
+
+**`BoardToolbar.tsx` (changed, about 80 to 115 lines).** Gains state `displayName` (initialized from `boardName`) and `renameOpen`. Renders, when `can(role, "edit_board")`, a secondary `BaseButton` "Rename board" (lucide `Pencil`) that opens `RenameBoardModal`, and, when `can(role, "delete_board")`, `DeleteBoardControl`. The `h1` shows `displayName`. `onRenamed(board)` sets `displayName = board.name` and calls `recordRename(board.board_id, board.name, board.updated_at)` (B26). No new prop is needed: `boardId`, `boardName`, and `role` are already props.
+
+**`RenameBoardModal.tsx` (new, about 100 lines).** As B22, with: input id `rename-board-input`, label "Board name"; the field is re-filled with `currentName` each time the modal opens; validation with `validateBoardName` (same 1 to 100 trimmed rule as creation, R45.5); `trim() === currentName.trim()` closes with no request (R45.7); success calls `onRenamed(updated)` with the `BoardSummary` of the PATCH response, `showSuccess("Board renamed.")`, and closes (R45.6); failure keeps the modal open with the text and calls `handleError` (R45.8). Submit and Cancel are disabled while `busy`.
+
+**`DeleteBoardControl.tsx` (new, about 70 lines).** A destructive `BaseButton` "Delete board" (lucide `Trash2`) opens `ConfirmDialog` with title "Delete board", message `Delete "<name>"? Its columns, cards, and comments are deleted with it.` (R45.9), confirm label "Delete board". `onCancel` closes only when not `busy` (so Escape and backdrop are ignored during the request, R45.11). Confirm: `busy = true`, `DELETE /api/boards/<id>`; on 200 `recordDelete(boardId)`, `showSuccess("Board deleted.")`, `router.push("/")` (R45.11); on failure `busy = false`, dialog stays open, `handleError(err)` (R45.13). `useRouter` comes from `next/navigation`.
+
+**`lib/deepLink.ts` (pure, new).**
+
+```ts
+export function resolveCardParam(raw: string | string[] | undefined): string | null  // first value, "" -> null (R46.5)
+export function findCardById(columns: Column[], id: string | null): BoardCard | null  // only cards in the payload (R46.4)
+export function stripCardParam(href: string): string                                  // path + other params + hash, without `card`
+```
+
+`resolveCardParam` takes the first element of an array and then treats `""` as absent, so `?card=&card=c1` gives `null` (the first value is empty). `stripCardParam` uses `new URL(href)` and `URLSearchParams.delete("card")`, and returns `pathname + (search ? "?" + search : "") + hash`.
+
+**`hooks/useCardDeepLink.ts` (new, about 40 lines; replaces the B23 code block).**
+
+```ts
+export function useCardDeepLink(initialCardId: string | null, columns: Column[], open: (card: BoardCard) => void) {
+  const handled = useRef(false);            // at most once per page load (R46.8), also under React StrictMode
+  const openedId = useRef<string | null>(null);
+  useEffect(() => {
+    if (handled.current) return;
+    handled.current = true;
+    const card = findCardById(columns, initialCardId);
+    if (card) { openedId.current = card.card_id; open(card); }       // as a click: isNew false (R46.3)
+  }, [initialCardId, columns, open]);
+  const onModalClose = useCallback((closedId: string) => {
+    if (openedId.current !== closedId) return;                        // a click-opened card leaves the URL alone
+    openedId.current = null;
+    window.history.replaceState(window.history.state, "", stripCardParam(window.location.href)); // R46.7
+  }, []);
+  return { onModalClose };
+}
+```
+
+The guard ref makes a full dependency array safe: later changes of `columns` (drag, add) never reopen. `replaceState` keeps `window.history.state` because the App Router stores its own entry state there; the Native History API section of `linking-and-navigating.md` shows `replaceState(null, '', newPath)` and says Next.js integrates these calls into the router, so either form updates `useSearchParams` readers without a request. Passing the current state is the safer choice and is checked by the Playwright deep-link scenario (back button after closing still works).
+
+**`BoardView.tsx` (changed, line budget at most 298).** One new prop `initialCardId?: string | null` (default `null`, so the existing tests that render `<BoardView board={...} />` keep compiling). One `const openCard = useCallback((card: Card | BoardCard) => { setSelectedCard(toBoardCard(card)); setSelectedCardIsNew(false); }, []);` replaces the two repeated blocks (net about -4 lines). `const { onModalClose } = useCardDeepLink(initialCardId ?? null, columns, openCard);` and the modal's `onClose` adds `onModalClose(selectedCard.card_id)`. The rename and delete wiring of B22 is not added to `BoardView` (it lives in `BoardToolbar`). The `scripts/check_file_size.py` check (R30.6, `repo-rules.test.ts`) enforces the limit.
+
+**Board page (`app/(boards)/boards/[id]/page.tsx`).** As B24, using `resolveCardParam((await searchParams).card)`; `searchParams` typed `Promise<{ [key: string]: string | string[] | undefined }>` as in `page.md`. The page is already `force-dynamic`. A 403 or 404 renders `BoardAccessMessage` before `BoardView` exists (R46.6); a 401 still calls `redirect("/login?expired=1")` (R46.10).
+
+**`MyTasksList.tsx`.** As B23: title `href` becomes `` `/boards/${card.board_id}?card=${encodeURIComponent(card.card_id)}` ``; the "Open board" link is unchanged (R46.1, R46.2). `card_id` is a UUID, so encoding changes nothing for real data and only guards against unexpected input.
+
+**Deep link request count.** The deep link adds no request of its own: the Card comes from the board payload (`findCardById`). Opening the modal then runs the same `GET /api/cards/<id>` that a click runs (V11 A18), because R46.3 requires the modal to behave as for a click. Closing sends nothing, and the modal never reopens from the parameter. Open issue 72 records the reading of R46.8.
+
+**Files (V12, B1 tree note).** New: `components/boards/RenameBoardModal.tsx`, `components/boards/DeleteBoardControl.tsx`, `hooks/useCardDeepLink.ts`, `hooks/useBoardPatches.ts`, `lib/deepLink.ts`, `lib/boardPatches.ts`. Changed: `components/boards/BoardToolbar.tsx`, `BoardView.tsx`, `BoardList.tsx`, `components/cards/MyTasksList.tsx`, `app/(boards)/boards/[id]/page.tsx`, `lib/types.ts`, `lib/format.ts` (`formatCount`). Unchanged: `app/(boards)/page.tsx`, `proxy.ts`, `lib/decideRoute.ts`, `lib/roles.ts`, `ConfirmDialog.tsx`, `CreateBoardModal.tsx`. Each new file holds one component, one hook (with its two small writer functions for `useBoardPatches`), or pure functions.
 
 ## Data Models
 
@@ -2419,6 +2722,69 @@ No existing row changes. A backend test lists the tables through `information_sc
 
 **Validates: Requirements 37.3, 37.5, 37.6, 37.12, 28.12**
 
+### V12 Correctness Properties (76 to 80)
+
+**Prework summary (V12).** Criteria that vary with input and test our own logic became properties: the count computation and query budget (R47.2 to R47.4), the create and update count values (R47.5, R47.6), the exclusion of counts from the detail response (R47.7), the deep-link resolution and the "at most once" rule (R46.3 to R46.5, R46.8), the singular/plural count formatting (R47.11). Classified as example tests instead: the rename form's field-level validation reuses `validateBoardName`, already covered by Property 29 (client validators mirror server rules) and by `CreateBoardModal`'s existing unit tests, so no new property restates it; the delete-flow button states (R45.10, R45.11, R45.13) are UI sequencing, covered by example-based Vitest tests (Testing Strategy); the history-API `card` parameter removal (R46.7) is an integration behavior against the browser History API, not a pure function over a wide input space, so it is an example test, not a property; R46.2, R46.6, R46.9, R46.10, R48.6, R48.7 are structural/example/smoke (link target text, access-message branch, documentation-reading step, unchanged `decideRoute`, line counts, deployment order).
+
+### Property 76: Board counts equal a naive model
+
+*For any* Board with any number of non-deleted and soft-deleted Board_Memberships of any role (including `guest`) and any number of non-deleted and soft-deleted Cards, `counts_for_boards` (and `counts_for_board`) returns `member_count` equal to a naive in-memory count of non-deleted Board_Memberships of that Board of any role and `card_count` equal to a naive in-memory count of non-deleted Cards of that Board regardless of Column, assignee, or status; Board_Memberships and Cards of a different Board are never counted.
+
+**Validates: Requirements 47.2, 47.3**
+
+### Property 77: Board list query count is constant
+
+*For any* authenticated User with from 0 to 20 Boards, each with any number of Board_Memberships and Cards, `GET /api/boards` executes the same number of SQL statements, at most 4 including the JWT user-lookup query, independent of the number of Boards returned or the number of Memberships or Cards per Board.
+
+**Validates: Requirements 47.4**
+
+### Property 78: Create and update carry the right counts
+
+*For any* User who creates a Board, the POST `/api/boards` response has `member_count` exactly 1 and `card_count` exactly 0; and *for any* Board with any number of Board_Memberships and Cards, a Board_Admin's PATCH `/api/boards/<id>` response has `member_count` and `card_count` equal to the Board's current naive counts (Property 76) measured after the rename commits.
+
+**Validates: Requirements 47.5, 47.6**
+
+### Property 79: Board detail never carries the counts
+
+*For any* Board with any number of Board_Memberships and Cards, the response of GET `/api/boards/<id>` contains neither a `member_count` key nor a `card_count` key, while the response of GET `/api/boards`, POST `/api/boards`, and PATCH `/api/boards/<id>` for the same Board always contain both.
+
+**Validates: Requirements 47.7**
+
+### Property 80: Deep-link resolution and the open-once rule
+
+*For any* list of Cards on a Board and any `card` parameter value, the board page opens the CardDetailModal for the Card whose `card_id` equals the parameter iff such a non-deleted Card exists on that Board, and opens no modal otherwise (a malformed value, a soft-deleted Card, or a Card of another Board all resolve to "no modal", with no error and no toast); *for any* sequence of opening and closing that modal within one page load, the deep link contributes at most one open, so closing it never reopens it and never sends a `GET /api/cards/<id>` request; and *for any* `card` parameter that is empty or supplied more than once, the empty value is treated as absent and the first of repeated values is used.
+
+**Validates: Requirements 46.3, 46.4, 46.5, 46.8**
+
+#### V12 refinement: Properties 81 to 83 and amendments
+
+**Prework (V12 refinement).** The design refinement (A22-R, B26, B27) moved three pieces of logic into pure functions whose behavior varies with input: the deep-link parsing and URL rebuild (`lib/deepLink.ts`, R46.1, R46.5, R46.7), the Board_Patch merge (`lib/boardPatches.ts`, R45.12, R20.10), and `formatCount` (R47.11). Each is cheap to run 100 times and has a large input space (strings, arrays, URLs, lists of Boards), so each becomes a property. Reflection: Property 80 already covers "which Card opens"; Property 81 covers only the pure parsing and URL rule, so they do not overlap. The R47.11 text rule was named in the first V12 Testing Strategy as "through `formatCount`'s own small property" without a number; Property 83 gives it one. Still example tests: R45.1 to R45.11 and R45.13 (UI sequencing), R46.2 and R46.6 (fixed link and fixed branch), R46.9 and R46.10 (documentation step, unchanged `decideRoute`), R47.8, R47.9 (no migration, OpenAPI text), R47.10 (type), R47.12, R47.13 (create flow, no client counting), R48 (suite rules).
+
+| Property | V12 change |
+|---|---|
+| 34 | Unchanged. The My Tasks link target is an example test (Testing Strategy V12), not part of `groupByBoard` |
+| 74 | Unchanged; the V12 rename and delete gating reuses `edit_board` and `delete_board`, already in the property |
+| 79 | The detail response keeps the keys of `BoardDetailSchema`, which is unchanged; the list, create, and update responses use `BoardSummarySchema` (A22-R). The statement of Property 79 holds as written |
+| 80 | "Never sends a `GET /api/cards/<id>` request" means the deep link itself sends none (resolution uses the board payload, closing sends none, there is no reopen). The modal's own detail load runs once per open as for a click (B27, Open issue 72) |
+
+### Property 81: Deep-link parameter parsing and URL rebuild
+
+*For any* value of the `card` search parameter (absent, a string including the empty string, or an array of strings), `resolveCardParam` returns `null` when the value is absent, empty, or an array whose first element is empty, and otherwise returns the first value unchanged; *for any* `/my-tasks` Card with any `board_id` and `card_id`, the title link target is `/boards/<board_id>?card=<encoded card_id>` and `resolveCardParam` of the parsed `card` value returns the original `card_id` (round trip); and *for any* absolute URL with any other query parameters and any hash, `stripCardParam` returns the same path, the same other parameters in the same order, and the same hash, with no `card` parameter, and applying it twice equals applying it once.
+
+**Validates: Requirements 46.1, 46.5, 46.7**
+
+### Property 82: Board patches merge
+
+*For any* list of Board_Summaries and any sequence of rename and delete patches, `applyBoardPatches` returns the input list in the same order minus every Board whose id was deleted; a renamed Board shows the patched name iff its listed `updated_at` is missing or older than the patch's `updated_at`, and keeps every other field (including `member_count` and `card_count`) unchanged; applying the patches twice equals applying them once; a list that already reflects every patch is returned unchanged; and `parsePatches` of `JSON.stringify(p)` equals `p` while `parsePatches` of any invalid string returns the empty patches.
+
+**Validates: Requirements 45.12, 20.10, 47.13**
+
+### Property 83: Count text
+
+*For any* non-negative integer `n` and noun in {"member", "card"}, `formatCount(n, noun)` equals `n + " " + noun` when `n` is exactly 1 and `n + " " + noun + "s"` otherwise; and *for any* Board_Summary, the rendered Board card contains `formatCount(member_count, "member")` and `formatCount(card_count, "card")` inside its single link to `/boards/<board_id>`.
+
+**Validates: Requirements 47.11, 47.13, 20.9**
+
 ## Error Handling
 
 | Situation | Behavior | Requirement |
@@ -2482,6 +2848,29 @@ No existing row changes. A backend test lists the tables through `information_sc
 | Link form URL invalid | field error, no request | 42.13 |
 | Role change request fails in the member panel | row keeps its old role, toast | 43.14 |
 | Schema applied before the V11 migration (`URGENT`, `manager`, new tables) | the generic 500 handler answers with no database details | 3.6, 44.1 |
+
+#### V12 error handling rows
+
+| Situation | Behavior | Requirement |
+|---|---|---|
+| Rename form: name empty after trim, or over 100 characters | field-level error, no PATCH request, `RenameBoardModal` stays open with the entered text | 45.5 |
+| Rename form: trimmed name equals the current name | `RenameBoardModal` closes, no PATCH request | 45.7 |
+| PATCH `/api/boards/<id>` (rename) fails | `RenameBoardModal` stays open with the entered text, displayed Board name unchanged, `useErrorHandler` toast | 45.8 |
+| Delete confirmed, DELETE `/api/boards/<id>` fails | stay on the board page, Board displayed unchanged, `ConfirmDialog` stays open with its buttons re-enabled, `useErrorHandler` toast | 45.13 |
+| Delete cancelled | `ConfirmDialog` closes, no DELETE request | 45.10 |
+| A non-admin role (`manager`, `member`, `guest`) views the board toolbar | rename and delete controls absent (display rule only; the API still returns 403 to a direct request) | 45.3, 45.14 |
+| `card` query parameter matches no non-deleted Card of the Board (malformed, soft-deleted, or another Board's Card) | board renders normally, no CardDetailModal opens, no error message, no toast | 46.4 |
+| `card` query parameter is empty or appears more than once | empty value treated as absent; first of repeated values used | 46.5 |
+| GET `/api/boards/<id>` returns 403 or 404 while a `card` parameter is present | existing access-denied or not-found state (R21.15) renders; the `card` parameter is ignored | 46.6 |
+| Unauthenticated request for `/boards/<id>?card=<card_id>` | existing `redirect("/login?expired=1")` branch fires; `next` is not set from the `card` parameter | 46.10 |
+| Modal opened by the deep link is closed | `card` parameter removed via `window.history.replaceState` (no new history entry, no reload, no new GET request); board state otherwise unchanged | 46.7 |
+| **V12 refinement** Escape or backdrop click while the DELETE request runs | ignored; `ConfirmDialog` stays open with disabled buttons until the response | 45.11 |
+| **V12 refinement** Rename or delete succeeds but `sessionStorage` is unavailable or full | error caught and ignored; the push navigation to `/` still shows fresh server data; only a later back navigation to an older cached Dashboard entry may show the old list until reload (Open issue 73) | 45.12 |
+| **V12 refinement** `kano_board_patches` holds invalid JSON | `parsePatches` returns the empty patches; the Dashboard shows the server list | 45.12 |
+| **V12 refinement** Deep link closed after the user already changed other query parameters | `stripCardParam` removes only `card` and keeps the other parameters and the hash | 46.7 |
+| **V12 refinement** Deep-link Card is deleted from the open modal | existing delete flow closes the modal; `onModalClose` removes `card`; the Card is gone from the board state | 46.7, 23 |
+| **V12 refinement** GET `/api/boards` count query fails | existing 500 handler (A2) with no database details; the Dashboard shows `ErrorPanel` with retry (B2) | 4.11, 20.8 |
+| **V12 refinement** Board deleted in another tab while it is listed | GET `/api/boards` omits it on the next server render; a click on a stale card leads to the existing 404 state (R21.15) | 21.15 |
 
 ## Testing Strategy
 
@@ -2672,6 +3061,63 @@ V5 to V9 strategy stays. Property tests use Hypothesis and fast-check, at least 
 | Roles and welcome (32.30) | `member` view hides columns, member panel, invite links, analytics; manager view shows columns, panel, both links, no analytics; welcome copy passes `findForbiddenClaims` after the "Urgent" change | 74, 60 |
 
 **Playwright (additions; credentials only through `requireCredentials()`).** (1) The pre-existing user (the Board creator, so `admin`) adds a checklist item and a link in a card, sees `1/1` progress and the link chip on the Card face, and sets the status to "Urgent" and sees the red badge. (2) A past due date shows the "Overdue" chip and, after opening the bell, the overdue row. (3) The Board creator joins a second generated account through the member link, which sees no column controls; the creator promotes it to manager through the dropdown (reload shows the column controls). Touch and the visual look of the chips stay in the manual 33.3 checklist. The existing Kanban journey is unaffected because its user created the Board.
+
+### Testing Strategy: V12 additions (Requirements 48.1 to 48.4)
+
+**Run-first step (R48.4, applies before any of the tables below).** Before writing or changing a single V12 test, the project runs `npm test` and `npx playwright test` from `web/` against the pre-V12 code and records every failing test, including failures not caused by V12 (R48.4). Those failures are fixed (not deleted, R48.5) as part of the same implementation pass that adds the V12 tests below; the exact list of pre-existing failures is a runtime result of that first run, not predicted in this design (as the requirement states) — the Traceability row for Requirement 48 names the general categories expected from the rest of this document's own text (the My Tasks link-target test and the Board card layout snapshot, both of which this revision's B23/B25 changes intentionally break and must update, R48.5).
+
+**Backend (pytest, additions).**
+
+| Area | Tests | Properties |
+|---|---|---|
+| Board counts (48.1) | exact `member_count`/`card_count` on GET, POST, PATCH `/api/boards`; a Board_Guest counts as a member; a soft-deleted Board_Membership and a soft-deleted Card are excluded; Cards and Board_Memberships of another Board are excluded; a Board with no Cards has `card_count` 0; `before_cursor_execute` counter asserts GET `/api/boards` is at most 4 and equal for 1 Board and for several Boards (reusing the `query_counter` fixture already used by `test_board_detail.py`); GET `/api/boards/<id>` response has neither key (`assert "member_count" not in data`) | 76, 77, 78, 79 |
+
+**Frontend (Vitest and React Testing Library, network mocked).**
+
+| Area | Tests | Properties |
+|---|---|---|
+| Rename and delete gating (48.2) | controls rendered for `admin`, absent for `manager`, `member`, `guest` (table test over the four roles, reusing the `boardRoles.test.tsx` pattern) | 74 (reused) |
+| Rename form (48.2) | field-level error with no request for empty, whitespace-only, and 101-character names; sends PATCH with the trimmed name for a valid, different name; a failing PATCH keeps the modal open and the previous displayed name | none (example) |
+| Delete flow (48.2) | cancel sends no request; confirm sends DELETE and navigates to `/`; a failing DELETE keeps the page and shows an error toast, dialog re-enabled | none (example) |
+| My Tasks link target (48.2) | the task title's `href` is `/boards/<board_id>?card=<card_id>`; the "Open board" link's `href` has no query string | none (example, supersedes the pre-V12 assertion that the title link equals the plain board URL) |
+| Deep link (48.2) | a known `card` value opens the CardDetailModal on first render; an unknown value opens none; two `card` values use the first; closing removes the parameter from the mocked `window.location`/`history`; the modal does not reopen after being closed once | 80 |
+| Board card counts (48.2) | `formatCount` singular/plural fast-check property (0, 1, 2, and arbitrary non-negative integers); `BoardList` renders "1 member"/"0 members"/"2 members" and the matching card text | 76 to 78 (through `formatCount`'s own small property); **V12 refinement:** Property 83 |
+
+**Playwright (additions; credentials only through `requireCredentials()`, each scenario creates its own uniquely named Board, R48.3).** (1) Rename a Board through the toolbar control and find the new name on the board page and back on the Dashboard. (2) Delete a Board through the `ConfirmDialog`, land on `/`, and confirm the Board is absent from the Dashboard. (3) From `/my-tasks`, click a task title and land on `/boards/<board_id>?card=<card_id>` with the CardDetailModal already open for that Card. (4) Create a Board and see "1 member", "0 cards" on its Dashboard card; add one Card and see "1 card" after returning to `/`. Deployment ordering (R48.7): where the E2E_Suite runs against a deployed frontend, the Kano_API carrying the V12 counts is deployed before scenario 4 runs.
+
+#### Testing Strategy: V12 refinement (checked against `web/__tests__`, `web/e2e`, `app/tests`)
+
+**Order of work (R48.4, R48.5).**
+1. From `web/`, run `npm test` (this is `vitest --run`, `package.json`) and `npx playwright test` against the pre-V12 code, and from `app/`, run `pytest`. Record every failing test with its file and name in the implementation task notes. The list is a runtime result and is not predicted here.
+2. Fix each recorded failure at its cause (code, test, fixture, or environment such as a missing `web/.env.test` value or an undeployed backend). Do not delete or skip a test to make a command pass.
+3. Make the V12 code changes, update the tests that V12 breaks (list below), add the V12 tests, and run the three commands again until each ends with every test passed and exit code 0.
+
+**Existing tests that V12 changes and must be updated, not deleted (R48.5).**
+- `web/__tests__/dashboard.test.tsx`: the `BoardSummary` fixtures gain `member_count` and `card_count`; the `href` assertions (`/boards/b1` and so on, lines 47 to 51) stay valid because the Board card stays one link; add the counts text assertions; the `next/navigation` mock (`push`, `refresh`) stays.
+- `web/__tests__/myTasksAndProfile.test.tsx`: any assertion that the task title links to the plain `/boards/<id>` changes to the Card_Deep_Link; the "Open board" assertion stays plain.
+- `web/__tests__/boardRoles.test.tsx`, `boardFeatures.test.tsx`, `boardMutations.test.tsx`, `boardSeparator.test.tsx`, `boardShell.test.tsx`, `v11RoleGating.test.tsx`: they render `<BoardView board={...} />`; `initialCardId` is optional, so they keep working. Because `BoardToolbar` now renders `DeleteBoardControl`, which calls `useRouter`, each of these files that renders an admin board needs a `vi.mock("next/navigation", ...)` with `push` (the pattern of `dashboard.test.tsx`). The `BoardDetail` fixtures need no counts after the `BoardBase` split (B25 refinement).
+- `app/tests/test_boards.py` and `test_boards_roles.py`: assertions of the exact key set of the list, create, or update response gain the two keys; monkeypatches of `board_service._new_membership` keep working because `create_board` adds no query.
+
+**Backend (pytest, file `app/tests/test_board_counts.py`, new).** Examples: creator-only Board gives 1 and 0; adding a `member`, a `manager`, and a `guest` gives 4; soft-deleting one membership gives 3; two Cards in two Columns, one soft deleted, give 1; Cards and memberships of a second Board do not count; POST gives 1 and 0; PATCH gives the current counts; GET detail has neither key. Query budget with the existing `query_counter` fixture: GET `/api/boards` for 1 Board and for 5 Boards with different numbers of Cards: equal counts, at most 4. Hypothesis (Property 76 and 77, `max_examples=100`, database reset inside the test body as in the V5 rule): random memberships (all roles, some soft deleted) and Cards (some soft deleted) over 1 to 4 Boards compared against a naive Python count. Property 78 and 79 are example-based plus one Hypothesis test each over random seeds. Tag every property test `# Feature: kano, Property <n>: <text>`.
+
+**Frontend (Vitest, new files).**
+
+| File | Content | Properties |
+|---|---|---|
+| `__tests__/v12DeepLink.test.ts` | fast-check over `resolveCardParam` inputs (absent, `""`, strings, arrays with empty first element), the My Tasks target round trip, `stripCardParam` over generated URLs with extra params and hash (idempotent) | 81 |
+| `__tests__/v12BoardPatches.test.ts` | fast-check over generated Board lists and patch sequences: deletion, rename by `updated_at`, idempotence, fixed point, `parsePatches` round trip and invalid JSON | 82 |
+| `__tests__/v12Counts.test.tsx` | fast-check over `formatCount`; `BoardList` texts for 0, 1, 2; one link per Board card; a new Board from `CreateBoardModal` shows "1 member" and "0 cards" with one POST and no GET | 83 |
+| `__tests__/v12RenameDelete.test.tsx` | gating table over four roles; rename validation (empty, spaces, 101 characters: no request); trimmed PATCH; same name: no request; failing PATCH keeps the modal and the old `h1`; delete cancel: no request; confirm: DELETE, disabled buttons, Escape ignored, `push("/")`, `sessionStorage` patch written; failing DELETE: dialog open, buttons enabled, one `handleError` call | 74 (reused), examples |
+| `__tests__/v12BoardDeepLink.test.tsx` | `BoardView` with `initialCardId` of a known Card: modal open after the first render without interaction, title of that Card, `isNew` false; unknown id: no modal, no toast; close: `history.replaceState` called once with the URL without `card`; re-render with new `columns`: no reopen; guest: read-only modal; no `fetch` beyond the modal's own GET | 80 |
+
+**Playwright (new file `web/e2e/v12Boards.spec.ts`, credentials only through `requireCredentials()`, unique Board names `V12 <scenario> <Date.now()>`).**
+1. Rename: create a Board, open it, "Rename board", enter a new name, see it in the toolbar `h1`; click "Boards" and find the new name on `/`; then go back and forward with `page.goBack()`/`page.goForward()` and still see the new name.
+2. Delete: create a Board, open it, "Delete board", confirm, expect `toHaveURL(/\/$/)`, the Board name absent; `page.goBack()` twice to the older Dashboard entry and the name is still absent.
+3. My Tasks deep link: create a Board, a Column, and a Card, assign it to the current user, open `/my-tasks`, click the title, expect `toHaveURL(/\/boards\/[^?]+\?card=/)` and the CardDetailModal (role `dialog`) with that title; close it and expect the URL without `card` and the board still shown.
+4. Counts: create a Board, see "1 member" and "0 cards" on its card; open it, add a Column and a Card, click "Boards", see "1 card".
+No `waitForTimeout`; web-first assertions only. Each scenario deletes the Board it created at the end through the UI when the scenario itself is not the delete scenario, so the shared account does not fill up (no other Board is touched, R48.3).
+
+**Ordering (R48.7).** Scenario 4 needs the V12 backend. Against a local stack it runs after the backend change is in place; against the deployed frontend it runs only after the V12 Kano_API is deployed (Part D V12 notes).
 
 ## Part D: Deployment, Guidelines, and Documentation Design
 
@@ -2873,12 +3319,71 @@ Every requirement maps to at least one design element. Part references point to 
 | 36.15 | Part D V11 notes |
 | 38.17 to 38.19 | B20 (welcome copy and forbidden list) |
 
+#### V12 additions to the Traceability Matrix (Requirements 45 to 48 and appended criteria)
+
+| Req | Title | Backend | Frontend | Tests |
+|---|---|---|---|---|
+| 45 | Board rename and delete | none (existing PATCH/DELETE `/api/boards/<id>`, A9) | B22 (`RenameBoardModal`, `DeleteBoardControl`, `BoardToolbar`, `BoardView` rename/delete wiring, `router.push("/")`) | Testing Strategy V12 additions (unit, Playwright 1 and 2) |
+| 46 | My Tasks deep link | none | B23 (`useCardDeepLink`, `MyTasksList` link target), B24 (`searchParams`, board page) | Properties 80, Playwright 3 |
+| 47 | Member and card counts | A22 (`counts.py`, `BoardSchema`, `openapi.yaml`) | B25 (`BoardSummary`, `formatCount`, `BoardList` card text) | Properties 76 to 79, Playwright 4 |
+| 48 | V12 tests and size limits | A22 (backend count tests) | B22 to B25 (file split, D25); Testing Strategy V12 additions (run-first step, R48.4) | Properties 76 to 80, all V12 tests |
+
+| Amended requirement | V12 design coverage |
+|---|---|
+| 8.13 | A22 (`BoardSchema` fields), B25 (`BoardSummary` type) |
+| 20.9, 20.10 | B25 (create flow, no new list request), D27 (Dashboard freshness) |
+| 21.29, 21.30 | B22 (toolbar controls), B23/B24 (deep-link open on first render) |
+| 25.8 | B23 (My Tasks link target, supersedes the plain per-task link) |
+| 31.26, 32.31, 33.18 | Testing Strategy V12 additions (backend, frontend, Playwright) |
+| 44.7 | A22 (states the GET `/api/boards/<id>` budget is unaffected; R44.4 scope note) |
+
+#### V12 refinement rows (design coverage after the code check)
+
+| Req | V12 refined design coverage |
+|---|---|
+| 45.1 to 45.3, 45.14 | B27 `BoardToolbar` gating with the existing `edit_board` and `delete_board` (no `roles.ts` change), Property 74, `v12RenameDelete.test.tsx` |
+| 45.4 to 45.8 | B22, B27 `RenameBoardModal`, Error Handling V12 rows, `v12RenameDelete.test.tsx`, Playwright 1 |
+| 45.9 to 45.11, 45.13 | B27 `DeleteBoardControl` (busy guard on Escape and backdrop), Error Handling V12 refinement rows, Playwright 2 |
+| 45.12 | D27 refinement, B26 (`applyBoardPatches`, `useBoardPatches`), Property 82, Playwright 1 and 2 (back and forward) |
+| 46.1, 46.2 | B23, B27 `MyTasksList`, Property 81, Playwright 3 |
+| 46.3, 46.4, 46.8 | B27 `useCardDeepLink`, `findCardById`, Property 80 (amended), `v12BoardDeepLink.test.tsx`, Open issue 72 |
+| 46.5 | B27 `resolveCardParam`, Property 81 |
+| 46.6, 46.10 | B23, B24 (existing 403/404 and 401 branches, `decideRoute` unchanged) |
+| 46.7 | D26, B27 `stripCardParam` and `replaceState`, Property 81, Playwright 3 |
+| 46.9 | D26, B24, B26, B27 (docs read: `page.md`, `use-search-params.md`, `04-linking-and-navigating.md`, `use-router.md`, `staleTimes.md`, `04-glossary.md`) |
+| 47.1 to 47.6 | A22-R (`board_counts.py`, `BoardSummarySchema`, service changes), Properties 76 to 78, `test_board_counts.py` |
+| 47.7 | A22-R (`BoardDetailSchema` unchanged), B25 refinement (`BoardBase`), Property 79 |
+| 47.8, 47.9 | A22-R (no migration, OpenAPI `BoardSummary`) |
+| 47.10 to 47.13 | B25 and its refinements, B26 (patches from server responses only), Property 83 |
+| 48.1 to 48.5 | Testing Strategy V12 refinement (order of work, tests to update, new test files, Playwright file) |
+| 48.6 | D25, B27 (file list, `BoardView` at most 298 lines) |
+| 48.7 | Part D V12 notes (deployment order) |
+| 8.13 | A22-R `BoardSummarySchema` |
+| 20.9 | B25, Property 83 |
+| 20.10 | B26, Property 82 |
+| 21.29 | B27 `BoardToolbar` |
+| 21.30 | B27 `useCardDeepLink` |
+| 25.8 | B27 `MyTasksList`, Property 81 |
+| 31.26 | Testing Strategy V12 refinement (backend) |
+| 32.31 | Testing Strategy V12 refinement (frontend table, tests to update) |
+| 33.18 | Testing Strategy V12 refinement (Playwright file) |
+| 44.7 | A22-R query budget paragraph |
+
 ### Part D: V11 notes (Requirements 34, 35, 36.15)
 
 - **Migration.** The V11 Migration_Step (hand-edited `ck_cards_status` and `ck_board_memberships_role`, the due-date index, two tables) runs on the development and test databases. Production is not deployed, so its first `flask db upgrade` applies the whole history. No new environment variable and no CORS change. The Vercel build for `web/` needs no setting; `@source "../lib"` is in `globals.css`.
 - **Verification list** gains: GET `/api/notifications/overdue`, POST and PATCH of a checklist item and a link, GET `/api/cards/<id>`, and PATCH `/api/boards/<id>/members/<user_id>` with a second account.
 - **README (R36.15).** Features list adds the Urgent status and label colors, overdue notifications, checklists, workspace links (URLs only), and the Manager role with its permissions; Local Run Steps state that V11 needs `flask db migrate` and `flask db upgrade`, with the two hand-edited check constraints; a sentence states that the role `member` no longer manages Columns. `scripts/check_readme_links.py` still applies.
 - **Guidelines.** `guidelines/backend.md` and `database.md` entries that name "admin only" or "7 tables" are reviewed at implementation time; `guidelines/design-system.md` gets any missing label or status token pair first (R39.10).
+
+### Part D: V12 notes (Requirements 34, 48.7)
+
+- **Migration.** None. V12 needs no `flask db migrate`/`upgrade` step on any database (R47.8).
+- **Deployment ordering (R48.7).** Where the E2E_Suite runs against a deployed frontend rather than a local dev server, the Kano_API carrying the V12 counts is deployed before the Dashboard-counts Playwright scenario (Testing Strategy V12 additions, scenario 4) runs against the deployed site, mirroring the existing deployment-order practice for prior versions' Playwright scenarios.
+- **README.** Not required by R48; the V12 requirements add no README criterion, so no README change is designed here.
+- **V12 refinement, deployment order.** Deploy the `kano-api` Vercel project first, check GET `/api/boards` on production returns `member_count` and `card_count` (one manual request with a test account), then deploy `kano-web`. A frontend deployed before the backend would render `undefined members`; the order prevents it, and the Playwright run against production starts only after both deployments are live.
+- **V12 refinement, environment.** No new environment variable, no CORS change (the methods PATCH and DELETE on `/api/boards/<id>` are already allowed for the board page), and no `next.config.ts` change.
+- **Verification list** gains: rename and delete a Board on production with a test account, open a Card from My Tasks, and check the Dashboard counts.
 
 ## Open issues
 
@@ -2968,3 +3473,20 @@ These are gaps or conflicts found while designing and revising. Items marked "as
 64. **Overdue index selectivity (R40.7).** A plain index on `due_date` is weakly selective for old open cards. A partial index on open, non-deleted cards is a later option; the requirement asks only for an index on the column.
 65. **Existing `7 tables` and `three roles` statements.** Several V5 and V6 passages (module-graph rule 5, test-database safety, A14 schema test, B10 `Role`, Property 55 and 56 sets) still say 7 tables or three roles. They are superseded by the V11 notes and not rewritten, as the V6 convention requires.
 66. **Pre-existing unresolved items.** Open issues 6 to 8, 10 to 13, 15, 16, 18, 20 to 26, 29 to 32, 39, 41, and 43 are not affected by V11 except issue 22, whose invite-token exposure now also applies to managers.
+
+### V12 open issues and inconsistencies between requirements V12 and this design
+
+67. **`BoardDetailSchema` inherits two fields it must then exclude (R47.7 versus D24).** Because `BoardDetailSchema(BoardSchema)` inherits every field of `BoardSchema` by default in Marshmallow, the cleanest-looking approach (just add the two fields to `BoardSchema`) would leak `member_count: null` and `card_count: null` into the detail response unless `BoardDetailSchema` explicitly excludes them. The design adds `class Meta: exclude = ("member_count", "card_count")` to `BoardDetailSchema` (A22). Alternative: define the two count fields only on a separate `BoardSummarySchema` that does not sit in `BoardDetailSchema`'s inheritance chain, and have `board_schema` in `board_service.py` become `BoardSummarySchema()`; not chosen because it renames the schema used throughout `board_service.py` (`serialize_board`, `create_board`, `update_board`) and the existing `routes/board_routes.py` imports, a larger diff than one `Meta.exclude` line for the same outcome. A backend test (A22, Testing Strategy V12) asserts the exclusion holds.
+68. **`BoardDetail extends BoardSummary` in TypeScript now implies fields the wire payload never sends (R47.7 versus B25).** `web/lib/types.ts`'s existing inheritance (`BoardDetail extends BoardSummary`) means `BoardDetail` now has `member_count`/`card_count` in its TypeScript shape even though the backend's `BoardDetailSchema` excludes them (issue 67). No code reads `boardDetail.member_count`, so this is a type-level inaccuracy, not a runtime bug. Alternative: change `BoardDetail` to extend a narrower `BoardIdentity` interface shared with `BoardSummary` instead of `BoardSummary` itself, which both `BoardSummary` and `BoardDetail` would extend; not chosen in this revision to avoid touching every file that currently relies on `BoardDetail` structurally satisfying `BoardSummary` (for example any future code passing a `BoardDetail` where a `BoardSummary` is expected). Recommendation: make this narrowing change at the next version that touches `lib/types.ts`'s Board interfaces.
+69. **PATCH `/api/boards/<id>` gains two queries with no stated budget (R47.6 versus R44.4, R44.7).** R44.7 (new in V12) clarifies that the GET `/api/boards/<id>` budget does not apply to GET `/api/boards`, but it does not say anything about PATCH `/api/boards/<id>`, which now runs its existing update queries plus `counts_for_board`'s two grouped queries. The design accepts the additional cost (A22) because R47 states no PATCH query cap and PATCH is not a high-frequency request like GET. Recommendation: if a future revision adds a query budget for every Board endpoint, state PATCH's budget explicitly.
+70. **`formatCount`'s rule duplicates `formatBadge`'s shape but is a new function (R47.11 versus existing `lib/format.ts`).** `lib/format.ts` already has one count-formatting function, `formatBadge` (notification counts, no noun, caps at "99+"). `formatCount` (B25) is deliberately a second, separate function because its rule differs (singular/plural with a noun, no cap at 99, always renders down to 0) and forcing one function to cover both shapes would add branching unrelated to either caller. Accepted as designed; not a conflict.
+
+#### V12 refinement open issues
+
+71. **Issues 67 and 68 resolved by the V12 refinement.** Issue 67: `BoardDetailSchema` is no longer touched; the counts live in the new `BoardSummarySchema` (A22-R), so no `Meta.exclude` is needed. Issue 68: `BoardDetail` and `BoardSummary` now both extend `BoardBase` (B25 refinement), so the TypeScript shape matches the wire shape.
+72. **Reading of R46.8 "no GET `/api/cards/<id>` request".** `CardDetailModal` loads `GET /api/cards/<id>` on every open since V11 (R41.9, A18), and R46.3 requires the deep-link open to behave as a click. The design reads R46.8 as "the deep link sends no request of its own to find or reopen the Card"; the modal's own load still runs once. Recommendation: at the next requirements revision, reword R46.8 to "SHALL find the Card in the GET `/api/boards/<id>` response and SHALL send no request beyond the request the CardDetailModal sends for any opened Card". No requirement text is changed now.
+73. **`sessionStorage` unavailable.** In a browser that blocks `sessionStorage`, Board_Patches cannot be stored. Push navigations still show fresh data; only a back navigation to an older Dashboard entry can show the old name or the deleted Board until a reload. Accepted; the case is rare and the data is not lost.
+74. **Counts after a back navigation.** R45.12 covers rename and delete only. After adding Cards or members, a back navigation to an older Dashboard entry shows the cached counts; the toolbar "Boards" link (push) shows fresh counts. Playwright scenario 4 uses the link. Extending Board_Patches to counts would mean counting in the browser, which R47.13 forbids. Recommendation: none needed unless the user wants back-navigation freshness for counts.
+75. **Pre-existing `BoardList` retry gap.** `BoardList` copies `initialBoards` into `useState` once. After an initial error, `router.refresh()` from `ErrorPanel` replaces `initialError` but not the `boards` state, so a successful retry can show "No boards yet" until the next navigation. Not caused by V12; if the run-first step (R48.4) or review confirms it, fix it in the same pass by resetting `boards` when `initialBoards` changes.
+76. **Playwright cleanup uses the V12 delete feature.** Scenarios 1, 3, and 4 delete their own Board at the end through the UI. If the delete feature regresses, those scenarios fail in cleanup, not in their own step. Accepted, because it keeps the shared E2E account from filling up and touches only Boards the scenario created (R48.3).
+77. **`useSearchParams` not used.** R46.9 asks to read the `useSearchParams` doc; it was read (`01-app/03-api-reference/04-functions/use-search-params.md`), and the design does not use the hook because the board page is a Server Component that receives `searchParams` as a prop and `BoardView` needs the value only once. Using the hook in `BoardView` would also be correct but would read a value the page already passes.

@@ -1,6 +1,6 @@
 # Implementation Plan: Kano
 
-**Version:** V11 (V11 adds tasks 44 to 56 for the URGENT status and label colors, the overdue notification, the card checklist, workspace links, and the Manager role, with 9 tables; V10 relaxed the screenshot set of tasks 23.4 and 23.5 to at least three images in `docs/screenshots/`; V1 to V5 tasks 1 to 22.2 preserved as history; V6 tasks added as 25 to 33; V7 narrows task 33.1; V8 frontend-only tasks added as 34 to 39; V9 footer tasks added as 40 to 43)
+**Version:** V12 (V12 adds tasks 57 to 69 for board rename and delete on the board page, the My Tasks deep link, the member and card counts on the Dashboard, and the run-first baseline with fully passing `pytest`, `npm test`, and `npx playwright test`, with no table change; V11 adds tasks 44 to 56 for the URGENT status and label colors, the overdue notification, the card checklist, workspace links, and the Manager role, with 9 tables; V10 relaxed the screenshot set of tasks 23.4 and 23.5 to at least three images in `docs/screenshots/`; V1 to V5 tasks 1 to 22.2 preserved as history; V6 tasks added as 25 to 33; V7 narrows task 33.1; V8 frontend-only tasks added as 34 to 39; V9 footer tasks added as 40 to 43)
 
 ## Overview
 
@@ -24,6 +24,8 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
 **V9 revision (requirements V9, design V9, frontend only).** V9 redesigns the shared Footer (brand group, portfolio text, GitHub and LinkedIn icon links). There is no backend task, migration, or API change. All tasks 1 to 39 stay exactly as written. The new tasks 40 to 43 are appended below task 39 and are all unchecked. Every V9 task starts by reading `guidelines/frontend.md` and `guidelines/design-system.md` (read only) and notes `web/AGENTS.md`: read the relevant Next.js docs in `web/node_modules/next/dist/docs/` before using any Next API (the Footer uses none).
 
 **V11 revision (requirements V11, design V11).** V11 adds Part G of the requirements: the fourth card status `URGENT` and deterministic label colors (R39), a compute-on-read overdue endpoint and UI (R40), the card checklist (R41), workspace links (R42), the Manager role with rank rules (R43), and the V11 schema, migration, and query budget (R44). All tasks 1 to 43 stay exactly as written (text, checkboxes, waves). The new tasks 44 to 56 are appended below task 43 and are all unchecked, in the V6 style: 44 backend models, schema, and permissions; 45 [MANUAL] V11 migration (user-owned, no agent-generated migration script, hand-edited check constraints); 46 backend features with pytest and property tests (including the updates to earlier tests that the V11 rules invalidate); 47 backend V11 checkpoint; 48 [MANUAL] design-system token check; 49 frontend libraries; 50 frontend components; 51 frontend tests; 52 Playwright updates; 53 README and documentation; 54 final checkpoint; 55 [MANUAL] browser verification; 56 [MANUAL] production schema and verification. Breaking change to keep in mind: the role `member` loses Column management (R10.11), so earlier tests and UI that let a `member` create, rename, delete, or reorder Columns are superseded by named V11 tasks. Where a V11 task changes work from an earlier task it says "Supersedes ... task X.Y; X.Y stays as history". Every V11 task reads `guidelines/backend.md` and `guidelines/database.md` (backend) or `guidelines/frontend.md` and `guidelines/design-system.md` (frontend, read only: `guidelines/` is never modified by an agent task) before generating code, keeps every file at or below 300 lines, and notes `web/AGENTS.md` (read the relevant Next.js docs in `web/node_modules/next/dist/docs/` before using any Next API). The new wave ids 86 to 115 are append-only, so they come after the pending deployment waves 67 to 79; see the V11 Notes for the deployment ordering recommendation.
+
+**V12 revision (requirements V12, design V12).** V12 adds Part H of the requirements: board rename and delete in the board toolbar for the Board_Admin (R45), the My Tasks deep link that opens the CardDetailModal (R46), `member_count` and `card_count` on the Board_Summary (R47, one small backend change, no migration), and the V12 tests and size limits (R48), plus the appended criteria 8.13, 20.9, 20.10, 21.29, 21.30, 25.8, 31.26, 32.31, 33.18, and 44.7. All tasks 1 to 56 stay exactly as written (text, checkboxes, waves). The new tasks 57 to 69 are appended below task 56 and are all unchecked, in the V11 style: 57 baseline run of `pytest`, `npm test`, and `npx playwright test` before any change (run first, record, fix); 58 backend counts (`board_counts.py`, `BoardSummarySchema`, `openapi.yaml`, pytest); 59 backend V12 checkpoint; 60 frontend libraries; 61 frontend components; 62 frontend tests; 63 Playwright; 64 full verification until every test passes; 65 README and documentation; 66 final checkpoint; 67 to 69 `[MANUAL]` deployment (API first) and browser verification. There is no migration and no V12 database task. The new wave ids 116 to 142 are append-only, so they come after the V11 waves; see the V12 Notes. Every V12 task reads `guidelines/backend.md` and `guidelines/database.md` (backend) or `guidelines/frontend.md` and `guidelines/design-system.md` (frontend, read only: `guidelines/` is never modified by an agent task) before generating code, keeps every file at or below 300 lines, and notes `web/AGENTS.md` (read the relevant Next.js docs in `web/node_modules/next/dist/docs/` before using any Next API). Where a V12 task changes work from an earlier task it says "Supersedes ... task X.Y; X.Y stays as history".
 
 ## Tasks
 
@@ -2139,6 +2141,361 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
   - _Requirements: 34.3, 34.5, 34.6, 44.1_
   - _Design: Part D (V11 notes), Open issue 66_
 
+- [ ] 57. Phase 32 (V12): Baseline run before any change (run first, record, fix)
+  - [ ] 57.1 [MANUAL] Prepare the local stack and the E2E environment for the baseline
+    - NOT executed by the agent. Start PostgreSQL with the development and test databases (task 4.3), then follow the README Local Run Steps: from `app/` with the venv active run `flask run`, and from `web/` run `npm run dev`; confirm `web/.env.test` holds `E2E_USER_EMAIL`, `E2E_USER_PASSWORD` (the E2E account of task 33.4) and `E2E_BASE_URL` (for example `http://localhost:3000`; `web/playwright.config.ts` loads `.env.test` and throws when `E2E_BASE_URL` is missing or not an absolute http or https URL), and that the E2E account exists in the development database; run `npx playwright install` once from `web/`
+    - The baseline must run against the code as it is before V12 (the V11 state), so do not change any file before tasks 57.2 and 57.3 have run
+    - _Requirements: 48.4, 33.8, 33.4_
+    - _Design: Testing Strategy V12 refinement (order of work, step 1)_
+    - Depends on: 54
+
+  - [ ] 57.2 Run the `pytest` and `npm test` baselines and record every failure
+    - Read `guidelines/backend.md` and `guidelines/frontend.md` first; note `web/AGENTS.md`
+    - Change no code and no test. From `app/` with the venv active run `pytest`; from `web/` run `npm test` (this is `vitest --run`). Create `docs/v12-baseline.md` with one section per command: the exact command, the date, the count of passed and failed tests, and for each failing test its file and test name, the first error line, and the cause class (V11 leftover, environment such as a missing `.env` value or database, or flaky). An all-green run is recorded as "no failures". The failures are a runtime result and are not predicted here (Requirement 48 criterion 4)
+    - _Requirements: 48.4, 31.8, 32.10_
+    - _Design: Testing Strategy V12 additions (run-first step), Testing Strategy V12 refinement (order of work)_
+    - Depends on: 57.1
+
+  - [ ] 57.3 Run the `npx playwright test` baseline and record every failure
+    - Read `guidelines/frontend.md` first; note `web/AGENTS.md`
+    - Change no code and no test. From `web/` with the stack of 57.1 running and `E2E_BASE_URL` set run `npx playwright test` (the config has two projects, `desktop` and `mobile`, and 2 retries; a test that passes only on a retry is recorded as flaky); append a `npx playwright test` section to `docs/v12-baseline.md` in the same format as 57.2. If the run cannot start because a server or a variable is missing, record that and repeat it after the user fixes the stack; do not skip the run
+    - _Requirements: 48.4, 33.8, 33.10_
+    - _Design: Testing Strategy V12 additions (run-first step), Testing Strategy V12 refinement (order of work)_
+    - Depends on: 57.2
+
+  - [ ] 57.4 Fix the recorded failures that V12 does not cause
+    - Read `guidelines/backend.md`, `guidelines/database.md`, `guidelines/frontend.md`, and `guidelines/design-system.md` first (read only); note `web/AGENTS.md`
+    - For each failure in `docs/v12-baseline.md` fix the cause (code, test, fixture, or environment) and note the fix next to the entry; never delete a test, skip a test, or weaken an assertion to make a command pass (Requirement 48 criterion 5). Failures that only the V12 changes will remove or change (the My Tasks link target and the Board card layout) are left to tasks 62.1 to 62.3 and are noted as such. Re-run the failing tests to confirm each fix
+    - _Requirements: 48.4, 48.5, 32.10, 33.8, 31.8_
+    - _Design: Testing Strategy V12 refinement (order of work, step 2)_
+    - Depends on: 57.3
+
+- [ ] 58. Phase 33 (V12): Backend counts (no migration)
+  - [ ] 58.1 Add the counts helper `board_counts.py`
+    - Read `guidelines/backend.md` and `guidelines/database.md` first
+    - `app/blueprints/boards/service/board_counts.py` exactly as design A22-R: `_grouped(model, board_ids)` runs one grouped `select(model.board_id, func.count())` with `active(model)`; `board_counts(board_ids)` returns `{board_id: (member_count, card_count)}` with two grouped queries for any number of ids and none for `[]`; `board_counts_one(board_id)`. Import `BoardMembership` from `boards/schema` and `Card` from `cards/schema` (models only through another package's `schema`). Do not name the module `counts.py` or a function `counts_for_board`: `board_service.py` already imports `counts_for_board` from `cards/service/counts.py`
+    - No model, column, constraint, or index change and no migration file (Requirement 47 criterion 8)
+    - _Requirements: 47.2, 47.3, 47.4, 47.8, 1.4, 30.6_
+    - _Design: A22-R (module `board_counts.py`), D24_
+    - Depends on: 57.4
+
+  - [ ] 58.2 Add `BoardSummarySchema` and the count values to list, create, and update
+    - Read `guidelines/backend.md` and `guidelines/database.md` first
+    - `board_schemas.py`: `BoardSummarySchema(BoardSchema)` with `member_count` and `card_count` integers; export it from `schema/__init__.py`; `BoardSchema` and `BoardDetailSchema` stay unchanged so GET `/api/boards/<id>` keeps its keys. `board_service.py`: `serialize_board(board, role, counts)`; `list_boards` calls `board_counts` once for all ids; `create_board` passes the literals `(1, 0)`; `update_board` calls `board_counts_one` after the commit. `board_routes.py` is unchanged. GET `/api/boards` runs at most 4 queries including the JWT user lookup
+    - _Requirements: 47.1, 47.4, 47.5, 47.6, 47.7, 8.13, 44.7, 29.2_
+    - _Design: A22-R (schema, service, query budget), D24_
+    - Depends on: 58.1
+
+  - [ ] 58.3 Document `member_count` and `card_count` in `app/openapi.yaml`
+    - Read `guidelines/backend.md` first
+    - New component `BoardSummary` (`allOf: [Board, {member_count: integer >= 0, card_count: integer >= 0, both required}]`) with the descriptions of Requirement 47 criteria 2 and 3; point the GET `/api/boards` array items and the data of `BoardEnvelope` (used by POST and PATCH `/api/boards`) at `BoardSummary`; `Board` and `BoardDetail` stay unchanged
+    - _Requirements: 47.9, 8.13_
+    - _Design: A22-R (OpenAPI)_
+    - Depends on: 58.2
+
+  - [ ] 58.4 Update the existing board tests that V12 changes
+    - Read `guidelines/backend.md` and `guidelines/database.md` first
+    - In `app/tests/test_boards.py` and `app/tests/test_boards_roles.py` extend every assertion of the exact key set of the list, create, or update response with `member_count` and `card_count`; check that the monkeypatches of `board_service._new_membership` still work; `test_board_detail.py` keeps its key set and its 5-query budget unchanged. Never delete or weaken an assertion
+    - Supersedes the key-set assertions of tasks 8.1 and 8.2 for the list, create, and update responses; those stay as history
+    - _Requirements: 8.13, 47.1, 47.7, 48.1, 31.26_
+    - _Design: Testing Strategy V12 refinement (existing tests, backend)_
+    - Depends on: 58.2, 5.1
+
+  - [ ] 58.5 Write `app/tests/test_board_counts.py`
+    - Read `guidelines/backend.md` and `guidelines/database.md` first
+    - Examples: a Board with only its creator gives 1 and 0; adding a `member`, a `manager`, and a `guest` gives 4; soft-deleting one membership gives 3; two Cards in two Columns of which one is soft deleted give 1; the Cards and memberships of a second Board are not counted; POST `/api/boards` returns 1 and 0; PATCH returns the current counts after members and Cards exist; GET `/api/boards/<id>` contains neither key
+    - _Requirements: 47.2, 47.3, 47.5, 47.6, 47.7, 48.1, 31.26_
+    - _Design: Testing Strategy V12 refinement (backend, `test_board_counts.py`)_
+    - Depends on: 58.2, 5.1
+
+  - [ ] 58.6 Write the query budget test and the property test for Property 77
+    - Read `guidelines/backend.md` and `guidelines/database.md` first
+    - File `app/tests/test_board_counts_budget.py`: with the existing `query_counter` fixture, GET `/api/boards` for 1 Board and for 5 Boards with different numbers of Cards and members runs at most 4 queries and the same number in both cases; a User with 0 Boards is not compared (2 queries, design A22-R)
+    - Property test (Hypothesis, `max_examples=100`, database reset inside the test body): **Property 77: Board list query count is constant** over 0 to 20 Boards with random memberships and Cards. Tag `# Feature: kano, Property 77: Board list query count is constant`
+    - **Validates: Requirements 47.4**
+    - _Requirements: 47.4, 48.1, 44.7, 31.26_
+    - _Design: Correctness Property 77, A22-R (query budget)_
+    - Depends on: 58.5
+
+  - [ ] 58.7 Write the property tests for Properties 76, 78, and 79
+    - Read `guidelines/backend.md` and `guidelines/database.md` first
+    - File `app/tests/test_board_counts_properties.py`, Hypothesis with `max_examples=100` and the database reset inside the test body: **Property 76: Board counts equal a naive model** (random memberships of all roles, some soft deleted, and Cards, some soft deleted, over 1 to 4 Boards compared with a naive Python count through `board_counts` and GET `/api/boards`); **Property 78: Create and update carry the right counts**; **Property 79: Board detail never carries the counts** (one Hypothesis test each over random seeds). Property 76 and 78 name `counts_for_boards` in the design text; this task tests `board_counts` and `board_counts_one` (design A22-R). Tag every test `# Feature: kano, Property <n>: <text>`
+    - **Validates: Requirements 47.2, 47.3, 47.5, 47.6, 47.7**
+    - _Requirements: 47.2, 47.3, 47.5, 47.6, 47.7, 48.1, 31.26_
+    - _Design: Correctness Properties 76, 78, 79_
+    - Depends on: 58.5
+
+- [ ] 59. V12 backend checkpoint
+  - Run `pytest -v` from `app/`; run `scripts/check_file_size.py` over `app/` and `scripts/check_repo_hygiene.py`; confirm that no backend file is over 300 lines and that `git status` shows no new file under `app/migrations/`
+  - Ensure all tests pass, ask the user if questions arise
+  - Frontend V12 tasks (60 onward) depend on this checkpoint
+  - Depends on: 58.3, 58.4, 58.6, 58.7
+  - _Requirements: 31.8, 30.6, 47.8, 48.1_
+
+- [ ] 60. Phase 34 (V12): Frontend libraries and hooks
+  - [ ] 60.1 Update the Board types in `web/lib/types.ts`
+    - Read `guidelines/frontend.md` and `guidelines/design-system.md` first (read only); note `web/AGENTS.md`
+    - New `BoardBase` (`board_id`, `name`, `my_role`, `created_at`, `updated_at?`); `BoardSummary extends BoardBase` adds `member_count: number` and `card_count: number`; `BoardDetail extends BoardBase` adds `columns` and no longer extends `BoardSummary`. Fix every compile error in `web/` that the split causes (the design found `BoardDetail` only in the board page, `BoardView`, and tests); run `npx tsc --noEmit` from `web/`
+    - Supersedes the `BoardDetail extends BoardSummary` shape of earlier tasks; those stay as history
+    - _Requirements: 47.10, 47.7_
+    - _Design: B25 (V12 refinement, types), Open issues 68 and 71_
+    - Depends on: 59
+
+  - [ ] 60.2 Add `formatCount` to `web/lib/format.ts`
+    - Read `guidelines/frontend.md` first; note `web/AGENTS.md`
+    - `formatCount(n: number, noun: string): string` returns `${n} ${noun}` for exactly 1 and `${n} ${noun}s` for every other non-negative integer (0 included); `formatBadge` stays unchanged (Open issue 70)
+    - _Requirements: 47.11_
+    - _Design: B25, Correctness Property 83, Open issue 70_
+    - Depends on: 59
+
+  - [ ] 60.3 Create `web/lib/deepLink.ts`
+    - Read `guidelines/frontend.md` first; note `web/AGENTS.md`
+    - Pure functions as design B27: `resolveCardParam(raw: string | string[] | undefined): string | null` (first array element, `""` becomes `null`, so `?card=&card=c1` gives `null`); `findCardById(columns, id): BoardCard | null` (only Cards in the payload); `stripCardParam(href): string` (`new URL`, `URLSearchParams.delete("card")`, returns pathname plus the remaining search plus the hash, idempotent)
+    - _Requirements: 46.1, 46.4, 46.5, 46.7_
+    - _Design: B27 (`lib/deepLink.ts`), Correctness Property 81_
+    - Depends on: 60.1
+
+  - [ ] 60.4 Create `web/lib/boardPatches.ts`
+    - Read `guidelines/frontend.md` first; note `web/AGENTS.md`
+    - Pure module as design B26: `BoardPatches`, `EMPTY_PATCHES`, `BOARD_PATCHES_KEY = "kano_board_patches"`, `parsePatches(raw)` (invalid or missing JSON gives `EMPTY_PATCHES`), `withRename`, `withDelete` (also drops a rename of that id), and `applyBoardPatches(boards, patches)` (keeps the order, removes deleted ids, applies a rename only when the listed `updated_at` is missing or older than the patch's, keeps `member_count` and `card_count` unchanged); no counting in the browser
+    - _Requirements: 45.12, 20.10, 47.13_
+    - _Design: B26 (`lib/boardPatches.ts`), Correctness Property 82_
+    - Depends on: 60.1
+
+  - [ ] 60.5 Create `web/hooks/useBoardPatches.ts`
+    - Read `guidelines/frontend.md` first; note `web/AGENTS.md` and read the React and Next docs it points to before using `useSyncExternalStore` with `sessionStorage`
+    - `useBoardPatches(): BoardPatches` reads `sessionStorage[BOARD_PATCHES_KEY]` through `useSyncExternalStore` (subscribe to `storage` events and to an in-tab event; server snapshot `null`); writers `recordRename(id, name, updatedAt)` and `recordDelete(id)` in the same file read, update with `withRename` or `withDelete`, write back, and dispatch the in-tab event; a `sessionStorage` failure is caught and ignored
+    - _Requirements: 45.12, 20.10_
+    - _Design: B26 (`hooks/useBoardPatches.ts`), Error Handling V12 refinement rows, Open issue 73_
+    - Depends on: 60.4
+
+  - [ ] 60.6 Create `web/hooks/useCardDeepLink.ts`
+    - Read `guidelines/frontend.md` first; note `web/AGENTS.md`
+    - As design B27: `useCardDeepLink(initialCardId, columns, open)` with a `handled` ref (at most one open per page load, also under React StrictMode) and an `openedId` ref; the effect uses the complete dependency array; it calls `open(card)` only when `findCardById` finds the Card; returns `{ onModalClose }`, which does nothing for a Card that a click opened and otherwise calls `window.history.replaceState(window.history.state, "", stripCardParam(window.location.href))`; no `GET /api/cards/<id>` request of its own
+    - _Requirements: 46.3, 46.4, 46.7, 46.8_
+    - _Design: B27 (`hooks/useCardDeepLink.ts`), Correctness Property 80, Open issue 72_
+    - Depends on: 60.3
+
+- [ ] 61. Phase 35 (V12): Frontend components
+  - [ ] 61.1 Create `RenameBoardModal.tsx`
+    - Read `guidelines/frontend.md` and `guidelines/design-system.md` first (read only); note `web/AGENTS.md`
+    - `web/components/boards/RenameBoardModal.tsx`, one component, as design B27: props `open`, `boardId`, `currentName`, `onClose`, `onRenamed(board)`; `BaseModal` with one input (id `rename-board-input`, label "Board name") re-filled with `currentName` on every open; `validateBoardName` field-level error with the text retained and no request for an empty, whitespace-only, or 101-character name; a trimmed name equal to the current name closes with no request; otherwise PATCH `/api/boards/<id>` with the trimmed name, on 200 `onRenamed(updated)`, `showSuccess("Board renamed.")`, close; on failure keep the modal open with the text and call `handleError`; Submit and Cancel disabled while busy; model it on `CreateBoardModal.tsx` (unchanged)
+    - _Requirements: 45.4, 45.5, 45.6, 45.7, 45.8, 48.6_
+    - _Design: B22, B27 (`RenameBoardModal.tsx`), D25_
+    - Depends on: 60.1
+
+  - [ ] 61.2 Create `DeleteBoardControl.tsx`
+    - Read `guidelines/frontend.md` and `guidelines/design-system.md` first (read only); note `web/AGENTS.md` and read the `useRouter` page in `web/node_modules/next/dist/docs/` before using `push`
+    - `web/components/boards/DeleteBoardControl.tsx`, one component, as design B27: a destructive `BaseButton` "Delete board" opens the existing `ConfirmDialog` (unchanged) with the message `Delete "<name>"? Its columns, cards, and comments are deleted with it.`; cancel closes with no request; confirm sets `busy`, sends DELETE `/api/boards/<id>`, on 200 calls `recordDelete`, `showSuccess("Board deleted.")`, and `router.push("/")`; on failure clears `busy`, keeps the dialog open, and calls `handleError`; `onCancel` is ignored while `busy` so Escape and a backdrop click do nothing during the request
+    - _Requirements: 45.9, 45.10, 45.11, 45.13, 48.6_
+    - _Design: B22, B27 (`DeleteBoardControl.tsx`), Error Handling V12 refinement rows_
+    - Depends on: 60.5
+
+  - [ ] 61.3 Wire rename and delete into `BoardToolbar.tsx`
+    - Read `guidelines/frontend.md` and `guidelines/design-system.md` first (read only); note `web/AGENTS.md`
+    - `BoardToolbar` keeps `displayName` state initialized from `boardName` and `renameOpen`; the `h1` shows `displayName`; a secondary `BaseButton` "Rename board" renders when `can(role, "edit_board")` and `DeleteBoardControl` renders when `can(role, "delete_board")` (only the admin; no change to `lib/roles.ts`, no new action name); `onRenamed(board)` sets `displayName` and calls `recordRename(board.board_id, board.name, board.updated_at)`; no new prop is needed
+    - _Requirements: 45.1, 45.2, 45.3, 45.6, 45.14, 21.29, 48.6_
+    - _Design: B27 (`BoardToolbar.tsx`), B22, B16 (gating table)_
+    - Depends on: 61.1, 61.2
+
+  - [ ] 61.4 Wire the deep link into `BoardView.tsx` (stays at most 298 lines)
+    - Read `guidelines/frontend.md` first; note `web/AGENTS.md`
+    - New optional prop `initialCardId?: string | null` (default `null`, so existing tests that render `<BoardView board={...} />` still compile); one `openCard` callback replaces the two repeated `setSelectedCard(toBoardCard(card)); setSelectedCardIsNew(false);` blocks (search results and Kanban columns); `const { onModalClose } = useCardDeepLink(initialCardId ?? null, columns, openCard)`; the modal's `onClose` also calls `onModalClose(selectedCard.card_id)`. No rename or delete code is added to `BoardView`; confirm with `scripts/check_file_size.py` that the file has at most 298 lines
+    - _Requirements: 46.3, 46.4, 46.7, 46.8, 21.30, 48.6, 30.6_
+    - _Design: B27 (`BoardView.tsx`), D25_
+    - Depends on: 60.6
+
+  - [ ] 61.5 Read `searchParams` in the board page
+    - Read `guidelines/frontend.md` first; note `web/AGENTS.md` and read `web/node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/page.md` (`searchParams` Promise), `01-app/03-api-reference/04-functions/use-search-params.md`, and `01-app/01-getting-started/04-linking-and-navigating.md` before editing
+    - `web/app/(boards)/boards/[id]/page.tsx`: add `searchParams: Promise<{ [key: string]: string | string[] | undefined }>`, `await` it, `resolveCardParam((await searchParams).card)`, and pass `initialCardId` to `BoardView`; the 403 and 404 branch (`BoardAccessMessage`) and the 401 redirect to `/login?expired=1` stay unchanged; `decideRoute`, `proxy.ts`, and the `next` rule are not touched
+    - _Requirements: 46.3, 46.5, 46.6, 46.9, 46.10, 21.30_
+    - _Design: B24, B27 (board page), D26_
+    - Depends on: 60.3, 61.4
+
+  - [ ] 61.6 Link the My Tasks title to the Card_Deep_Link
+    - Read `guidelines/frontend.md` first; note `web/AGENTS.md`
+    - `web/components/cards/MyTasksList.tsx`: the task title `href` becomes `` `/boards/${card.board_id}?card=${encodeURIComponent(card.card_id)}` ``; the group "Open board" link keeps `/boards/<board_id>` with no query
+    - Supersedes the plain per-task board link of task 18.10 and the Requirement 25 criterion 2 target; those stay as history
+    - _Requirements: 46.1, 46.2, 25.8_
+    - _Design: B23, B27 (`MyTasksList.tsx`)_
+    - Depends on: 60.3
+
+  - [ ] 61.7 Show the counts on the Board cards and merge the Board_Patches
+    - Read `guidelines/frontend.md` and `guidelines/design-system.md` first (read only); note `web/AGENTS.md`
+    - `web/components/boards/BoardList.tsx`: `const shown = applyBoardPatches(boards, useBoardPatches())`, and the list and the empty state render from `shown`; inside the existing single `<Link>` add `<p className="mt-1 text-xs text-ink-muted">` with two `<span>` texts `formatCount(board.member_count, "member")` and `formatCount(board.card_count, "card")` separated by an `aria-hidden` dot; no counting in the browser; `CreateBoardModal.tsx` is unchanged (its POST response already carries 1 and 0). The pre-existing `initialBoards` copy gap (Open issue 75) is fixed here only when task 57.2 or 57.3 recorded it as a failure
+    - _Requirements: 47.11, 47.12, 47.13, 45.12, 20.9, 20.10_
+    - _Design: B25 (Board card text, create flow), B26 (`BoardList.tsx`), Open issue 75_
+    - Depends on: 60.2, 60.5
+
+  - [ ] 61.8 Update the frontend repository-rule tests for the V12 files
+    - Read `guidelines/frontend.md` first; note `web/AGENTS.md`
+    - Extend `web/__tests__/repo-rules.test.ts`: one component per file for `RenameBoardModal` and `DeleteBoardControl`, one hook per file for `useCardDeepLink` and `useBoardPatches`; no native `<button` outside `BaseButton`; no `dangerouslySetInnerHTML`; `scripts/check_file_size.py` over `web/` (300 lines, `BoardView.tsx` at most 298); split any failing file
+    - Supersedes the file lists of tasks 30.11, 37.9, 40.6, and 50.11; those stay as history
+    - _Requirements: 48.6, 28.9, 30.6, 30.7_
+    - _Design: B27 (files), D25_
+    - Depends on: 61.1, 61.2, 61.3, 61.4, 61.5, 61.6, 61.7
+
+- [ ] 62. Phase 36 (V12): Frontend tests
+  - [ ] 62.1 Update the dashboard tests for the counts
+    - Read `guidelines/frontend.md` first
+    - `web/__tests__/dashboard.test.tsx`: the `BoardSummary` fixtures gain `member_count` and `card_count`; keep the `href` assertions (the Board card stays one link) and the `next/navigation` mock; add count text assertions for the fixtures
+    - _Requirements: 48.2, 48.5, 32.31, 47.11_
+    - _Design: Testing Strategy V12 refinement (existing tests, `dashboard.test.tsx`)_
+    - Depends on: 61.7
+
+  - [ ] 62.2 Update the My Tasks tests for the link targets
+    - Read `guidelines/frontend.md` first
+    - `web/__tests__/myTasksAndProfile.test.tsx`: the task title `href` assertion becomes `/boards/<board_id>?card=<card_id>`; the "Open board" assertion stays `/boards/<board_id>` with no query
+    - Supersedes the plain-link assertion of task 18.10 and its RTL test; those stay as history
+    - _Requirements: 46.1, 46.2, 48.2, 48.5, 32.31, 25.8_
+    - _Design: Testing Strategy V12 refinement (existing tests, `myTasksAndProfile.test.tsx`)_
+    - Depends on: 61.6
+
+  - [ ] 62.3 Add the `next/navigation` mock to the BoardView tests
+    - Read `guidelines/frontend.md` first
+    - `BoardToolbar` now renders `DeleteBoardControl`, which calls `useRouter`: in `boardRoles.test.tsx`, `boardFeatures.test.tsx`, `boardMutations.test.tsx`, `boardSeparator.test.tsx`, `boardShell.test.tsx`, and `v11RoleGating.test.tsx` add `vi.mock("next/navigation", ...)` with `push` and `refresh` (the pattern of `dashboard.test.tsx`) where the file renders an admin board; run `npm test` and fix every failure caused by V12 without weakening or deleting an assertion
+    - _Requirements: 48.2, 48.5, 32.31, 32.10_
+    - _Design: Testing Strategy V12 refinement (existing tests, BoardView files)_
+    - Depends on: 61.3, 61.4
+
+  - [ ] 62.4 Write `v12DeepLink.test.ts`
+    - Read `guidelines/frontend.md` first
+    - fast-check over `resolveCardParam` inputs (absent, `""`, strings, arrays with an empty first element), the My Tasks target round trip, and `stripCardParam` over generated URLs with extra parameters and a hash (same path, same other parameters in order, same hash, idempotent)
+    - Property test: **Property 81: Deep-link parameter parsing and URL rebuild**
+    - **Validates: Requirements 46.1, 46.5, 46.7**
+    - _Requirements: 46.1, 46.5, 46.7, 48.2, 32.31_
+    - _Design: Correctness Property 81, Testing Strategy V12 refinement (frontend files)_
+    - Depends on: 60.3, 61.6
+
+  - [ ] 62.5 Write `v12BoardPatches.test.ts`
+    - Read `guidelines/frontend.md` first
+    - fast-check over generated Board lists and patch sequences: deletion removes the id and keeps the order, a rename applies by `updated_at`, other fields including the counts stay unchanged, applying twice equals applying once, a list that already reflects the patches is unchanged, `parsePatches(JSON.stringify(p))` equals `p`, and invalid JSON gives the empty patches
+    - Property test: **Property 82: Board patches merge**
+    - **Validates: Requirements 45.12, 20.10, 47.13**
+    - _Requirements: 45.12, 20.10, 47.13, 48.2, 32.31_
+    - _Design: Correctness Property 82, Testing Strategy V12 refinement (frontend files)_
+    - Depends on: 60.4
+
+  - [ ] 62.6 Write `v12Counts.test.tsx`
+    - Read `guidelines/frontend.md` first
+    - fast-check over `formatCount`; `BoardList` shows "0 members", "1 member", "2 members" and "0 cards", "1 card", "2 cards"; one link per Board card; a Board from `CreateBoardModal` shows "1 member" and "0 cards" with one POST and no GET; the displayed counts come only from the Board_Summary fields
+    - Property test: **Property 83: Count text**
+    - **Validates: Requirements 47.11, 47.13, 20.9**
+    - _Requirements: 47.11, 47.12, 47.13, 20.9, 48.2, 32.31_
+    - _Design: Correctness Property 83, Testing Strategy V12 refinement (frontend files)_
+    - Depends on: 60.2, 61.7
+
+  - [ ] 62.7 Write `v12RenameDelete.test.tsx`
+    - Read `guidelines/frontend.md` first
+    - Gating table over `admin`, `manager`, `member`, and `guest` (controls only for the admin); rename validation (empty, spaces, 101 characters: field error, no request, text retained); trimmed PATCH; the same name closes with no request; a failing PATCH keeps the modal and the old `h1` and calls `handleError` once; delete cancel sends no request; confirm sends DELETE, disables the buttons, ignores Escape, writes the `sessionStorage` patch, and calls `push("/")`; a failing DELETE keeps the dialog open with enabled buttons and one error toast
+    - Property test: **Property 74: Frontend `can` and role controls** (reused for the `edit_board` and `delete_board` gating)
+    - **Validates: Requirements 45.1, 45.2, 45.3**
+    - _Requirements: 45.1 to 45.14, 48.2, 32.31_
+    - _Design: Testing Strategy V12 refinement (frontend files), Correctness Property 74_
+    - Depends on: 61.3, 61.4
+
+  - [ ] 62.8 Write `v12BoardDeepLink.test.tsx`
+    - Read `guidelines/frontend.md` first
+    - `BoardView` with `initialCardId` of a known Card: the modal is open after the first render without interaction, shows that Card's title, and `isNew` is false; an unknown id opens nothing and shows no toast; closing calls `history.replaceState` once with the URL without `card`; a re-render with new `columns` does not reopen; a guest sees the read-only modal; no `fetch` beyond the modal's own GET `/api/cards/<id>`; an Escape or close of a click-opened Card leaves the URL alone; the first of two `card` values opens that Card (through `resolveCardParam` and, where the existing page tests allow it, by awaiting the board page with `searchParams` `{ card: ["c1", "c2"] }`)
+    - Property test: **Property 80: Deep-link resolution and the open-once rule**
+    - **Validates: Requirements 46.3, 46.4, 46.5, 46.8**
+    - _Requirements: 46.3, 46.4, 46.5, 46.7, 46.8, 48.2, 32.31_
+    - _Design: Correctness Property 80, Testing Strategy V12 refinement (frontend files)_
+    - Depends on: 61.4, 60.6
+
+- [ ] 63. Phase 37 (V12): Playwright
+  - [ ] 63.1 Create `web/e2e/v12Boards.spec.ts` with the rename and delete scenarios
+    - Read `guidelines/frontend.md` first; note `web/AGENTS.md`; model the spec on `web/e2e/kanban.spec.ts`
+    - Credentials only through `requireCredentials()` of `web/e2e/support/credentials.ts`, no literal e-mail or password, no `waitForTimeout`, web-first assertions only; each scenario creates its own Board named `V12 <scenario> <Date.now()>` and touches no other Board. Scenario 1 (rename): create a Board, open it, "Rename board", enter a new name, see it in the toolbar `h1`, click "Boards" and find the new name on `/`, then `page.goBack()` and `page.goForward()` and still see it; delete the Board at the end through the UI. Scenario 2 (delete): create a Board, open it, "Delete board", confirm, expect `toHaveURL(/\/$/)` and the name absent from the Dashboard, then `page.goBack()` twice and the name is still absent
+    - _Requirements: 48.3, 33.18, 33.6, 33.10, 45.6, 45.11, 45.12_
+    - _Design: Testing Strategy V12 refinement (Playwright, scenarios 1 and 2), Open issue 76_
+    - Depends on: 61.3, 61.7, 31.1
+
+  - [ ] 63.2 Add the My Tasks deep link scenario
+    - Read `guidelines/frontend.md` first
+    - Scenario 3 in `web/e2e/v12Boards.spec.ts`: create a Board, a Column, and a Card, assign the Card to the current user, open `/my-tasks`, click the task title, expect `toHaveURL(/\/boards\/[^?]+\?card=/)` and the CardDetailModal (role `dialog`) showing that title; close it and expect the URL without `card` with the board still shown; delete the Board at the end through the UI
+    - _Requirements: 48.3, 33.18, 46.1, 46.3, 46.7_
+    - _Design: Testing Strategy V12 refinement (Playwright, scenario 3), Open issue 76_
+    - Depends on: 61.5, 61.6, 63.1
+
+  - [ ] 63.3 Add the Dashboard counts scenario
+    - Read `guidelines/frontend.md` first
+    - Scenario 4 in `web/e2e/v12Boards.spec.ts`: create a Board and see "1 member" and "0 cards" on its Dashboard card; open it, add a Column and a Card, click "Boards" (a push navigation, Open issue 74), and see "1 card"; delete the Board at the end through the UI. This scenario needs the V12 backend; against a deployed frontend it runs only after task 67
+    - _Requirements: 48.3, 48.7, 33.18, 47.5, 47.11, 47.12_
+    - _Design: Testing Strategy V12 refinement (Playwright, scenario 4, ordering), Open issues 74 and 76_
+    - Depends on: 58.2, 61.7, 63.2
+
+  - [ ] 63.4 Extend the no-literal-credentials check over the V12 spec
+    - Read `guidelines/frontend.md` first
+    - Confirm the scan of `web/e2e/` (task 31.9, Property 58, extended by task 52.4) covers `v12Boards.spec.ts` and fails on a literal e-mail address or a literal password passed to a fill; add a case that lists `v12Boards.spec.ts` and asserts it imports `requireCredentials`
+    - Supersedes the file lists of tasks 31.9, 37.7, and 52.4; those stay as history
+    - **Validates: Requirements 33.10, 33.12**
+    - _Requirements: 33.6, 33.10, 33.12, 33.18_
+    - _Design: Correctness Property 58_
+    - Depends on: 63.3
+
+- [ ] 64. Phase 38 (V12): Full verification until every test passes
+  - [ ] 64.1 Run `pytest`, `npm test`, `npm run build`, and the repository checks until all pass
+    - Read `guidelines/backend.md` and `guidelines/frontend.md` first; note `web/AGENTS.md`
+    - From `app/` run `pytest -v`; from `web/` run `npm test` and `npm run build` (`next build --webpack`, which also type-checks); from the repository root run `scripts/check_file_size.py` over `app/` and `web/`, `scripts/check_repo_hygiene.py`, and `scripts/check_readme_links.py`. Every failure is fixed at its cause, including the failures recorded in `docs/v12-baseline.md`; a test is never deleted, skipped (`skip`, `xfail`, `.only`), or weakened to make a command pass. Repeat until each command ends with zero failures and exit code 0, and note the final counts in `docs/v12-baseline.md` (section "After V12")
+    - _Requirements: 48.4, 48.5, 32.10, 31.8, 30.6, 35.1_
+    - _Design: Testing Strategy V12 refinement (order of work, step 3)_
+    - Depends on: 59, 61.8, 62.1, 62.2, 62.3, 62.4, 62.5, 62.6, 62.7, 62.8, 63.4
+
+  - [ ] 64.2 [MANUAL] Restart the local API and the web app with the V12 code
+    - NOT executed by the agent. Stop the running `flask run` and `npm run dev`, then start `flask run` from `app/` and `npm run dev` from `web/` again so both run the V12 code (the counts scenario needs the V12 backend); keep the database and `E2E_BASE_URL` as in task 57.1. There is no `flask db upgrade` in V12
+    - _Requirements: 48.4, 48.7, 33.8_
+    - _Design: Testing Strategy V12 refinement (Ordering), Part D (V12 notes)_
+    - Depends on: 64.1
+
+  - [ ] 64.3 Run `npx playwright test` until every test passes
+    - Read `guidelines/frontend.md` first; note `web/AGENTS.md`
+    - From `web/` with the stack of 64.2 running and `E2E_BASE_URL` set run `npx playwright test` (both projects, `desktop` and `mobile`). Every failure is fixed at its cause (code, selector, fixture, or environment); a test is never deleted, skipped, or given more retries to pass. Repeat until the command ends with every test passed and exit code 0, with no test that passes only on a retry, and append the final counts to `docs/v12-baseline.md` (section "After V12")
+    - _Requirements: 48.4, 48.5, 33.8, 33.10, 33.18_
+    - _Design: Testing Strategy V12 refinement (order of work, step 3)_
+    - Depends on: 64.2
+
+- [ ] 65. Phase 39 (V12): README and documentation
+  - [ ] 65.1 Update `README.md` for V12
+    - Read `guidelines/frontend.md` first; keep the look described in words only and name no example HTML file (Requirement 36.14)
+    - Features list: the Board management entry says that a board is renamed and deleted from the board toolbar by its admin; the My Tasks entry says that a task title opens that Card on its board; the Board management or Dashboard entry says that each Board card shows its member count and card count. Test Steps keep `pytest -v`, `npm test`, and `npx playwright test` and state that the Dashboard counts scenario needs the V12 API; add no migration step (V12 has none); do not remove the owner's TODO placeholders of task 23.3; run `scripts/check_readme_links.py`
+    - The design says that the V12 requirements add no README criterion (Part D V12 notes); this task keeps the README accurate, is a documentation-only change, and is listed as a gap in the V12 Notes
+    - _Requirements: 36.12, 36.14, 35.1_
+    - _Design: Part D (V12 notes), D3_
+    - Depends on: 64.1
+
+  - [ ] 65.2 Update `docs/deployment.md` and review the other documents for V12 drift
+    - Read `guidelines/backend.md` first
+    - `docs/deployment.md` (section "Verification Order"): add the V12 checks of Part D: GET `/api/boards` on production returns `member_count` and `card_count`, rename and delete a Board with a test account, open a Card from My Tasks, and check the Dashboard counts; state that `kano-api` is deployed first and `kano-web` second, and that V12 needs no `flask db upgrade`, no new environment variable, and no CORS or `next.config.ts` change; check `docs/violation-report.md` and `docs/guideline-comparison.md` for statements that V12 makes outdated; search `guidelines/*.md` for statements about rename, delete, or the Board response and report each hit in the task result instead of editing (agents never modify `guidelines/`); re-run `scripts/check_repo_hygiene.py` and `scripts/check_readme_links.py`
+    - _Requirements: 34.5, 35.1, 36.12, 48.7_
+    - _Design: Part D (V12 notes, deployment order, environment, verification list)_
+    - Depends on: 64.1
+
+- [ ] 66. V12 final checkpoint
+  - Run `pytest -v` from `app/`, `npm test` and `npm run build` from `web/`, `scripts/check_file_size.py` over `app/` and `web/`, `scripts/check_repo_hygiene.py`, and `scripts/check_readme_links.py`; confirm that `docs/v12-baseline.md` lists the final zero-failure counts of `pytest`, `npm test`, and `npx playwright test`, and that no backend or frontend file is over 300 lines
+  - Ensure all tests pass, ask the user if questions arise
+  - Depends on: 59, 64.3, 65.1, 65.2
+  - _Requirements: 31.8, 32.10, 33.8, 30.6, 35.1, 36.12, 48.4_
+
+- [ ] 67. [MANUAL] Deploy the API with the V12 counts first and verify it on production
+  - NOT executed by the agent. Deploy the `kano-api` Vercel project (V12 needs no `flask db upgrade`, no new environment variable, and no CORS change). Then check with a test account: GET `/api/boards` on production returns `member_count` and `card_count` on every item, POST `/api/boards` returns 1 and 0, PATCH `/api/boards/<id>` returns the current counts, and GET `/api/boards/<id>` has neither field. A frontend deployed before this step would show "undefined members"
+  - Depends on: 66
+  - _Requirements: 48.7, 47.1, 47.5, 47.6, 47.7, 34.5, 34.6_
+  - _Design: Part D (V12 notes, deployment order)_
+
+- [ ] 68. [MANUAL] Deploy the web app and run the end-to-end suite against production
+  - NOT executed by the agent. Deploy the `kano-web` Vercel project only after task 67 is complete; then, from `web/`, set `E2E_BASE_URL` in the shell to the deployed frontend URL (a shell value wins over `web/.env.test`, which `playwright.config.ts` loads with `override: false`) and run `npx playwright test`;ns over `web/.env.test`, which `playwright.config.ts` loads with `override: false`) and run `npx playwright test`; every test must pass (the counts scenario needs the V12 API of task 67)
+  - Depends on: 67
+  - _Requirements: 48.7, 33.8, 33.18, 34.3_
+  - _Design: Part D (V12 notes, deployment order), Testing Strategy V12 refinement (Ordering)_
+
+- [ ] 69. [MANUAL] Verify rename, delete, the My Tasks deep link, and the counts in the browser
+  - NOT executed by the agent. Check on the deployed site (or first against `flask run` and `npm run dev`), at a desktop width and at 375 px (browser device mode), with the admin account and a second account that is not the admin
+  - Check in words: the admin sees "Rename board" and "Delete board" in the board toolbar, renames the Board and sees the new name at once, in the toolbar and on `/` (also after the browser back button), and deletes a Board through the dialog (Cancel keeps it, Escape does nothing while the request runs) and lands on `/` without it; a manager, a member, and a guest see neither control; a task title in My Tasks opens that Card in the board with the dialog already open, "Open board" opens the board only, closing the dialog removes `card` from the address and the back button still works, a wrong `card` value shows the plain board; each Board card on `/` shows "N member(s)" and "N card(s)" with the singular for exactly 1, a new Board shows "1 member" and "0 cards", and after adding a Card and returning with the "Boards" link it shows "1 card"
+  - Depends on: 68
+  - _Requirements: 45.1 to 45.14, 46.1 to 46.8, 47.11, 47.12, 34.8_
+  - _Design: Part D (V12 notes, verification list), B22 to B27_
+
 ## Notes
 
 - Tasks marked `[MANUAL]` are performed by the user and never by the agent: 4.1, 4.2, 4.3, 15.2, 22.3, 22.4, 22.5, 22.6, 22.7, 22.8, 22.9, 23.4, 23.8, and the V6 manual tasks 26.1 (V6 migration on the development and test databases), 26.2 (optional backfill), 33.3 (browser verification of invite links and the welcome flow), 33.4 (`web/.env.test` and the local E2E account), and 33.5 (E2E account on the production database).
@@ -2278,7 +2635,34 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     { "id": 112, "tasks": ["53.1", "53.2"] },
     { "id": 113, "tasks": ["54"] },
     { "id": 114, "tasks": ["55"] },
-    { "id": 115, "tasks": ["56"] }
+    { "id": 115, "tasks": ["56"] },
+    { "id": 116, "tasks": ["57.1"] },
+    { "id": 117, "tasks": ["57.2"] },
+    { "id": 118, "tasks": ["57.3"] },
+    { "id": 119, "tasks": ["57.4"] },
+    { "id": 120, "tasks": ["58.1"] },
+    { "id": 121, "tasks": ["58.2"] },
+    { "id": 122, "tasks": ["58.3", "58.4", "58.5"] },
+    { "id": 123, "tasks": ["58.6", "58.7"] },
+    { "id": 124, "tasks": ["59"] },
+    { "id": 125, "tasks": ["60.1", "60.2"] },
+    { "id": 126, "tasks": ["60.3", "60.4"] },
+    { "id": 127, "tasks": ["60.5", "60.6"] },
+    { "id": 128, "tasks": ["61.1", "61.2"] },
+    { "id": 129, "tasks": ["61.3", "61.6", "61.7"] },
+    { "id": 130, "tasks": ["61.4", "62.1", "62.2", "62.4", "62.5", "62.6"] },
+    { "id": 131, "tasks": ["61.5", "62.3", "62.7", "62.8"] },
+    { "id": 132, "tasks": ["61.8", "63.1"] },
+    { "id": 133, "tasks": ["63.2"] },
+    { "id": 134, "tasks": ["63.3"] },
+    { "id": 135, "tasks": ["63.4"] },
+    { "id": 136, "tasks": ["64.1"] },
+    { "id": 137, "tasks": ["64.2", "65.1", "65.2"] },
+    { "id": 138, "tasks": ["64.3"] },
+    { "id": 139, "tasks": ["66"] },
+    { "id": 140, "tasks": ["67"] },
+    { "id": 141, "tasks": ["68"] },
+    { "id": 142, "tasks": ["69"] }
 
   ]
 }
@@ -2301,3 +2685,15 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
 - Requirement coverage (task numbers): R39: 44.2, 46.15, 49.2, 49.3, 49.5, 50.3, 50.4 · R40: 44.2, 46.9, 46.10, 49.6, 50.3, 50.7, 51.4, 52.3 · R41: 44.3, 44.4, 44.7, 46.4, 46.5, 49.6, 50.5, 51.2 · R42: 44.3, 44.4, 44.14, 46.6, 46.7, 49.7, 50.6, 51.3 · R43: 44.5, 44.6, 44.7, 44.8, 46.11, 46.12, 46.16, 49.4, 50.1, 50.2, 51.1, 52.1 · R44: 44.2, 44.3, 44.10, 44.11, 45.1, 46.2, 46.3, 46.17. Amended rows: R1.4, R1.9, R2.2, R2.9 to R2.11, R2.15, R2.16, R3.5, R3.9, R3.11 in 44.3, 44.9, 44.11, 45.1, 46.17 · R4.3 in 46.18 · R9, R10, R14.10 in 44.8, 46.11, 46.13, 46.15 · R11 in 44.2, 46.15 · R20, R21, R23, R25 in 50.1, 50.4, 50.8 · R28.12, R37 in 44.8, 46.14 · R31.18 to R31.25 in 44.13, 44.14, 46.3, 46.5, 46.7, 46.8, 46.10, 46.12, 46.13, 46.16 · R32.24 to R32.30 in 49.2 to 49.7, 50.x, 51.x · R36.15 in 53.1 · R38.17 to R38.19 in 50.9.
 - Tests of earlier work invalidated by V11 (all named in the V11 tasks): 3.5 and 25.6 by 44.11; 5.1 by 46.1; 8.1 (four queries) by 46.2; 8.2 and 8.4 by 46.11 and 46.12; 9.2 by 46.13; 14.1 and 27.11 by 46.16; 14.2 and 27.14 by 46.8; 14.3 and 27.13 by 46.18; 14.5 and 27.15 by 46.3; 25.7 by 44.12; 25.8 and 25.9 by 44.15; 27.4 and 27.6 by 46.15; 27.9 by 46.14; 27.12 by 46.17; 29.1, 29.3, 29.9 by 49.1 to 49.4; 30.1, 36.1 by 50.1 and 50.2; 30.2 by 50.4; 30.4 by 50.2; 30.8 by 50.8; 31.7 by 52.1; 35.1 and 37.2 by 50.9; remaining RTL fixtures by 51.5.
 - Known inconsistencies and gaps found while planning (the specification documents were not edited): (1) design Open issue 45: Requirement 15.2 lists only `app/`, `components/`, and `hooks/` as Tailwind sources while R39.5 and R39.9 put class strings in `lib/`; task 49.5 adds `@source "../lib"` and the requirement text still needs "and `lib/`". (2) Requirement 39.10 asks that missing token pairs be defined in `guidelines/design-system.md` first, but agents never modify `guidelines/`; this is handled by the manual task 48. (3) Requirement 43.8 (400 for a request that names the Board_Admin) overlaps R43.6 (403 by rank) and R9.7; tasks 44.6, 46.11, and 46.12 apply the owner check first (admin gets 400, manager gets 403, Open issue 47). (4) Requirement 11.15 says a non-Board_Member gets 403 on every single-Card endpoint, which would include a guest, but R41.9 gives a guest 200 on GET `/api/cards/<id>`; tasks follow R41.9 (Open issue 49). (5) Requirement 42.2 does not cap the default label, so tasks cut it to 100 characters (Open issue 48). (6) Requirement 43 does not say that a role change to the current role returns 200 or that body validation (400) runs before the permission check (403); tasks 46.11 and 46.12 apply both (Open issue 59). (7) Requirement 33 has no V11 criteria, so the Playwright tasks 52.1 to 52.3 cite only the design Testing Strategy. (8) The CHANGELOG says the string "checklist" was removed from the forbidden list, but the current Requirement 38.19 list does not contain it; task 50.9 only verifies `lib/forbiddenClaims.ts`. (9) Requirement 23.1 (card data within 300 ms) and R41.9 (checklist and links from GET `/api/cards/<id>`) are reconciled in task 50.4 by showing the board-state fields at once and loading the sections asynchronously. (10) Search and My Tasks cards carry no counts (R44.5, Open issue 58), so task 50.3 hides the checklist and link indicators when the counts are absent. (11) Open issues 50, 51, 52, 61, 62, 63, and 64 are accepted as stated and need no task beyond the notes in 46.9, 49.6, 50.7, and 50.2.
+
+## V12 Notes
+
+- V12 history rule: tasks 1 to 56 and the waves 0 to 115 are unchanged history. A V12 task that changes earlier work names the task it supersedes. The checked boxes of the earlier tasks describe the V5 to V11 state and do not claim V12 behaviour. The pending manual tasks of earlier versions (33.x, 39, 55, 56) do not block any V12 task.
+- Manual V12 tasks (never run by the agent): 57.1 (prepare the local stack and the E2E environment), 64.2 (restart the local API and web app with the V12 code), 67 (deploy the API first and verify the counts on production), 68 (deploy the web app and run the end-to-end suite against production), 69 (browser verification). There is no V12 migration task: V12 adds no table, column, constraint, or index (Requirement 47 criterion 8), so no task runs `flask db migrate` or `flask db upgrade`.
+- Order: the baseline run first (57, before any code or test change, as Requirement 48 criterion 4 and design Testing Strategy V12 refinement require), then the backend (58, 59), then the frontend libraries, components, and tests (60 to 62), Playwright (63), the full verification until every test passes (64), documentation (65), the final checkpoint (66), and the manual deployment (67 to 69). The frontend depends on the backend checkpoint (59) as in V6 and V11. The new wave ids 116 to 142 are append-only, so they run after the V11 waves.
+- Where the results are recorded: `docs/v12-baseline.md` (new, tasks 57.2, 57.3, 64.1, and 64.3) holds the failing tests of the baseline runs and the final zero-failure counts. The list of baseline failures is a runtime result and is not predicted here.
+- Deployment ordering (Requirement 48 criterion 7, design Part D V12 notes): the API with the counts (task 67) is deployed and checked before the web app (task 68), and the Playwright run against production starts only after both deployments are live. Against the local stack, scenario 4 of task 63.3 runs only after the V12 backend runs locally (task 64.2).
+- Property coverage (76 to 83): 76 in 58.7; 77 in 58.6; 78 and 79 in 58.7; 80 in 62.8; 81 in 62.4; 82 in 62.5; 83 in 62.6. Older properties reused or touched by V12: 74 in 62.7 (gating of `edit_board` and `delete_board`); 58 in 63.4 (no literal credentials in `v12Boards.spec.ts`); 29 and 34 are unchanged (design amendment table).
+- Requirement coverage (task numbers): R45: 60.4, 60.5, 61.1, 61.2, 61.3, 61.7, 62.7, 63.1 · R46: 60.3, 60.6, 61.4, 61.5, 61.6, 62.2, 62.4, 62.8, 63.2 · R47: 58.1, 58.2, 58.3, 58.5, 58.6, 58.7, 60.1, 60.2, 61.7, 62.6, 63.3 · R48: 57.1 to 57.4, 58.4 to 58.7, 61.8, 62.x, 63.x, 64.1 to 64.3, 67, 68 · amended criteria: 8.13 in 58.2 and 58.4; 20.9 and 20.10 in 61.7, 62.6; 21.29 in 61.3; 21.30 in 61.4 and 61.5; 25.8 in 61.6 and 62.2; 31.26 in 58.4 to 58.7; 32.31 in 62.1 to 62.8; 33.18 in 63.1 to 63.4; 44.7 in 58.2 and 58.6.
+- Tests of earlier work invalidated by V12 (all named in V12 tasks): 8.1 and 8.2 (key sets of the list, create, and update responses) by 58.4; the V11 boards role tests `test_boards_roles.py` by 58.4; 18.10 (plain My Tasks link) by 61.6 and 62.2; the dashboard fixtures and the Board card layout by 62.1; the `BoardView` render tests (`boardRoles`, `boardFeatures`, `boardMutations`, `boardSeparator`, `boardShell`, `v11RoleGating`) by 62.3 (new `next/navigation` mock); the file lists of 30.11, 37.9, 40.6, and 50.11 by 61.8; the file lists of 31.9, 37.7, and 52.4 by 63.4.
+- Known inconsistencies and gaps found while planning (the specification documents were not edited): (1) Properties 76 and 78 in the design name `counts_for_boards` and `counts_for_board`, but the refined backend design A22-R renames them to `board_counts` and `board_counts_one` (the old names would shadow the `counts_for_board` of `cards/service/counts.py`); tasks 58.1 and 58.7 use the A22-R names. (2) The first text of B22 and B23 (`onRenamed(newName)`, `BoardView` owning the displayed name, a `void` hook with `clearDeepLinkParam`) is superseded by B27; tasks follow B27 (`onRenamed(board)`, `BoardToolbar` owns the name, `useCardDeepLink` returns `{ onModalClose }`). (3) Part D V12 notes say that no README change is designed, but the user asked for the documentation to be updated; task 65.1 limits the README change to the Features list and Test Steps and task 65.2 changes `docs/deployment.md` (design Part D verification list). (4) Requirement 46 criterion 8 says no GET `/api/cards/<id>` request while the V11 modal loads it on every open; tasks follow the reading of Open issue 72 (the deep link sends no request of its own) and task 62.8 asserts exactly that. (5) Open issue 75 (the `BoardList` retry gap) is fixed in task 61.7 only if the baseline or a review confirms it. (6) Open issues 73 and 74 (`sessionStorage` unavailable, counts after a back navigation) are accepted as stated and need no task. (7) The earlier tasks use no lint command, so V12 does not add `npm run lint` to the verification; `npm run build` type-checks.
