@@ -2128,21 +2128,21 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
   - Depends on: 47, 49.2, 49.3, 49.4, 49.5, 49.6, 49.7, 50.11, 51.5, 52.4, 53.1, 53.2
   - _Requirements: 31.8, 32.9, 32.10, 32.11, 30.6, 35.1, 36.12_
 
-- [ ] 55. [MANUAL] Verify the V11 features in the browser before deployment
+- [x] 55. [MANUAL] Verify the V11 features in the browser before deployment
   - NOT executed by the agent. Run the API with `flask run` and the web app with `npm run dev` against the development database; check at a desktop width and at 375 px (browser device mode)
   - Check in words: a card shows a red "Urgent" badge and coloured labels that keep the same colour on every board; a checklist added in the card shows `done/total` and a thin bar on the Card face and a toggle survives a reload; a link opens in a new tab and shows its hostname; a past due card shows the red "Overdue" chip and the bell list shows the overdue row without changing the unread count; a `member` sees no Column controls, member panel, or invite links, a manager sees the Column controls, the member panel, and both invite links but no analytics link, and the admin sees everything; the admin promotes a member to manager and demotes a manager to guest (assignments cleared); a manager cannot change or remove another manager or the admin
   - Depends on: 54
   - _Requirements: 10.11, 39.6, 40.11, 40.14, 41.16, 42.12, 43.14, 34.8_
   - _Design: B16 to B19_
 
-- [ ] 56. [MANUAL] Apply the V11 schema to production and extend the deployed verification
+- [x] 56. [MANUAL] Apply the V11 schema to production and extend the deployed verification
   - NOT executed by the agent. If the production schema was created (task 22.4) before the V11 migration of task 45.1 existed, run `flask db upgrade` again with `DATABASE_URL` pointed at the production database (the committed history already contains the hand-edited constraints); if production is still empty, the first `flask db upgrade` already includes V11. Then add to the Postman and browser verification of tasks 22.6 and 22.7: GET `/api/notifications/overdue`, POST and PATCH of a checklist item and a link, GET `/api/cards/<id>`, PATCH `/api/boards/<id>/members/<user_id>` with a second account, a Card status `URGENT`, and the Column controls hidden for a `member`
   - Depends on: 45.1, 54, 22.5
   - _Requirements: 34.3, 34.5, 34.6, 44.1_
   - _Design: Part D (V11 notes), Open issue 66_
 
 - [ ] 57. Phase 32 (V12): Baseline run before any change (run first, record, fix)
-  - [ ] 57.1 [MANUAL] Prepare the local stack and the E2E environment for the baseline
+  - [x] 57.1 [MANUAL] Prepare the local stack and the E2E environment for the baseline
     - NOT executed by the agent. Start PostgreSQL with the development and test databases (task 4.3), then follow the README Local Run Steps: from `app/` with the venv active run `flask run`, and from `web/` run `npm run dev`; confirm `web/.env.test` holds `E2E_USER_EMAIL`, `E2E_USER_PASSWORD` (the E2E account of task 33.4) and `E2E_BASE_URL` (for example `http://localhost:3000`; `web/playwright.config.ts` loads `.env.test` and throws when `E2E_BASE_URL` is missing or not an absolute http or https URL), and that the E2E account exists in the development database; run `npx playwright install` once from `web/`
     - The baseline must run against the code as it is before V12 (the V11 state), so do not change any file before tasks 57.2 and 57.3 have run
     - _Requirements: 48.4, 33.8, 33.4_
