@@ -75,7 +75,7 @@ export function MyTasksList({ initialCards, initialError = null }: MyTasksListPr
                   >
                     <div className="min-w-0">
                       <Link
-                        href={`/boards/${card.board_id}`}
+                        href={`/boards/${card.board_id}?card=${encodeURIComponent(card.card_id)}`}
                         className="text-sm font-medium text-ink hover:text-primary-600 hover:underline break-words"
                       >
                         {card.title}

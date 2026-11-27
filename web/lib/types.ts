@@ -115,7 +115,7 @@ export interface Column {
   cards: BoardCard[];
 }
 
-export interface BoardSummary {
+export interface BoardBase {
   board_id: string;
   name: string;
   my_role: Role;
@@ -123,7 +123,12 @@ export interface BoardSummary {
   updated_at?: string;
 }
 
-export interface BoardDetail extends BoardSummary {
+export interface BoardSummary extends BoardBase {
+  member_count: number;
+  card_count: number;
+}
+
+export interface BoardDetail extends BoardBase {
   columns: Column[];
 }
 

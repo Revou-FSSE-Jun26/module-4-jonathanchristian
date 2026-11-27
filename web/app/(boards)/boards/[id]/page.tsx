@@ -3,6 +3,7 @@ import { BoardAccessMessage } from "@/components/boards/BoardAccessMessage";
 import { BoardView } from "@/components/boards/BoardView";
 import { ErrorPanel } from "@/components/shared/ErrorPanel";
 import { apiRequest } from "@/lib/apiClient";
+import { resolveCardParam } from "@/lib/deepLink";
 import { ApiError } from "@/lib/errors";
 import { getServerToken } from "@/lib/serverAuth";
 import type { BoardDetail } from "@/lib/types";
@@ -11,15 +12,18 @@ export const dynamic = "force-dynamic";
 
 export default async function BoardDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const { id } = await params;
+  const initialCardId = resolveCardParam((await searchParams).card);
   const token = await getServerToken();
 
   try {
     const board = await apiRequest<BoardDetail>(`/api/boards/${id}`, { token });
-    return <BoardView board={board} />;
+    return <BoardView board={board} initialCardId={initialCardId} />;
   } catch (err) {
     if (err instanceof ApiError) {
       if (err.statusCode === 401) {

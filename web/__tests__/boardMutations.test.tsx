@@ -6,6 +6,10 @@ import type { BoardDetail } from "@/lib/types";
 
 const handleErrorMock = vi.fn();
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+}));
+
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({
     user: { user_id: "u1", name: "Member", email: "m@b.c", created_at: "" },

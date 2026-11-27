@@ -10,6 +10,7 @@ import { MemberPanel } from "@/components/boards/MemberPanel";
 import { AddCardForm } from "@/components/cards/AddCardForm";
 import { CardDetailModal } from "@/components/cards/CardDetailModal";
 import { BaseButton } from "@/components/shared/BaseButton";
+import { useCardDeepLink } from "@/hooks/useCardDeepLink";
 import { useDragAndDrop } from "@/hooks/useDragAndDrop";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
 import { apiRequest } from "@/lib/apiClient";
@@ -27,6 +28,7 @@ function toBoardCard(card: Card | BoardCard): BoardCard {
 
 export interface BoardViewProps {
   board: BoardDetail;
+  initialCardId?: string | null;
 }
 
 function sortColumns(cols: Column[]): Column[] {
@@ -39,7 +41,7 @@ function sortColumns(cols: Column[]): Column[] {
 }
 
 /** Interactive Kanban board workspace with search, drag-and-drop, members, analytics, and card details. */
-export function BoardView({ board }: BoardViewProps) {
+export function BoardView({ board, initialCardId = null }: BoardViewProps) {
   const { handleError } = useErrorHandler();
   const [columns, setColumns] = useState<Column[]>(() => sortColumns(board.columns));
   const [members, setMembers] = useState<Member[]>([]);
@@ -56,6 +58,13 @@ export function BoardView({ board }: BoardViewProps) {
 
   const { onDragStart, onDragOver, onDrop, onTouchStart, pendingIds, touchDrag } =
     useDragAndDrop(columns, setColumns, { enabled: canEditCards });
+
+  const openCard = useCallback((card: Card | BoardCard) => {
+    setSelectedCard(toBoardCard(card));
+    setSelectedCardIsNew(false);
+  }, []);
+
+  const { onModalClose } = useCardDeepLink(initialCardId, columns, openCard);
 
   useEffect(() => {
     let cancelled = false;
@@ -192,10 +201,7 @@ export function BoardView({ board }: BoardViewProps) {
                     <p className="text-sm font-medium text-ink">{card.title}</p>
                     <BaseButton
                       variant="secondary"
-                      onClick={() => {
-                        setSelectedCard(toBoardCard(card));
-                        setSelectedCardIsNew(false);
-                      }}
+                      onClick={() => openCard(card)}
                       className="self-start"
                     >
                       Open card
@@ -213,10 +219,7 @@ export function BoardView({ board }: BoardViewProps) {
                   isDragTarget={touchDrag?.targetColumnId === column.column_id}
                   touchDraggingCardId={touchDrag?.cardId ?? null}
                   pendingIds={pendingIds}
-                  onSelectCard={(card) => {
-                    setSelectedCard(toBoardCard(card));
-                    setSelectedCardIsNew(false);
-                  }}
+                  onSelectCard={openCard}
                   onDragStart={onDragStart}
                   onDragOver={onDragOver}
                   onDrop={onDrop}
@@ -250,8 +253,10 @@ export function BoardView({ board }: BoardViewProps) {
           members={members}
           isNew={selectedCardIsNew}
           onClose={() => {
+            const closedId = selectedCard.card_id;
             setSelectedCard(null);
             setSelectedCardIsNew(false);
+            onModalClose(closedId);
           }}
           onUpdated={handleCardUpdated}
           onCountsChanged={handleCardCountsChanged}

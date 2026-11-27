@@ -5,6 +5,10 @@ import { BoardView } from "@/components/boards/BoardView";
 import type { BoardDetail, CardStatus, Role } from "@/lib/types";
 import { CARD_STATUSES, STATUS_LABEL } from "@/lib/status";
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+}));
+
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({ user: { user_id: "u1", name: "User", email: "u@b.c", created_at: "" } }),
 }));

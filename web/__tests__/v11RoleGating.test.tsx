@@ -16,6 +16,10 @@ import type { BoardDetail, Member, Role } from "@/lib/types";
 const showSuccessMock = vi.fn();
 const handleErrorMock = vi.fn();
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+}));
+
 vi.mock("@/lib/toast", () => ({
   showSuccess: (...args: unknown[]) => showSuccessMock(...args),
   showError: vi.fn(),

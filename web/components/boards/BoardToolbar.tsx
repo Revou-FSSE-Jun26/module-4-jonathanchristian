@@ -1,10 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, BarChart3, Users } from "lucide-react";
+import { ArrowLeft, BarChart3, Pencil, Users } from "lucide-react";
 import { CardSearchInput } from "@/components/boards/CardSearchInput";
+import { DeleteBoardControl } from "@/components/boards/DeleteBoardControl";
+import { RenameBoardModal } from "@/components/boards/RenameBoardModal";
 import { BaseBadge } from "@/components/shared/BaseBadge";
 import { BaseButton } from "@/components/shared/BaseButton";
+import { recordRename } from "@/hooks/useBoardPatches";
 import { can, ROLE_VARIANT } from "@/lib/roles";
 import type { CardSearchResult, Role } from "@/lib/types";
 
@@ -28,8 +32,12 @@ export function BoardToolbar({
   onOpenMembers,
   onOpenAnalytics,
 }: BoardToolbarProps) {
+  const [displayName, setDisplayName] = useState(boardName);
+  const [renameOpen, setRenameOpen] = useState(false);
   const showMembers = can(role, "manage_members");
   const showAnalytics = can(role, "view_analytics");
+  const showRename = can(role, "edit_board");
+  const showDelete = can(role, "delete_board");
   const roleLabel = role === "guest" ? "Guest" : role;
 
   return (
@@ -45,7 +53,7 @@ export function BoardToolbar({
           <ArrowLeft className="size-4" aria-hidden="true" />
           <span>Boards</span>
         </Link>
-        <h1 className="text-xl font-semibold text-ink break-words">{boardName}</h1>
+        <h1 className="text-xl font-semibold text-ink break-words">{displayName}</h1>
         <BaseBadge variant={ROLE_VARIANT[role]}>{roleLabel}</BaseBadge>
       </div>
 
@@ -67,7 +75,32 @@ export function BoardToolbar({
             <span>Analytics</span>
           </BaseButton>
         ) : null}
+        {showRename ? (
+          <BaseButton variant="secondary" onClick={() => setRenameOpen(true)}>
+            <Pencil className="size-4" aria-hidden="true" />
+            <span>Rename board</span>
+          </BaseButton>
+        ) : null}
+        {showDelete ? (
+          <DeleteBoardControl boardId={boardId} boardName={displayName} />
+        ) : null}
       </div>
+      {showRename ? (
+        <RenameBoardModal
+          open={renameOpen}
+          boardId={boardId}
+          currentName={displayName}
+          onClose={() => setRenameOpen(false)}
+          onRenamed={(updated) => {
+            setDisplayName(updated.name);
+            recordRename(
+              updated.board_id,
+              updated.name,
+              updated.updated_at ?? new Date().toISOString()
+            );
+          }}
+        />
+      ) : null}
     </div>
   );
 }

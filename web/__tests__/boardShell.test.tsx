@@ -4,6 +4,10 @@ import { BoardAccessMessage } from "@/components/boards/BoardAccessMessage";
 import { BoardView } from "@/components/boards/BoardView";
 import type { BoardDetail } from "@/lib/types";
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+}));
+
 vi.mock("@/hooks/useAuth", () => ({
   useAuth: () => ({ user: { user_id: "u1", name: "Admin", email: "a@b.c", created_at: "" } }),
 }));

@@ -125,9 +125,16 @@ describe("MyTasksList and ProfileForm", () => {
 
     const { rerender } = render(<MyTasksList initialCards={tasks} />);
     expect(screen.getByText("Roadmap")).toBeInTheDocument();
-    expect(screen.getByText("Write docs")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open board" })).toHaveAttribute("href", "/boards/b1");
+    expect(screen.getByRole("link", { name: "Write docs" })).toHaveAttribute(
+      "href",
+      "/boards/b1?card=c1"
+    );
     expect(screen.getByText("Not started")).toBeInTheDocument();
-    expect(screen.getByText("Release V6")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Release V6" })).toHaveAttribute(
+      "href",
+      "/boards/b1?card=c2"
+    );
     expect(screen.getByText("Done")).toBeInTheDocument();
 
     rerender(<MyTasksList initialCards={[]} />);

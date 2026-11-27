@@ -8,6 +8,9 @@ import { BaseBadge } from "@/components/shared/BaseBadge";
 import { BaseButton } from "@/components/shared/BaseButton";
 import { ErrorPanel } from "@/components/shared/ErrorPanel";
 import { CreateBoardModal } from "@/components/boards/CreateBoardModal";
+import { useBoardPatches } from "@/hooks/useBoardPatches";
+import { applyBoardPatches } from "@/lib/boardPatches";
+import { formatCount } from "@/lib/format";
 import { ROLE_VARIANT } from "@/lib/roles";
 import type { BoardSummary } from "@/lib/types";
 
@@ -21,6 +24,8 @@ export function BoardList({ initialBoards, initialError = null }: BoardListProps
   const router = useRouter();
   const [boards, setBoards] = useState<BoardSummary[]>(initialBoards);
   const [createOpen, setCreateOpen] = useState(false);
+  const patches = useBoardPatches();
+  const shown = applyBoardPatches(boards, patches);
 
   if (initialError) {
     return (
@@ -41,7 +46,7 @@ export function BoardList({ initialBoards, initialError = null }: BoardListProps
         </BaseButton>
       </div>
 
-      {boards.length === 0 ? (
+      {shown.length === 0 ? (
         <div className="bg-surface border border-line rounded-lg p-12 text-center flex flex-col items-center gap-3">
           <LayoutGrid className="size-12 text-ink-subtle" aria-hidden="true" />
           <h2 className="text-base font-semibold text-ink">No boards yet</h2>
@@ -52,7 +57,7 @@ export function BoardList({ initialBoards, initialError = null }: BoardListProps
         </div>
       ) : (
         <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {boards.map((board) => (
+          {shown.map((board) => (
             <li key={board.board_id} className="min-w-0">
               <Link
                 href={`/boards/${board.board_id}`}
@@ -66,6 +71,11 @@ export function BoardList({ initialBoards, initialError = null }: BoardListProps
                     {board.my_role}
                   </BaseBadge>
                 </div>
+                <p className="mt-1 text-xs text-ink-muted flex flex-wrap items-center gap-1.5">
+                  <span>{formatCount(board.member_count, "member")}</span>
+                  <span aria-hidden="true">·</span>
+                  <span>{formatCount(board.card_count, "card")}</span>
+                </p>
               </Link>
             </li>
           ))}

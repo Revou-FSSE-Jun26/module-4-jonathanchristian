@@ -81,3 +81,11 @@ export function diffCardFields(
   }
   return diff;
 }
+
+/**
+ * Format a non-negative integer count with a singular or plural English noun.
+ * Uses the singular form only when `n === 1`; 0 and values above 1 use `${noun}s`.
+ */
+export function formatCount(n: number, noun: string): string {
+  return n === 1 ? `${n} ${noun}` : `${n} ${noun}s`;
+}

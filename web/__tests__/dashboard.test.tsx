@@ -37,19 +37,46 @@ describe("Dashboard BoardList and CreateBoardModal", () => {
     render(
       <BoardList
         initialBoards={[
-          { board_id: "b1", name: "Roadmap", my_role: "admin", created_at: "2026-11-18T00:00:00Z" },
-          { board_id: "b2", name: "Design", my_role: "member", created_at: "2026-11-18T00:00:00Z" },
-          { board_id: "b3", name: "Public", my_role: "guest", created_at: "2026-11-18T00:00:00Z" },
+          {
+            board_id: "b1",
+            name: "Roadmap",
+            my_role: "admin",
+            created_at: "2026-11-18T00:00:00Z",
+            member_count: 1,
+            card_count: 0,
+          },
+          {
+            board_id: "b2",
+            name: "Design",
+            my_role: "member",
+            created_at: "2026-11-18T00:00:00Z",
+            member_count: 3,
+            card_count: 5,
+          },
+          {
+            board_id: "b3",
+            name: "Public",
+            my_role: "guest",
+            created_at: "2026-11-18T00:00:00Z",
+            member_count: 2,
+            card_count: 1,
+          },
         ]}
       />
     );
 
     expect(screen.getByText("Roadmap").closest("a")).toHaveAttribute("href", "/boards/b1");
     expect(screen.getByText("admin")).toBeInTheDocument();
+    expect(screen.getByText("1 member")).toBeInTheDocument();
+    expect(screen.getByText("0 cards")).toBeInTheDocument();
     expect(screen.getByText("Design").closest("a")).toHaveAttribute("href", "/boards/b2");
     expect(screen.getByText("member")).toBeInTheDocument();
+    expect(screen.getByText("3 members")).toBeInTheDocument();
+    expect(screen.getByText("5 cards")).toBeInTheDocument();
     expect(screen.getByText("Public").closest("a")).toHaveAttribute("href", "/boards/b3");
     expect(screen.getByText("guest")).toBeInTheDocument();
+    expect(screen.getByText("2 members")).toBeInTheDocument();
+    expect(screen.getByText("1 card")).toBeInTheDocument();
   });
 
   it("renders empty state and error panel with retry", async () => {

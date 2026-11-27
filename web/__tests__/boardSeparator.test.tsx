@@ -6,6 +6,10 @@ import { BoardView } from "@/components/boards/BoardView";
 import { AuthContext } from "@/lib/authContext";
 import type { AuthContextValue, BoardDetail, Role } from "@/lib/types";
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+}));
+
 vi.mock("react-hot-toast", () => ({
   default: { success: vi.fn(), error: vi.fn(), loading: vi.fn() },
 }));

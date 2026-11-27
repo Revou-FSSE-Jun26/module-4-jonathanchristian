@@ -2232,8 +2232,8 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
   - Depends on: 58.3, 58.4, 58.6, 58.7
   - _Requirements: 31.8, 30.6, 47.8, 48.1_
 
-- [ ] 60. Phase 34 (V12): Frontend libraries and hooks
-  - [ ] 60.1 Update the Board types in `web/lib/types.ts`
+- [x] 60. Phase 34 (V12): Frontend libraries and hooks
+  - [x] 60.1 Update the Board types in `web/lib/types.ts`
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first (read only); note `web/AGENTS.md`
     - New `BoardBase` (`board_id`, `name`, `my_role`, `created_at`, `updated_at?`); `BoardSummary extends BoardBase` adds `member_count: number` and `card_count: number`; `BoardDetail extends BoardBase` adds `columns` and no longer extends `BoardSummary`. Fix every compile error in `web/` that the split causes (the design found `BoardDetail` only in the board page, `BoardView`, and tests); run `npx tsc --noEmit` from `web/`
     - Supersedes the `BoardDetail extends BoardSummary` shape of earlier tasks; those stay as history
@@ -2241,78 +2241,78 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B25 (V12 refinement, types), Open issues 68 and 71_
     - Depends on: 59
 
-  - [ ] 60.2 Add `formatCount` to `web/lib/format.ts`
+  - [x] 60.2 Add `formatCount` to `web/lib/format.ts`
     - Read `guidelines/frontend.md` first; note `web/AGENTS.md`
     - `formatCount(n: number, noun: string): string` returns `${n} ${noun}` for exactly 1 and `${n} ${noun}s` for every other non-negative integer (0 included); `formatBadge` stays unchanged (Open issue 70)
     - _Requirements: 47.11_
     - _Design: B25, Correctness Property 83, Open issue 70_
     - Depends on: 59
 
-  - [ ] 60.3 Create `web/lib/deepLink.ts`
+  - [x] 60.3 Create `web/lib/deepLink.ts`
     - Read `guidelines/frontend.md` first; note `web/AGENTS.md`
     - Pure functions as design B27: `resolveCardParam(raw: string | string[] | undefined): string | null` (first array element, `""` becomes `null`, so `?card=&card=c1` gives `null`); `findCardById(columns, id): BoardCard | null` (only Cards in the payload); `stripCardParam(href): string` (`new URL`, `URLSearchParams.delete("card")`, returns pathname plus the remaining search plus the hash, idempotent)
     - _Requirements: 46.1, 46.4, 46.5, 46.7_
     - _Design: B27 (`lib/deepLink.ts`), Correctness Property 81_
     - Depends on: 60.1
 
-  - [ ] 60.4 Create `web/lib/boardPatches.ts`
+  - [x] 60.4 Create `web/lib/boardPatches.ts`
     - Read `guidelines/frontend.md` first; note `web/AGENTS.md`
     - Pure module as design B26: `BoardPatches`, `EMPTY_PATCHES`, `BOARD_PATCHES_KEY = "kano_board_patches"`, `parsePatches(raw)` (invalid or missing JSON gives `EMPTY_PATCHES`), `withRename`, `withDelete` (also drops a rename of that id), and `applyBoardPatches(boards, patches)` (keeps the order, removes deleted ids, applies a rename only when the listed `updated_at` is missing or older than the patch's, keeps `member_count` and `card_count` unchanged); no counting in the browser
     - _Requirements: 45.12, 20.10, 47.13_
     - _Design: B26 (`lib/boardPatches.ts`), Correctness Property 82_
     - Depends on: 60.1
 
-  - [ ] 60.5 Create `web/hooks/useBoardPatches.ts`
+  - [x] 60.5 Create `web/hooks/useBoardPatches.ts`
     - Read `guidelines/frontend.md` first; note `web/AGENTS.md` and read the React and Next docs it points to before using `useSyncExternalStore` with `sessionStorage`
     - `useBoardPatches(): BoardPatches` reads `sessionStorage[BOARD_PATCHES_KEY]` through `useSyncExternalStore` (subscribe to `storage` events and to an in-tab event; server snapshot `null`); writers `recordRename(id, name, updatedAt)` and `recordDelete(id)` in the same file read, update with `withRename` or `withDelete`, write back, and dispatch the in-tab event; a `sessionStorage` failure is caught and ignored
     - _Requirements: 45.12, 20.10_
     - _Design: B26 (`hooks/useBoardPatches.ts`), Error Handling V12 refinement rows, Open issue 73_
     - Depends on: 60.4
 
-  - [ ] 60.6 Create `web/hooks/useCardDeepLink.ts`
+  - [x] 60.6 Create `web/hooks/useCardDeepLink.ts`
     - Read `guidelines/frontend.md` first; note `web/AGENTS.md`
     - As design B27: `useCardDeepLink(initialCardId, columns, open)` with a `handled` ref (at most one open per page load, also under React StrictMode) and an `openedId` ref; the effect uses the complete dependency array; it calls `open(card)` only when `findCardById` finds the Card; returns `{ onModalClose }`, which does nothing for a Card that a click opened and otherwise calls `window.history.replaceState(window.history.state, "", stripCardParam(window.location.href))`; no `GET /api/cards/<id>` request of its own
     - _Requirements: 46.3, 46.4, 46.7, 46.8_
     - _Design: B27 (`hooks/useCardDeepLink.ts`), Correctness Property 80, Open issue 72_
     - Depends on: 60.3
 
-- [ ] 61. Phase 35 (V12): Frontend components
-  - [ ] 61.1 Create `RenameBoardModal.tsx`
+- [x] 61. Phase 35 (V12): Frontend components
+  - [x] 61.1 Create `RenameBoardModal.tsx`
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first (read only); note `web/AGENTS.md`
     - `web/components/boards/RenameBoardModal.tsx`, one component, as design B27: props `open`, `boardId`, `currentName`, `onClose`, `onRenamed(board)`; `BaseModal` with one input (id `rename-board-input`, label "Board name") re-filled with `currentName` on every open; `validateBoardName` field-level error with the text retained and no request for an empty, whitespace-only, or 101-character name; a trimmed name equal to the current name closes with no request; otherwise PATCH `/api/boards/<id>` with the trimmed name, on 200 `onRenamed(updated)`, `showSuccess("Board renamed.")`, close; on failure keep the modal open with the text and call `handleError`; Submit and Cancel disabled while busy; model it on `CreateBoardModal.tsx` (unchanged)
     - _Requirements: 45.4, 45.5, 45.6, 45.7, 45.8, 48.6_
     - _Design: B22, B27 (`RenameBoardModal.tsx`), D25_
     - Depends on: 60.1
 
-  - [ ] 61.2 Create `DeleteBoardControl.tsx`
+  - [x] 61.2 Create `DeleteBoardControl.tsx`
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first (read only); note `web/AGENTS.md` and read the `useRouter` page in `web/node_modules/next/dist/docs/` before using `push`
     - `web/components/boards/DeleteBoardControl.tsx`, one component, as design B27: a destructive `BaseButton` "Delete board" opens the existing `ConfirmDialog` (unchanged) with the message `Delete "<name>"? Its columns, cards, and comments are deleted with it.`; cancel closes with no request; confirm sets `busy`, sends DELETE `/api/boards/<id>`, on 200 calls `recordDelete`, `showSuccess("Board deleted.")`, and `router.push("/")`; on failure clears `busy`, keeps the dialog open, and calls `handleError`; `onCancel` is ignored while `busy` so Escape and a backdrop click do nothing during the request
     - _Requirements: 45.9, 45.10, 45.11, 45.13, 48.6_
     - _Design: B22, B27 (`DeleteBoardControl.tsx`), Error Handling V12 refinement rows_
     - Depends on: 60.5
 
-  - [ ] 61.3 Wire rename and delete into `BoardToolbar.tsx`
+  - [x] 61.3 Wire rename and delete into `BoardToolbar.tsx`
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first (read only); note `web/AGENTS.md`
     - `BoardToolbar` keeps `displayName` state initialized from `boardName` and `renameOpen`; the `h1` shows `displayName`; a secondary `BaseButton` "Rename board" renders when `can(role, "edit_board")` and `DeleteBoardControl` renders when `can(role, "delete_board")` (only the admin; no change to `lib/roles.ts`, no new action name); `onRenamed(board)` sets `displayName` and calls `recordRename(board.board_id, board.name, board.updated_at)`; no new prop is needed
     - _Requirements: 45.1, 45.2, 45.3, 45.6, 45.14, 21.29, 48.6_
     - _Design: B27 (`BoardToolbar.tsx`), B22, B16 (gating table)_
     - Depends on: 61.1, 61.2
 
-  - [ ] 61.4 Wire the deep link into `BoardView.tsx` (stays at most 298 lines)
+  - [x] 61.4 Wire the deep link into `BoardView.tsx` (stays at most 298 lines)
     - Read `guidelines/frontend.md` first; note `web/AGENTS.md`
     - New optional prop `initialCardId?: string | null` (default `null`, so existing tests that render `<BoardView board={...} />` still compile); one `openCard` callback replaces the two repeated `setSelectedCard(toBoardCard(card)); setSelectedCardIsNew(false);` blocks (search results and Kanban columns); `const { onModalClose } = useCardDeepLink(initialCardId ?? null, columns, openCard)`; the modal's `onClose` also calls `onModalClose(selectedCard.card_id)`. No rename or delete code is added to `BoardView`; confirm with `scripts/check_file_size.py` that the file has at most 298 lines
     - _Requirements: 46.3, 46.4, 46.7, 46.8, 21.30, 48.6, 30.6_
     - _Design: B27 (`BoardView.tsx`), D25_
     - Depends on: 60.6
 
-  - [ ] 61.5 Read `searchParams` in the board page
+  - [x] 61.5 Read `searchParams` in the board page
     - Read `guidelines/frontend.md` first; note `web/AGENTS.md` and read `web/node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/page.md` (`searchParams` Promise), `01-app/03-api-reference/04-functions/use-search-params.md`, and `01-app/01-getting-started/04-linking-and-navigating.md` before editing
     - `web/app/(boards)/boards/[id]/page.tsx`: add `searchParams: Promise<{ [key: string]: string | string[] | undefined }>`, `await` it, `resolveCardParam((await searchParams).card)`, and pass `initialCardId` to `BoardView`; the 403 and 404 branch (`BoardAccessMessage`) and the 401 redirect to `/login?expired=1` stay unchanged; `decideRoute`, `proxy.ts`, and the `next` rule are not touched
     - _Requirements: 46.3, 46.5, 46.6, 46.9, 46.10, 21.30_
     - _Design: B24, B27 (board page), D26_
     - Depends on: 60.3, 61.4
 
-  - [ ] 61.6 Link the My Tasks title to the Card_Deep_Link
+  - [x] 61.6 Link the My Tasks title to the Card_Deep_Link
     - Read `guidelines/frontend.md` first; note `web/AGENTS.md`
     - `web/components/cards/MyTasksList.tsx`: the task title `href` becomes `` `/boards/${card.board_id}?card=${encodeURIComponent(card.card_id)}` ``; the group "Open board" link keeps `/boards/<board_id>` with no query
     - Supersedes the plain per-task board link of task 18.10 and the Requirement 25 criterion 2 target; those stay as history
@@ -2320,14 +2320,14 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B23, B27 (`MyTasksList.tsx`)_
     - Depends on: 60.3
 
-  - [ ] 61.7 Show the counts on the Board cards and merge the Board_Patches
+  - [x] 61.7 Show the counts on the Board cards and merge the Board_Patches
     - Read `guidelines/frontend.md` and `guidelines/design-system.md` first (read only); note `web/AGENTS.md`
     - `web/components/boards/BoardList.tsx`: `const shown = applyBoardPatches(boards, useBoardPatches())`, and the list and the empty state render from `shown`; inside the existing single `<Link>` add `<p className="mt-1 text-xs text-ink-muted">` with two `<span>` texts `formatCount(board.member_count, "member")` and `formatCount(board.card_count, "card")` separated by an `aria-hidden` dot; no counting in the browser; `CreateBoardModal.tsx` is unchanged (its POST response already carries 1 and 0). The pre-existing `initialBoards` copy gap (Open issue 75) is fixed here only when task 57.2 or 57.3 recorded it as a failure
     - _Requirements: 47.11, 47.12, 47.13, 45.12, 20.9, 20.10_
     - _Design: B25 (Board card text, create flow), B26 (`BoardList.tsx`), Open issue 75_
     - Depends on: 60.2, 60.5
 
-  - [ ] 61.8 Update the frontend repository-rule tests for the V12 files
+  - [x] 61.8 Update the frontend repository-rule tests for the V12 files
     - Read `guidelines/frontend.md` first; note `web/AGENTS.md`
     - Extend `web/__tests__/repo-rules.test.ts`: one component per file for `RenameBoardModal` and `DeleteBoardControl`, one hook per file for `useCardDeepLink` and `useBoardPatches`; no native `<button` outside `BaseButton`; no `dangerouslySetInnerHTML`; `scripts/check_file_size.py` over `web/` (300 lines, `BoardView.tsx` at most 298); split any failing file
     - Supersedes the file lists of tasks 30.11, 37.9, 40.6, and 50.11; those stay as history
@@ -2335,15 +2335,15 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: B27 (files), D25_
     - Depends on: 61.1, 61.2, 61.3, 61.4, 61.5, 61.6, 61.7
 
-- [ ] 62. Phase 36 (V12): Frontend tests
-  - [ ] 62.1 Update the dashboard tests for the counts
+- [x] 62. Phase 36 (V12): Frontend tests
+  - [x] 62.1 Update the dashboard tests for the counts
     - Read `guidelines/frontend.md` first
     - `web/__tests__/dashboard.test.tsx`: the `BoardSummary` fixtures gain `member_count` and `card_count`; keep the `href` assertions (the Board card stays one link) and the `next/navigation` mock; add count text assertions for the fixtures
     - _Requirements: 48.2, 48.5, 32.31, 47.11_
     - _Design: Testing Strategy V12 refinement (existing tests, `dashboard.test.tsx`)_
     - Depends on: 61.7
 
-  - [ ] 62.2 Update the My Tasks tests for the link targets
+  - [x] 62.2 Update the My Tasks tests for the link targets
     - Read `guidelines/frontend.md` first
     - `web/__tests__/myTasksAndProfile.test.tsx`: the task title `href` assertion becomes `/boards/<board_id>?card=<card_id>`; the "Open board" assertion stays `/boards/<board_id>` with no query
     - Supersedes the plain-link assertion of task 18.10 and its RTL test; those stay as history
@@ -2351,14 +2351,14 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Testing Strategy V12 refinement (existing tests, `myTasksAndProfile.test.tsx`)_
     - Depends on: 61.6
 
-  - [ ] 62.3 Add the `next/navigation` mock to the BoardView tests
+  - [x] 62.3 Add the `next/navigation` mock to the BoardView tests
     - Read `guidelines/frontend.md` first
     - `BoardToolbar` now renders `DeleteBoardControl`, which calls `useRouter`: in `boardRoles.test.tsx`, `boardFeatures.test.tsx`, `boardMutations.test.tsx`, `boardSeparator.test.tsx`, `boardShell.test.tsx`, and `v11RoleGating.test.tsx` add `vi.mock("next/navigation", ...)` with `push` and `refresh` (the pattern of `dashboard.test.tsx`) where the file renders an admin board; run `npm test` and fix every failure caused by V12 without weakening or deleting an assertion
     - _Requirements: 48.2, 48.5, 32.31, 32.10_
     - _Design: Testing Strategy V12 refinement (existing tests, BoardView files)_
     - Depends on: 61.3, 61.4
 
-  - [ ] 62.4 Write `v12DeepLink.test.ts`
+  - [x] 62.4 Write `v12DeepLink.test.ts`
     - Read `guidelines/frontend.md` first
     - fast-check over `resolveCardParam` inputs (absent, `""`, strings, arrays with an empty first element), the My Tasks target round trip, and `stripCardParam` over generated URLs with extra parameters and a hash (same path, same other parameters in order, same hash, idempotent)
     - Property test: **Property 81: Deep-link parameter parsing and URL rebuild**
@@ -2367,7 +2367,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Correctness Property 81, Testing Strategy V12 refinement (frontend files)_
     - Depends on: 60.3, 61.6
 
-  - [ ] 62.5 Write `v12BoardPatches.test.ts`
+  - [x] 62.5 Write `v12BoardPatches.test.ts`
     - Read `guidelines/frontend.md` first
     - fast-check over generated Board lists and patch sequences: deletion removes the id and keeps the order, a rename applies by `updated_at`, other fields including the counts stay unchanged, applying twice equals applying once, a list that already reflects the patches is unchanged, `parsePatches(JSON.stringify(p))` equals `p`, and invalid JSON gives the empty patches
     - Property test: **Property 82: Board patches merge**
@@ -2376,7 +2376,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Correctness Property 82, Testing Strategy V12 refinement (frontend files)_
     - Depends on: 60.4
 
-  - [ ] 62.6 Write `v12Counts.test.tsx`
+  - [x] 62.6 Write `v12Counts.test.tsx`
     - Read `guidelines/frontend.md` first
     - fast-check over `formatCount`; `BoardList` shows "0 members", "1 member", "2 members" and "0 cards", "1 card", "2 cards"; one link per Board card; a Board from `CreateBoardModal` shows "1 member" and "0 cards" with one POST and no GET; the displayed counts come only from the Board_Summary fields
     - Property test: **Property 83: Count text**
@@ -2385,7 +2385,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Correctness Property 83, Testing Strategy V12 refinement (frontend files)_
     - Depends on: 60.2, 61.7
 
-  - [ ] 62.7 Write `v12RenameDelete.test.tsx`
+  - [x] 62.7 Write `v12RenameDelete.test.tsx`
     - Read `guidelines/frontend.md` first
     - Gating table over `admin`, `manager`, `member`, and `guest` (controls only for the admin); rename validation (empty, spaces, 101 characters: field error, no request, text retained); trimmed PATCH; the same name closes with no request; a failing PATCH keeps the modal and the old `h1` and calls `handleError` once; delete cancel sends no request; confirm sends DELETE, disables the buttons, ignores Escape, writes the `sessionStorage` patch, and calls `push("/")`; a failing DELETE keeps the dialog open with enabled buttons and one error toast
     - Property test: **Property 74: Frontend `can` and role controls** (reused for the `edit_board` and `delete_board` gating)
@@ -2394,7 +2394,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Testing Strategy V12 refinement (frontend files), Correctness Property 74_
     - Depends on: 61.3, 61.4
 
-  - [ ] 62.8 Write `v12BoardDeepLink.test.tsx`
+  - [x] 62.8 Write `v12BoardDeepLink.test.tsx`
     - Read `guidelines/frontend.md` first
     - `BoardView` with `initialCardId` of a known Card: the modal is open after the first render without interaction, shows that Card's title, and `isNew` is false; an unknown id opens nothing and shows no toast; closing calls `history.replaceState` once with the URL without `card`; a re-render with new `columns` does not reopen; a guest sees the read-only modal; no `fetch` beyond the modal's own GET `/api/cards/<id>`; an Escape or close of a click-opened Card leaves the URL alone; the first of two `card` values opens that Card (through `resolveCardParam` and, where the existing page tests allow it, by awaiting the board page with `searchParams` `{ card: ["c1", "c2"] }`)
     - Property test: **Property 80: Deep-link resolution and the open-once rule**

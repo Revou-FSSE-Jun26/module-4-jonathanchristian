@@ -79,6 +79,8 @@ describe("Frontend repository rules (G-FE-03, G-FE-04, G-FE-20, G-BE-18)", () =>
       "LinkForm.tsx",
       "RoleSelect.tsx",
       "OverdueItemRow.tsx",
+      "RenameBoardModal.tsx",
+      "DeleteBoardControl.tsx",
     ]) {
       expect(basenames.has(required)).toBe(true);
     }
@@ -110,5 +112,24 @@ describe("Frontend repository rules (G-FE-03, G-FE-04, G-FE-20, G-BE-18)", () =>
     const footerPath = path.join(WEB_ROOT, "components", "Footer.tsx");
     const content = fs.readFileSync(footerPath, "utf8");
     expect(content).not.toMatch(/["']use client["']/);
+  });
+
+  it("enforces one exported hook per V12 hook file and BoardView line limit", () => {
+    for (const [file, hookName] of [
+      ["useCardDeepLink.ts", "useCardDeepLink"],
+      ["useBoardPatches.ts", "useBoardPatches"],
+    ]) {
+      const hookPath = path.join(WEB_ROOT, "hooks", file);
+      expect(fs.existsSync(hookPath)).toBe(true);
+      const content = fs.readFileSync(hookPath, "utf8");
+      const matches = Array.from(
+        content.matchAll(/export\s+function\s+(use[A-Za-z0-9_]*)\b/g)
+      );
+      expect(matches.map((m) => m[1])).toEqual([hookName]);
+    }
+
+    const boardViewPath = path.join(WEB_ROOT, "components", "boards", "BoardView.tsx");
+    const lineCount = fs.readFileSync(boardViewPath, "utf8").split(/\r?\n/).length;
+    expect(lineCount).toBeLessThanOrEqual(298);
   });
 });
