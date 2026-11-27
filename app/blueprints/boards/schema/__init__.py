@@ -3,6 +3,7 @@ from app.blueprints.boards.schema.board_schemas import (
     BoardCreateSchema,
     BoardDetailSchema,
     BoardSchema,
+    BoardSummarySchema,
     BoardUpdateSchema,
     ColumnDetailSchema,
 )
@@ -30,6 +31,7 @@ __all__ = [
     "BoardDetailSchema",
     "BoardMembership",
     "BoardSchema",
+    "BoardSummarySchema",
     "BoardUpdateSchema",
     "ColumnDetailSchema",
     "INVITE_ROLES",

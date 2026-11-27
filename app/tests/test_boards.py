@@ -33,7 +33,8 @@ def test_create_board_makes_creator_admin(client, make_user, auth_header, count_
 
     user = make_user()
     data = assert_envelope(client.post("/api/boards", json={"name": " Roadmap "}, headers=auth_header(user)), 201)
-    assert set(data) == {"board_id", "name", "my_role", "created_at", "updated_at"}
+    assert set(data) == {"board_id", "name", "my_role", "created_at", "updated_at", "member_count", "card_count"}
+    assert (data["member_count"], data["card_count"]) == (1, 0)
     assert (data["name"], data["my_role"]) == ("Roadmap", "admin")
     board_id = uuid.UUID(data["board_id"])
     assert fetch(Board, board_id).created_by == user.user_id
@@ -104,6 +105,8 @@ def test_list_boards_returns_only_own_boards_newest_first(
         str(first.board_id),
     ]
     assert [b["my_role"] for b in data] == ["admin", "member", "admin"]
+    assert all(set(b) == {"board_id", "name", "my_role", "created_at", "updated_at", "member_count", "card_count"} for b in data)
+    assert [(b["member_count"], b["card_count"]) for b in data] == [(1, 0), (2, 0), (1, 0)]
 
 
 def test_list_boards_is_empty_without_boards(client, make_user, auth_header):
@@ -139,6 +142,8 @@ def test_admin_can_rename_board(client, make_board, auth_header, fetch):
         200,
     )
     assert (data["name"], data["my_role"]) == ("New", "admin")
+    assert set(data) == {"board_id", "name", "my_role", "created_at", "updated_at", "member_count", "card_count"}
+    assert (data["member_count"], data["card_count"]) == (1, 0)
     assert fetch(Board, board.board_id).name == "New"
 
 

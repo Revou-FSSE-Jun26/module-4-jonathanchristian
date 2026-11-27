@@ -56,7 +56,7 @@ app/
   openapi.yaml         API reference for frontend development
 ```
 
-Each feature package follows the same split: `routes.py` parses input and returns `ok(...)`, `service.py` holds the logic and queries, and `schema.py` holds the SQLAlchemy model and Marshmallow schemas. The boards package also owns the invitation links (`service/invite_service.py`, `service/accept.py`, `routes/invite_routes.py`); the card status rule is the pure function `apply_status_change` in `cards/service/status.py`. The `cards` package also owns the checklist (`service/checklist_service.py`, `routes/checklist_routes.py`), the workspace links (`service/link_service.py`, `routes/link_routes.py`, the pure URL rule `schema/url_rules.py`), and the per-card counts (`service/counts.py`). Overdue cards are computed on read by `notifications/service/overdue_service.py`.
+Each feature package follows the same split: `routes.py` parses input and returns `ok(...)`, `service.py` holds the logic and queries, and `schema.py` holds the SQLAlchemy model and Marshmallow schemas. The boards package also owns the invitation links (`service/invite_service.py`, `service/accept.py`, `routes/invite_routes.py`); the card status rule is the pure function `apply_status_change` in `cards/service/status.py`. The `cards` package also owns the checklist (`service/checklist_service.py`, `routes/checklist_routes.py`), the workspace links (`service/link_service.py`, `routes/link_routes.py`, the pure URL rule `schema/url_rules.py`), and the per-card counts (`service/counts.py`). The per-board member and card counts of the board list live in `boards/service/board_counts.py`. Overdue cards are computed on read by `notifications/service/overdue_service.py`.
 
 ## Database schema
 
@@ -118,10 +118,10 @@ All paths are under `/api`. The full request and response reference, with exampl
 | POST | `/api/auth/refresh` | refresh token | New access token |
 | GET | `/api/users/me` | user | Own profile |
 | PATCH | `/api/users/me` | user | Update `name` and/or `password` (with `current_password`); an `email` field is always 400 |
-| POST | `/api/boards` | user | Create board, caller becomes admin, both invitation tokens are created (201) |
-| GET | `/api/boards` | user | List own boards (with `my_role`), newest first |
-| GET | `/api/boards/<id>` | participant | Board with columns and cards (each card carries `checklist_done`, `checklist_total`, `link_count`) |
-| PATCH | `/api/boards/<id>` | admin | Rename board |
+| POST | `/api/boards` | user | Create board, caller becomes admin, both invitation tokens are created (201); the response carries `member_count` 1 and `card_count` 0 |
+| GET | `/api/boards` | user | List own boards (with `my_role`, `member_count`, and `card_count`), newest first |
+| GET | `/api/boards/<id>` | participant | Board with columns and cards, without the two board counts (each card carries `checklist_done`, `checklist_total`, `link_count`) |
+| PATCH | `/api/boards/<id>` | admin | Rename board; the response carries the current `member_count` and `card_count` |
 | DELETE | `/api/boards/<id>` | admin | Soft delete board tree |
 | POST | `/api/boards/<id>/members` | manager | Add member by email, always role `member` (201) |
 | GET | `/api/boards/<id>/members` | participant | List members with roles |
@@ -156,6 +156,10 @@ All paths are under `/api`. The full request and response reference, with exampl
 | GET | `/api/notifications/overdue` | user | Own overdue cards (computed on read, nothing stored) |
 | PATCH | `/api/notifications/<id>/read` | recipient | Mark as read (idempotent) |
 | GET | `/api/boards/<id>/analytics` | admin | Cards per column, completed this week, member activity |
+
+### Board counts
+
+The board list shows how big each board is. `GET /api/boards`, `POST /api/boards`, and `PATCH /api/boards/<id>` return two extra integers on every board: `member_count` (non-deleted memberships of any role, so guests and managers count) and `card_count` (non-deleted cards, whatever their column, assignee, or status). They are never stored: they are counted on every read by `boards/service/board_counts.py` with two grouped queries for any number of boards, so `GET /api/boards` runs at most 4 queries (2 for a user without boards) however many boards, members, or cards exist. A new board answers 1 and 0 without a query. `GET /api/boards/<id>` does not carry the two fields. V12 adds no table, column, constraint, or index, so there is no new migration.
 
 ### Card status
 

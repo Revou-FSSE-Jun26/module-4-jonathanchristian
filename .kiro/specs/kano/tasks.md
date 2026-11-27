@@ -2170,8 +2170,8 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Testing Strategy V12 refinement (order of work, step 2)_
     - Depends on: 57.3
 
-- [ ] 58. Phase 33 (V12): Backend counts (no migration)
-  - [ ] 58.1 Add the counts helper `board_counts.py`
+- [x] 58. Phase 33 (V12): Backend counts (no migration)
+  - [x] 58.1 Add the counts helper `board_counts.py`
     - Read `guidelines/backend.md` and `guidelines/database.md` first
     - `app/blueprints/boards/service/board_counts.py` exactly as design A22-R: `_grouped(model, board_ids)` runs one grouped `select(model.board_id, func.count())` with `active(model)`; `board_counts(board_ids)` returns `{board_id: (member_count, card_count)}` with two grouped queries for any number of ids and none for `[]`; `board_counts_one(board_id)`. Import `BoardMembership` from `boards/schema` and `Card` from `cards/schema` (models only through another package's `schema`). Do not name the module `counts.py` or a function `counts_for_board`: `board_service.py` already imports `counts_for_board` from `cards/service/counts.py`
     - No model, column, constraint, or index change and no migration file (Requirement 47 criterion 8)
@@ -2179,21 +2179,21 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: A22-R (module `board_counts.py`), D24_
     - Depends on: 57.4
 
-  - [ ] 58.2 Add `BoardSummarySchema` and the count values to list, create, and update
+  - [x] 58.2 Add `BoardSummarySchema` and the count values to list, create, and update
     - Read `guidelines/backend.md` and `guidelines/database.md` first
     - `board_schemas.py`: `BoardSummarySchema(BoardSchema)` with `member_count` and `card_count` integers; export it from `schema/__init__.py`; `BoardSchema` and `BoardDetailSchema` stay unchanged so GET `/api/boards/<id>` keeps its keys. `board_service.py`: `serialize_board(board, role, counts)`; `list_boards` calls `board_counts` once for all ids; `create_board` passes the literals `(1, 0)`; `update_board` calls `board_counts_one` after the commit. `board_routes.py` is unchanged. GET `/api/boards` runs at most 4 queries including the JWT user lookup
     - _Requirements: 47.1, 47.4, 47.5, 47.6, 47.7, 8.13, 44.7, 29.2_
     - _Design: A22-R (schema, service, query budget), D24_
     - Depends on: 58.1
 
-  - [ ] 58.3 Document `member_count` and `card_count` in `app/openapi.yaml`
+  - [x] 58.3 Document `member_count` and `card_count` in `app/openapi.yaml`
     - Read `guidelines/backend.md` first
     - New component `BoardSummary` (`allOf: [Board, {member_count: integer >= 0, card_count: integer >= 0, both required}]`) with the descriptions of Requirement 47 criteria 2 and 3; point the GET `/api/boards` array items and the data of `BoardEnvelope` (used by POST and PATCH `/api/boards`) at `BoardSummary`; `Board` and `BoardDetail` stay unchanged
     - _Requirements: 47.9, 8.13_
     - _Design: A22-R (OpenAPI)_
     - Depends on: 58.2
 
-  - [ ] 58.4 Update the existing board tests that V12 changes
+  - [x] 58.4 Update the existing board tests that V12 changes
     - Read `guidelines/backend.md` and `guidelines/database.md` first
     - In `app/tests/test_boards.py` and `app/tests/test_boards_roles.py` extend every assertion of the exact key set of the list, create, or update response with `member_count` and `card_count`; check that the monkeypatches of `board_service._new_membership` still work; `test_board_detail.py` keeps its key set and its 5-query budget unchanged. Never delete or weaken an assertion
     - Supersedes the key-set assertions of tasks 8.1 and 8.2 for the list, create, and update responses; those stay as history
@@ -2201,14 +2201,14 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Testing Strategy V12 refinement (existing tests, backend)_
     - Depends on: 58.2, 5.1
 
-  - [ ] 58.5 Write `app/tests/test_board_counts.py`
+  - [x] 58.5 Write `app/tests/test_board_counts.py`
     - Read `guidelines/backend.md` and `guidelines/database.md` first
     - Examples: a Board with only its creator gives 1 and 0; adding a `member`, a `manager`, and a `guest` gives 4; soft-deleting one membership gives 3; two Cards in two Columns of which one is soft deleted give 1; the Cards and memberships of a second Board are not counted; POST `/api/boards` returns 1 and 0; PATCH returns the current counts after members and Cards exist; GET `/api/boards/<id>` contains neither key
     - _Requirements: 47.2, 47.3, 47.5, 47.6, 47.7, 48.1, 31.26_
     - _Design: Testing Strategy V12 refinement (backend, `test_board_counts.py`)_
     - Depends on: 58.2, 5.1
 
-  - [ ] 58.6 Write the query budget test and the property test for Property 77
+  - [x] 58.6 Write the query budget test and the property test for Property 77
     - Read `guidelines/backend.md` and `guidelines/database.md` first
     - File `app/tests/test_board_counts_budget.py`: with the existing `query_counter` fixture, GET `/api/boards` for 1 Board and for 5 Boards with different numbers of Cards and members runs at most 4 queries and the same number in both cases; a User with 0 Boards is not compared (2 queries, design A22-R)
     - Property test (Hypothesis, `max_examples=100`, database reset inside the test body): **Property 77: Board list query count is constant** over 0 to 20 Boards with random memberships and Cards. Tag `# Feature: kano, Property 77: Board list query count is constant`
@@ -2217,7 +2217,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Correctness Property 77, A22-R (query budget)_
     - Depends on: 58.5
 
-  - [ ] 58.7 Write the property tests for Properties 76, 78, and 79
+  - [x] 58.7 Write the property tests for Properties 76, 78, and 79
     - Read `guidelines/backend.md` and `guidelines/database.md` first
     - File `app/tests/test_board_counts_properties.py`, Hypothesis with `max_examples=100` and the database reset inside the test body: **Property 76: Board counts equal a naive model** (random memberships of all roles, some soft deleted, and Cards, some soft deleted, over 1 to 4 Boards compared with a naive Python count through `board_counts` and GET `/api/boards`); **Property 78: Create and update carry the right counts**; **Property 79: Board detail never carries the counts** (one Hypothesis test each over random seeds). Property 76 and 78 name `counts_for_boards` in the design text; this task tests `board_counts` and `board_counts_one` (design A22-R). Tag every test `# Feature: kano, Property <n>: <text>`
     - **Validates: Requirements 47.2, 47.3, 47.5, 47.6, 47.7**
@@ -2225,7 +2225,7 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - _Design: Correctness Properties 76, 78, 79_
     - Depends on: 58.5
 
-- [ ] 59. V12 backend checkpoint
+- [x] 59. V12 backend checkpoint
   - Run `pytest -v` from `app/`; run `scripts/check_file_size.py` over `app/` and `scripts/check_repo_hygiene.py`; confirm that no backend file is over 300 lines and that `git status` shows no new file under `app/migrations/`
   - Ensure all tests pass, ask the user if questions arise
   - Frontend V12 tasks (60 onward) depend on this checkpoint

@@ -32,6 +32,13 @@ class BoardSchema(Schema):
     updated_at = UtcDateTime()
 
 
+class BoardSummarySchema(BoardSchema):
+    """Board_Summary of GET, POST, and PATCH /api/boards (R47.1): BoardSchema plus the two counts."""
+
+    member_count = fields.Integer()
+    card_count = fields.Integer()
+
+
 class ColumnDetailSchema(ColumnSchema):
     cards = fields.List(fields.Nested(CardSchema))
 

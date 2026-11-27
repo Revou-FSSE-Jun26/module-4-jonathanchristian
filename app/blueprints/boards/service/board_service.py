@@ -8,9 +8,10 @@ from app.blueprints.boards.schema import (
     Board,
     BoardDetailSchema,
     BoardMembership,
-    BoardSchema,
+    BoardSummarySchema,
 )
 from app.blueprints.boards.service import cascade, invite_service as invites
+from app.blueprints.boards.service.board_counts import board_counts, board_counts_one
 from app.blueprints.cards.schema import Card
 from app.blueprints.cards.service.counts import NO_COUNTS, apply_counts, counts_for_board
 from app.blueprints.columns.schema import Column
@@ -18,12 +19,14 @@ from app.extensions import db
 from app.permissions import ADMIN, require_board_admin, require_board_reader
 from app.soft_delete import active
 
-board_schema = BoardSchema()
+board_schema = BoardSummarySchema()
 board_detail_schema = BoardDetailSchema()
 
 
-def serialize_board(board, role):
+def serialize_board(board, role, counts):
+    """Dump a Board_Summary; `counts` is `(member_count, card_count)`."""
     board.my_role = role
+    board.member_count, board.card_count = counts
     return board_schema.dump(board)
 
 
@@ -45,7 +48,8 @@ def create_board(user, data):
     db.session.flush()  # the Board row exists; the membership follows in the same transaction
     db.session.add(_new_membership(board, user, ADMIN))
     db.session.commit()
-    return serialize_board(board, ADMIN)
+    # The creator's membership is the only one and a new Board has no Card: no query needed (R47.5).
+    return serialize_board(board, ADMIN, (1, 0))
 
 
 def list_boards(user):
@@ -55,7 +59,8 @@ def list_boards(user):
         .where(BoardMembership.user_id == user.user_id, active(BoardMembership), active(Board))
         .order_by(Board.created_at.desc(), Board.board_id.desc())
     ).all()
-    return [serialize_board(board, role) for board, role in rows]
+    counts = board_counts([board.board_id for board, _ in rows])
+    return [serialize_board(board, role, counts[board.board_id]) for board, role in rows]
 
 
 def get_board_detail(user, board_id):
@@ -93,7 +98,7 @@ def update_board(user, board_id, load_data):
     data = load_data()  # validated after the 404/403 checks
     board.name = data["name"]
     db.session.commit()
-    return serialize_board(board, membership.role)
+    return serialize_board(board, membership.role, board_counts_one(board_id))
 
 
 def delete_board(user, board_id):

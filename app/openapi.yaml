@@ -235,7 +235,7 @@ paths:
                 properties:
                   data:
                     type: array
-                    items: { $ref: "#/components/schemas/Board" }
+                    items: { $ref: "#/components/schemas/BoardSummary" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
   /api/boards/{board_id}:
@@ -1405,6 +1405,15 @@ components:
         my_role: { type: string, enum: [admin, manager, member, guest], description: The caller's role on this board }
         created_at: { type: string, format: date-time }
         updated_at: { type: string, format: date-time }
+    BoardSummary:
+      description: A Board as returned by GET, POST, and PATCH `/api/boards`. GET `/api/boards/{board_id}` (`BoardDetail`) does not carry the two counts.
+      allOf:
+        - $ref: "#/components/schemas/Board"
+        - type: object
+          required: [member_count, card_count]
+          properties:
+            member_count: { type: integer, minimum: 0, description: Number of non-deleted board memberships of any role (admin, manager, member, and guest) }
+            card_count: { type: integer, minimum: 0, description: Number of non-deleted cards on the board, whatever their column, assignee, or status }
     Member:
       type: object
       properties:
@@ -1611,7 +1620,7 @@ components:
     BoardEnvelope:
       type: object
       properties:
-        data: { $ref: "#/components/schemas/Board" }
+        data: { $ref: "#/components/schemas/BoardSummary" }
     BoardDetailEnvelope:
       type: object
       properties:
