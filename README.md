@@ -99,7 +99,7 @@ The server side was developed and validated using Claude Code. It managed the **
    py -m venv venv
    venv\Scripts\activate
    ```
-3. Install the backend dependencies from `app/requirements.txt`:
+3. Install the backend dependencies from `app/requirements.txt` (it includes the pinned list in the root `requirements.txt`):
    ```powershell
    py -m pip install -r requirements.txt
    ```

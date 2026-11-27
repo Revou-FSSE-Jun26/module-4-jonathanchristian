@@ -832,3 +832,22 @@ Recommendation for the next requirements revision: reword Requirement 46 criteri
 - Docs: the `docs/deployment.md` entrypoint note is rewritten.
 - Tasks: 70.5 fallback marked done; new task 70.6.
 - Verification: local only. From the repository root, `import index` loads the app, and `GET /api/health` through the Flask test client returns `200 {"data":{"status":"ok"}}`. Not yet verified on Vercel (task 70.6, manual step).
+
+## V15 - 2026-11-28
+### Changes
+- Specification change: Requirement 1 criterion 11 now places the pinned backend dependencies in the repository root `requirements.txt`; `app/requirements.txt` contains only `-r ../requirements.txt`. The V1 to V14 wording is kept inside the criterion.
+  - Before: "THE Kano_API SHALL list Flask, … and pytest in `app/requirements.txt`, each pinned to an exact version (`name==version`)."
+  - After: "THE Kano_API SHALL list Flask, … and pytest in the repository root `requirements.txt`, each pinned to an exact version (`name==version`), and `app/requirements.txt` SHALL contain no package line of its own, only `-r ../requirements.txt` …"
+- Design change: added D10 (V15 refinement), which supersedes the `requirements.txt` part of D10 (V14 refinement). Updated the `app/` folder tree entry and the backend deployment text (V12 wording kept, V15 note added).
+- Implementation change: root `requirements.txt` now holds the 28 pins (same versions, unchanged); `app/requirements.txt` is `-r ../requirements.txt`. No application code changed.
+- Guideline change (user-approved): `guidelines/backend.md` naming rule and example now name the root `requirements.txt`.
+- Docs: `README.md` install step, `app/README.md` (project layout line for `wsgi.py`, and the deployment paragraph, which wrongly said Vercel uses `app/` as the project root), and `docs/deployment.md` entrypoint note.
+- Bug fix: the deployment of commit `1c3e939` still failed with `ModuleNotFoundError: No module named 'app'`. The build log showed the virtual environment at `/vercel/path0/app/.vercel/python/.venv`, `Installing required dependencies from app/requirements.txt`, and "No Python version specified" although the root has `.python-version`. Cause as diagnosed: Vercel picks the Python project root from the manifest that declares Flask, which was only `app/requirements.txt`. Not yet verified by a new deployment.
+### Reason
+- Requested by the user (option A of the conflict raised against Requirement 1.11 and `guidelines/backend.md`): the backend must deploy on Vercel (Requirements 34.1 and 34.7).
+### Impact
+- Requirements: 1.11 changed.
+- Design: D10 (V15 refinement); `app/` folder tree; Vercel backend deployment text.
+- Tasks: new task 70.7. Task 2.1 (which created `app/requirements.txt`) is kept as history.
+- Breaking changes: developer workflow only. New pins go into the root `requirements.txt`; `pip freeze > app/requirements.txt` must no longer be used. `pip install -r requirements.txt` from `app/` is unchanged.
+- Verification: local only (pip resolution from `app/`, and `import index` with `/api/health` returning 200). If the Vercel build still uses `app/`, correct this entry, do not remove it.

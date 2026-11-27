@@ -81,9 +81,9 @@ Every new entry must keep the Rule / Rationale / Kano Example structure.
 - **Kano Example:** the generic `Exception` handler in `app/errors.py` calls `db.session.rollback()` and `logger.exception(...)`.
 
 ### G-BE-16: Python naming and dependency install
-- **Rule:** Follow PEP 8 (PascalCase classes, snake_case everything else) and install packages only with `py -m pip install <name>` into the existing `app/venv`, pinning exact versions in `app/requirements.txt`.
+- **Rule:** Follow PEP 8 (PascalCase classes, snake_case everything else) and install packages only with `py -m pip install <name>` into the existing `app/venv`, pinning exact versions in the repository root `requirements.txt` (`app/requirements.txt` only contains `-r ../requirements.txt`; spec V15, Requirement 1.11).
 - **Rationale:** Consistent names and pinned versions make the project reproducible.
-- **Kano Example:** `class CardCreateSchema`, `def next_last_order(...)`, `Flask-Migrate==<version>` in `app/requirements.txt`.
+- **Kano Example:** `class CardCreateSchema`, `def next_last_order(...)`, `Flask-Migrate==<version>` in the root `requirements.txt`.
 
 ### G-BE-17: pytest conventions
 - **Rule:** Name tests `test_<behavior>` in `app/tests/`, run them only against the database in `TEST_DATABASE_URL` (a name ending in `_test`, never `DATABASE_URL`), and have each test create its own data and assert the envelope shape and status code.

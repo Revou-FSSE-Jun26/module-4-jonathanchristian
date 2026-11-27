@@ -1,6 +1,6 @@
 # Implementation Plan: Kano
 
-**Version:** V14 (V14 adds task 70.5 for the root `pyproject.toml` Vercel entrypoint and moves the manual redeploy checks of task 70 after it; V13 text follows) V13 (V13 adds task 70 for the backend Vercel deployment fix: remove the root `vercel.json`, add `.python-version`, and verify the function deploys; all earlier tasks and checkboxes are unchanged and task 22.1 is kept as history; V12 text follows) V12 (V12 adds tasks 57 to 69 for board rename and delete on the board page, the My Tasks deep link, the member and card counts on the Dashboard, and the run-first baseline with fully passing `pytest`, `npm test`, and `npx playwright test`, with no table change; V11 adds tasks 44 to 56 for the URGENT status and label colors, the overdue notification, the card checklist, workspace links, and the Manager role, with 9 tables; V10 relaxed the screenshot set of tasks 23.4 and 23.5 to at least three images in `docs/screenshots/`; V1 to V5 tasks 1 to 22.2 preserved as history; V6 tasks added as 25 to 33; V7 narrows task 33.1; V8 frontend-only tasks added as 34 to 39; V9 footer tasks added as 40 to 43)
+**Version:** V15 (V15 adds task 70.7: the pinned dependencies move to the repository root `requirements.txt` and `app/requirements.txt` includes it, per Requirement 1 criterion 11 (V15); task 2.1 is kept as history; V14 text follows) V14 (V14 adds task 70.5 for the root `pyproject.toml` Vercel entrypoint and moves the manual redeploy checks of task 70 after it; V13 text follows) V13 (V13 adds task 70 for the backend Vercel deployment fix: remove the root `vercel.json`, add `.python-version`, and verify the function deploys; all earlier tasks and checkboxes are unchanged and task 22.1 is kept as history; V12 text follows) V12 (V12 adds tasks 57 to 69 for board rename and delete on the board page, the My Tasks deep link, the member and card counts on the Dashboard, and the run-first baseline with fully passing `pytest`, `npm test`, and `npx playwright test`, with no table change; V11 adds tasks 44 to 56 for the URGENT status and label colors, the overdue notification, the card checklist, workspace links, and the Manager role, with 9 tables; V10 relaxed the screenshot set of tasks 23.4 and 23.5 to at least three images in `docs/screenshots/`; V1 to V5 tasks 1 to 22.2 preserved as history; V6 tasks added as 25 to 33; V7 narrows task 33.1; V8 frontend-only tasks added as 34 to 39; V9 footer tasks added as 40 to 43)
 
 ## Overview
 
@@ -2724,3 +2724,11 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
   - _Requirements: 34.1, 34.7_
   - _Design: D10 (V14 refinement)_
   - Depends on: 70.5
+- [ ] 70.7 (V15) Declare the backend dependencies at the repository root
+  - [x] Move the pinned list (28 packages) from `app/requirements.txt` to the root `requirements.txt`; replace `app/requirements.txt` with `-r ../requirements.txt`
+  - [x] Update Requirement 1.11, D10 (V15 refinement), the `design.md` folder tree and deployment text, `guidelines/backend.md`, `README.md`, `app/README.md`, and `docs/deployment.md`
+  - [x] Local checks: `py -m pip install -r requirements.txt` from `app/` resolves all 28 pins through the root file with nothing to install; `import index` from the root still returns `200` on `GET /api/health`
+  - [ ] [MANUAL] Commit, push, and redeploy `kano-api` without build cache; the build log must show the venv at `/vercel/path0/.vercel/python/.venv`, `Installing required dependencies from requirements.txt`, and no "No Python version specified" warning; then `GET /api/health` returns 200 and the 70.2 and 70.3 checks run
+  - _Requirements: 1.11 (V15), 34.1, 34.7_
+  - _Design: D10 (V15 refinement)_
+  - Depends on: 70.6

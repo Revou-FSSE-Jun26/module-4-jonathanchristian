@@ -46,7 +46,7 @@ app/
   soft_delete.py       SoftDeleteMixin, active(), soft_delete_where()
   ordering.py          FLOAT order formulas
   health.py            GET /api/health
-  wsgi.py              entry point for flask run / gunicorn / Vercel
+  wsgi.py              entry point for flask run / gunicorn (Vercel loads it through the root index.py)
   blueprints/<feature>/ routes.py, service.py, schema.py (each may be a package once it nears 300 lines:
                        boards, cards, and notifications are packages: boards has routes/, service/, schema/;
                        cards has routes/, service/, schema/; notifications has routes/ and service/)
@@ -266,7 +266,7 @@ The suite refuses to run unless `TEST_DATABASE_URL` is set, differs from `DATABA
 
 ## Deployment note
 
-The backend is meant to run on Vercel (Python runtime) with `app/` as the project root; Railway is an alternative. Set the same environment variables there. The local virtual environment uses Python 3.14, and a `psycopg2-binary` wheel for that version may not exist on every platform or hosting runtime. If installation fails, pin a supported Python version (for example with a `.python-version` file) or switch the driver (`psycopg2` built from source, or `psycopg[binary]`, which also changes the URL prefix to `postgresql+psycopg://`).
+The backend is meant to run on Vercel (Python runtime) with the repository root as the project root (not `app/`), Framework Preset Flask, the root `index.py` as entrypoint, and the pinned dependencies in the root `requirements.txt`; see `../docs/deployment.md`. Railway is an alternative. Set the same environment variables there. The local virtual environment uses Python 3.14, and a `psycopg2-binary` wheel for that version may not exist on every platform or hosting runtime. The root `.python-version` pins `3.12` for Vercel. If installation still fails, switch the driver (`psycopg2` built from source, or `psycopg[binary]`, which also changes the URL prefix to `postgresql+psycopg://`).
 
 ## Further reading
 
