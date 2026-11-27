@@ -1,0 +1,6 @@
+# Vercel ignore rules for the kano-web project (Root Directory: web).
+# Vercel uses this file instead of the repository-root .vercelignore, which excludes web/ for kano-api.
+# Do not delete it: without it, the root file removes the whole frontend before the build.
+debug.log
+playwright-report
+test-results

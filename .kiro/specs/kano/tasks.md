@@ -2732,3 +2732,11 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
   - _Requirements: 1.11 (V15), 34.1, 34.7_
   - _Design: D10 (V15 refinement)_
   - Depends on: 70.6
+- [ ] 70.8 Frontend Vercel deployment: project-level `.vercelignore` (implementation change, no version bump)
+  - [x] Add `web/.vercelignore` (comments plus git-ignored `debug.log`, `playwright-report`, `test-results`) so the `kano-web` project no longer falls back to the repository-root `.vercelignore`, whose `web/` entry removed the whole frontend (`NEXT_NO_VERSION`)
+  - [x] Add a Root Directory and per-project `.vercelignore` warning to `docs/deployment.md` section 1
+  - [ ] [MANUAL] Push and redeploy `kano-web` (Root Directory `web`, preset Next.js, `NEXT_PUBLIC_API_BASE_URL` and `API_BASE_URL` set); the build log must list no `/web/...` path under "Removed … ignored files"
+  - [ ] [MANUAL] Set `CORS_ORIGINS` on `kano-api` to the exact `kano-web` production origin, redeploy `kano-api`, and run the browser checks of `docs/deployment.md` section 4
+  - _Requirements: 34.1, 34.7_
+  - _Design: D10_
+  - Depends on: 70.7

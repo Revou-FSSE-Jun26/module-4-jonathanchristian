@@ -11,6 +11,11 @@ This guide covers deploying the Kano monorepo as two separate Vercel projects (`
 | `kano-api` | Repository root (`.`), Framework Preset **Flask** | Vercel Python runtime, auto-detected (no `vercel.json`) | `app/wsgi.py` |
 | `kano-web` | `web/` | Next.js | `npm run build` |
 
+> [!WARNING]
+> **Root Directory is the most important setting.** `kano-api` must use the repository root (leave it empty, never `app`), and `kano-web` must use `web`. With `app`, Vercel builds from inside `app/`: it ignores the root `.python-version` and `index.py`, flattens `app/` into `/var/task`, and every request fails with `ModuleNotFoundError: No module named 'app'`.
+>
+> **`.vercelignore` per project.** Vercel uses the `.vercelignore` in a project's Root Directory and only falls back to the repository-root file when there is none. The root `.vercelignore` excludes `web/` (for `kano-api`), so `web/.vercelignore` must exist. Without it, the `kano-web` build removes the whole frontend and fails with `NEXT_NO_VERSION`.
+
 > [!IMPORTANT]
 > Disable **Vercel Deployment Protection** on both projects so `kano-api` and `kano-web` are reachable over HTTPS without a Vercel login. Otherwise browser requests and Playwright E2E checks will be blocked by Vercel's auth wall.
 

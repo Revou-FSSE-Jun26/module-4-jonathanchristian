@@ -14,7 +14,7 @@ Kano is a Trello-like task management app. Users create boards, organize work in
 
 | Project | Public URL |
 |---|---|
-| Kano_API | `PENDING: https://<kano-api>.vercel.app` |
+| Kano_API | `https://kano-app-seven.vercel.app/` |
 | Kano_Web | `PENDING: https://<kano-web>.vercel.app` |
 
 > [!NOTE]  

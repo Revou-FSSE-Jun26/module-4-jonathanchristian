@@ -851,3 +851,15 @@ Recommendation for the next requirements revision: reword Requirement 46 criteri
 - Tasks: new task 70.7. Task 2.1 (which created `app/requirements.txt`) is kept as history.
 - Breaking changes: developer workflow only. New pins go into the root `requirements.txt`; `pip freeze > app/requirements.txt` must no longer be used. `pip install -r requirements.txt` from `app/` is unchanged.
 - Verification: local only (pip resolution from `app/`, and `import index` with `/api/health` returning 200). If the Vercel build still uses `app/`, correct this entry, do not remove it.
+
+### V15 correction and frontend deployment fix - 2026-11-28 (no version bump)
+#### Bug fix (root cause of the V13 to V15 backend failures, corrected record)
+- The `kano-api` Vercel project had Root Directory `app` throughout V13, V14, and V15. After it was cleared (repository root), the backend deployed and `/api/health` answered on Vercel. This was verified by the user on the deployment of commit `e7557ad`.
+- The causes recorded in V13 (legacy `builds` key), V14 (Vercel ignoring `tool.vercel.entrypoint`), and V15 (Flask detected only in `app/requirements.txt`) were wrong. Each failure came from the `app` Root Directory: Vercel built from inside `app/`, so it never read the root `vercel.json`, `pyproject.toml`, `.python-version`, `index.py`, or `requirements.txt`, and `../requirements.txt` was outside the build. The V13 to V15 entries are kept as history.
+- The V13 to V15 changes are still in place and deploy correctly: no `vercel.json`, root `index.py`, root `.python-version`, and the pinned list in the root `requirements.txt` (Requirement 1.11 as of V15). Whether to keep or revert any of them is an open decision for the user. Requirement 1.11 (V15) is the change most likely to be reverted, because it was made for a cause that turned out to be wrong.
+#### Implementation change (frontend)
+- Added `web/.vercelignore`. The first `kano-web` build (commit `e7557ad`, Root Directory `web`) used the repository-root `.vercelignore`, whose `web/` entry removed every frontend file, and failed with `NEXT_NO_VERSION`. Vercel uses a `.vercelignore` in the project's Root Directory when one exists (Vercel docs, ".vercelignore", Monorepos), so the root file still applies only to `kano-api`.
+- `docs/deployment.md` section 1 has a warning about the Root Directory and the per-project `.vercelignore`.
+#### Impact
+- Requirements: none. Design: none (the root `.vercelignore` described in the deployment section is unchanged). Tasks: new task 70.8.
+- Not yet verified: the `kano-web` build with `web/.vercelignore`.
