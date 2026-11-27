@@ -811,3 +811,17 @@ Recommendation for the next requirements revision: reword Requirement 46 criteri
 - Tasks: new task 70 (70.1 done; 70.2 to 70.4 manual and open). Task 22.1 is unchanged and kept as history.
 - Breaking changes: none for the API. Anyone who relied on the root `vercel.json` must use Framework Preset Flask.
 - Open: the fix is unverified until 70.2 and 70.3 pass. If it fails, this entry must be corrected, not removed.
+
+## V14 - 2026-11-28
+### Changes
+- Design change: added a root `pyproject.toml` with `[tool.vercel] entrypoint = "app.wsgi:app"`. Added D10 (V14 refinement) in `design.md`. V13 text is kept.
+- Implementation change: created `pyproject.toml`; updated `docs/deployment.md` (entrypoint note). `app/wsgi.py` and all application code are unchanged.
+- Bug fix: after V13, the function deployed but every request failed with `ModuleNotFoundError: No module named 'app'` raised from `/var/task/wsgi.py` line 9. Cause as diagnosed: Vercel treated `app/` as the source root and copied its contents to `/var/task`, so the package `app` did not exist. Not yet verified by a new deployment.
+### Reason
+- The deployed backend must serve `/api/health` (Requirements 34.1 and 34.7 are unchanged).
+### Impact
+- Requirements: none (version header only).
+- Design: D10 gains a V14 refinement.
+- Tasks: new task 70.5. Tasks 70.2 to 70.4 stay open and must run after 70.5.
+- Breaking changes: none.
+- Open and unverified: dependency discovery. Dependencies are only in `app/requirements.txt`; if the next log shows a missing module, add a root `requirements.txt` with `-r app/requirements.txt`. Fallback for the entrypoint: a root `index.py`. If the fix fails, correct this entry, do not remove it.

@@ -1,6 +1,6 @@
 # Implementation Plan: Kano
 
-**Version:** V13 (V13 adds task 70 for the backend Vercel deployment fix: remove the root `vercel.json`, add `.python-version`, and verify the function deploys; all earlier tasks and checkboxes are unchanged and task 22.1 is kept as history; V12 text follows) V12 (V12 adds tasks 57 to 69 for board rename and delete on the board page, the My Tasks deep link, the member and card counts on the Dashboard, and the run-first baseline with fully passing `pytest`, `npm test`, and `npx playwright test`, with no table change; V11 adds tasks 44 to 56 for the URGENT status and label colors, the overdue notification, the card checklist, workspace links, and the Manager role, with 9 tables; V10 relaxed the screenshot set of tasks 23.4 and 23.5 to at least three images in `docs/screenshots/`; V1 to V5 tasks 1 to 22.2 preserved as history; V6 tasks added as 25 to 33; V7 narrows task 33.1; V8 frontend-only tasks added as 34 to 39; V9 footer tasks added as 40 to 43)
+**Version:** V14 (V14 adds task 70.5 for the root `pyproject.toml` Vercel entrypoint and moves the manual redeploy checks of task 70 after it; V13 text follows) V13 (V13 adds task 70 for the backend Vercel deployment fix: remove the root `vercel.json`, add `.python-version`, and verify the function deploys; all earlier tasks and checkboxes are unchanged and task 22.1 is kept as history; V12 text follows) V12 (V12 adds tasks 57 to 69 for board rename and delete on the board page, the My Tasks deep link, the member and card counts on the Dashboard, and the run-first baseline with fully passing `pytest`, `npm test`, and `npx playwright test`, with no table change; V11 adds tasks 44 to 56 for the URGENT status and label colors, the overdue notification, the card checklist, workspace links, and the Manager role, with 9 tables; V10 relaxed the screenshot set of tasks 23.4 and 23.5 to at least three images in `docs/screenshots/`; V1 to V5 tasks 1 to 22.2 preserved as history; V6 tasks added as 25 to 33; V7 narrows task 33.1; V8 frontend-only tasks added as 34 to 39; V9 footer tasks added as 40 to 43)
 
 ## Overview
 
@@ -2710,3 +2710,10 @@ Kano is built backend first, then frontend, as the user ordered. Phases: 0 found
     - Depends on: 70.2
   - [ ] 70.4 [MANUAL] If the build fails on Python or `psycopg2-binary`, read the build log and fix from it (for example `psycopg[binary]`); record the result in `docs/deployment.md`
     - Depends on: 70.2
+- [ ] 70.5 (V14) Add the root `pyproject.toml` with `[tool.vercel] entrypoint = "app.wsgi:app"`, because Vercel otherwise copies `app/` contents to `/var/task` and `from app import create_app` fails with `ModuleNotFoundError`
+  - [x] Create `pyproject.toml` and update `docs/deployment.md` (done)
+  - [ ] [MANUAL] Redeploy, call `GET /api/health`, and confirm the traceback is gone (rerun 70.2 and 70.3 checks after this task)
+  - [ ] [MANUAL] If it still fails: add a root `index.py` (`from app.wsgi import app`); if the log reports a missing dependency, add a root `requirements.txt` with `-r app/requirements.txt`; record the outcome in `docs/deployment.md`
+  - _Requirements: 34.1, 34.7_
+  - _Design: D10 (V14 refinement)_
+  - Depends on: 70.1
