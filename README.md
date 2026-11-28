@@ -172,6 +172,14 @@ py scripts/check_readme_links.py
 | **Welcome page:** the landing page for first-time visitors, with a sample board and a card being dragged into In progress | ![Welcome page with a sample Kanban board and a card mid-drag](docs/screenshots/welcome.png) |
 | **Dashboard:** all boards of the signed-in user, each with the user's role (admin, member, or guest), member avatars, and last activity | ![Dashboard listing seven boards with role badges](docs/screenshots/dashboard-page.png) |
 | **Board Detail:** the Mobile App Redesign board with Backlog, In Progress, Review, and Done columns, labels, assignees, due dates, card search, Members, and Analytics | ![Board detail page with four columns of cards](docs/screenshots/board-content-page.png) |
+| **Register:** the account creation form with name, email, and password fields and a link to the login page | ![Register page with a Create your account form](docs/screenshots/register-page.png) |
+| **Login:** the sign-in form with email and password fields and a link to the register page | ![Login page with a Log in to Kano form](docs/screenshots/login-page.png) |
+| **Create board:** the dialog opened from the Dashboard, where a board name is entered (here, Server Deployment) | ![Create board dialog over an empty Dashboard](docs/screenshots/create-board.png) |
+| **Card details:** the card modal with title, description, due date, assignee, status, labels, checklist, workspace links, and comments | ![Card details modal for the card Create Roadmap Plan](docs/screenshots/card-details-modal.png) |
+| **Board members:** the board admin adds members by email and copies or regenerates the member (can edit) and guest (view only) invitation links | ![Board members dialog with invitation links](docs/screenshots/member-list-modal.png) |
+| **My Tasks:** every card assigned to the signed-in user, grouped by board, with its column, status, and due date, and an Open board link | ![My Tasks page listing one assigned card on the Server Deployment board](docs/screenshots/my-tasks.png) |
+| **Notifications:** the bell dropdown with an unread count badge, showing an assignment notification with a Mark as read action | ![Notifications dropdown with one unread assignment notification](docs/screenshots/notification-bar.png) |
+| **Edit profile:** change the display name or password. The email is shown but cannot be edited | ![Profile page with name and change password fields](docs/screenshots/edit-profile.png) |
 
 ## Security note
 
